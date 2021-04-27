@@ -19,16 +19,6 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
-    container-job:
-    runs-on: ubuntu-latest
-    container: postgis:12-3.1-alpine
-    services:
-      postgres:
-        image: postgis
-        env:
-          POSTGRES_PASSWORD: NotTheDefault
-        ports:
-          - 3432:5432
     steps:
       - uses: actions/checkout@v2
         with:
