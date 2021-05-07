@@ -33,38 +33,95 @@ from autocnet.matcher.cpu_extractor import extract_features
 from autocnet import cg
 
 def image_diff(arr1, arr2):
-     arr1 = arr1.astype("float32")
-     arr2 = arr2.astype("float32")
-     arr1[arr1 == 0] = np.nan
-     arr2[arr2 == 0] = np.nan
+    """
+    Diff two images but accounts for null pixels. Intended to be used with change 
+    detection algorithms.  
 
-     isis_null = pysis.specialpixels.SPECIAL_PIXELS['Real']['Null']
-     arr1[arr1 == isis_null] = np.nan
-     arr2[arr2 == isis_null] = np.nan
+    Parameters 
+    ----------
 
-     diff = arr1-arr2
-     diff[np.isnan(diff)] = 0
+    arr1 : np.ndarray
+           2D numpy array containing the first image, must have the same shape as arr2
 
-     return diff
+    arr2 : np.ndarray 
+           2D numpy array containing the second image, must have the same shape as arr1
+
+    Returns
+    -------
+
+    : np.ndarray 
+      new diffed image 
+    """
+    arr1 = arr1.astype("float32")
+    arr2 = arr2.astype("float32")
+    arr1[arr1 == 0] = np.nan
+    arr2[arr2 == 0] = np.nan
+
+    isis_null = pysis.specialpixels.SPECIAL_PIXELS['Real']['Null']
+    arr1[arr1 == isis_null] = np.nan
+    arr2[arr2 == isis_null] = np.nan
+
+    diff = arr1-arr2
+    diff[np.isnan(diff)] = 0
+
+    return diff
 
 
 def image_ratio(arr1, arr2):
-     arr1 = arr1.astype("float32")
-     arr2 = arr2.astype("float32")
-     arr1[arr1 == 0] = np.nan
-     arr2[arr2 == 0] = np.nan
+    """
+    Gets the ratio of two images but accounts for null and zero pixels. Intended to be used with change 
+    detection algorithms.  
 
-     isis_null = pysis.specialpixels.SPECIAL_PIXELS['Real']['Null']
-     arr1[arr1 == isis_null] = np.nan
-     arr2[arr2 == isis_null] = np.nan
+    Parameters 
+    ----------
 
-     ratio = arr1/arr2
-     ratio[np.isnan(ratio)] = 0
+    arr1 : np.ndarray
+           2D numpy array containing the first image, must have the same shape as arr2
 
-     return ratio
+    arr2 : np.ndarray 
+           2D numpy array containing the second image, must have the same shape as arr1
+
+    Returns
+    -------
+
+    : np.ndarray 
+      new image containing ratioed pixels
+    """
+    arr1 = arr1.astype("float32")
+    arr2 = arr2.astype("float32")
+    arr1[arr1 == 0] = np.nan
+    arr2[arr2 == 0] = np.nan
+
+    isis_null = pysis.specialpixels.SPECIAL_PIXELS['Real']['Null']
+    arr1[arr1 == isis_null] = np.nan
+    arr2[arr2 == isis_null] = np.nan
+
+    ratio = arr1/arr2
+    ratio[np.isnan(ratio)] = 0
+
+    return ratio
 
 
 def image_diff_sq(arr1, arr2):
+     """
+     Diff two images but accounts for null pixels then squares the result. Intended to be used with change 
+     detection algorithms.  
+
+     Parameters 
+     ----------
+
+     arr1 : np.ndarray
+            2D numpy array containing the first image, must have the same shape as arr2
+
+     arr2 : np.ndarray 
+            2D numpy array containing the second image, must have the same shape as arr1
+
+     Returns
+     -------
+     
+     : np.ndarray 
+       new image containing diffed pixels
+     """
      return image_diff(arr1, arr2)**2
 
 
@@ -473,7 +530,10 @@ def blob_detector(image1, image2, sub_solar_azimuth, image_func=image_diff_sq,
 
 def rv_detector(im1, im2, search_size, pattern_size=None, threshold=.999):
     """
-    RV coefficient based change detection.
+    RV coefficient based change detection. This computes an RV coefficient on a sliding window 
+    and correlates low scores below the input threshold to expected change.  
+    
+    **WARNING*: The time complexity for this is `1 + (search_size - pattern_size))^2` per overlapping pixel between im1 and im2. So larger the differemce between the search and pattern size, it causes compute time to increase exponentially. 
 
     Parameters
     ----------
@@ -492,14 +552,14 @@ def rv_detector(im1, im2, search_size, pattern_size=None, threshold=.999):
     threshold : float
         The cutoff value for an RV value to be considered a change
 
-
+    Returns 
+    -------
     : pd.DataFrame
       A pandas dataframe containing a points of changed areas
 
     : np.ndarray
       A numpy array containing the RV values of each pixel.  Note that the array is
        padded by NaN values for 1/2 window size on each size
-
     """
     def get_window(arr, ulx, uly, size):
         return arr[ulx:ulx+size, uly:uly+size]
