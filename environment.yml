@@ -22,7 +22,7 @@ dependencies:
   - opencv <= 3.5
   - pillow
   - pip
-  - plio >= 1.2.0, < 2
+  - plio >= 1.2.4, < 2
   - plurmy
   - psycopg2
   - proj >= 7.0.0, <8
