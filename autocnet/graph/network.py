@@ -18,7 +18,7 @@ import shapely
 import scipy.special
 
 import geoalchemy2
-from sqlalchemy.ext.declarative.api import DeclarativeMeta
+from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.sql import func
 import shapely.affinity
 import shapely.geometry
