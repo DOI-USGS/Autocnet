@@ -22,7 +22,7 @@ dependencies:
   - opencv <= 3.5
   - pillow
   - pip
-  - plio >= 1.2.4, < 2
+  - plio < 1.2.4
   - plurmy
   - psycopg2
   - proj >= 7.0.0, <8
@@ -30,7 +30,7 @@ dependencies:
   - pytest
   - pytest-cov
   - pysis
-  - pvl >= 1.0, < 2
+  - pvl < 1.0
   - richdem
   - scikit-image
   - scikit-learn
