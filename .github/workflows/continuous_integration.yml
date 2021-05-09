@@ -47,6 +47,8 @@ jobs:
           conda list
       - name: Setup Test DB
         run: psql -h localhost -p 35432 -c 'create database template_postgis;' -U postgres
+        env:
+          PGPASSWORD: NotTheDefault
       - name: Install Python Package
         run: |
           python setup.py install
