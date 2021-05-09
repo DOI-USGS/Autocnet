@@ -15,14 +15,14 @@ dependencies:
   - imageio
   - ipykernel
   - jupyter
-  - knoten
+  - knoten >= 0.2.0, < 1.0
   - ncurses
   - networkx >=2, <3
   - numpy
   - opencv <= 3.5
   - pillow
   - pip
-  - plio >= 1.1.0
+  - plio >= 1.2.0, < 2
   - plurmy
   - psycopg2
   - proj >= 7.0.0, <8
@@ -30,7 +30,7 @@ dependencies:
   - pytest
   - pytest-cov
   - pysis
-  - pvl < 1.0
+  - pvl >= 1.0, < 2
   - richdem
   - scikit-image
   - scikit-learn
