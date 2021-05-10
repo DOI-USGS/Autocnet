@@ -459,7 +459,7 @@ def try_db_creation(engine, config):
 
     # Trigger that watches for points that should be active/inactive
     # based on the point count.
-    if not engine.dialect.has_table(engine, "points"):
+    if not sqlalchemy.inspect(engine).has_table("points"):
         event.listen(Base.metadata, 'before_create', valid_point_function)
         event.listen(Measures.__table__, 'after_create', valid_point_trigger)
         event.listen(Base.metadata, 'before_create', valid_geom_function)
