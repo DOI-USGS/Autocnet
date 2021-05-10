@@ -38,7 +38,7 @@ jobs:
           mamba-version: "*"
           use-mamba: true
           channels: conda-forge, defaults
-          channel-priority: true
+          channel-priority: strict
           activate-environment: autocnet
           environment-file: environment.yml
           python-version: ${{ matrix.python-version }}

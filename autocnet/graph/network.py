@@ -1945,7 +1945,7 @@ class NetworkCandidateGraph(CandidateGraph):
         node = NetworkNode(image_path=img_path, image_name=image_name)
         node.parent = self
         node.populate_db()
-        return node.id
+        return node['node_id']
         
     def copy_images(self, newdir):
         """
