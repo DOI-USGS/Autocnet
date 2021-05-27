@@ -16,10 +16,11 @@ Is available at: https://usgs-astrogeology.github.io/autocnet/
 ## Installation Instructions
 We suggest using Anaconda Python to install Autocnet within a virtual environment.  These steps will walk you through the process.
 
-1. [Download](https://www.continuum.io/downloads) and install the Python 3.x Miniconda installer.  Respond ``Yes`` when prompted to add conda to your BASH profile.  
-2. Install the autocnet environment using the supplied environment.yml file: `conda env create -n autocnet -f environment.yml` 
-3. Activate your environment: `conda activate autocnet`
-4. If you are doing to develop autocnet or would like to use the bleeding edge version: `python setup.py develop`. Otherwise, `conda install -c usgs-astrogeology autocnet`
+1. [Download](https://www.continuum.io/downloads) and install the Python 3.x Miniconda installer.  Respond ``Yes`` when prompted to add conda to your BASH profile.
+2. Install `mamba`. [`mamba`](https://github.com/mamba-org/mamba) is a fast cross platform package manager that has, in our experience, improved environment solving. The AutoCNet environment is complex and `mamba` is necessary to get a solve. To install `conda install -c conda-forge mamba`.
+3. Install the autocnet environment using the supplied environment.yml file: `mamba env create -n autocnet -f environment.yml` 
+4. Activate your environment: `conda activate autocnet`
+5. If you are doing to develop autocnet or would like to use the bleeding edge version: `python setup.py develop`. Otherwise, `conda install -c usgs-astrogeology autocnet`
 
 ## How to run the test suite locally
 
