@@ -16,7 +16,6 @@ from skimage import registration
 from skimage import filters
 from scipy import fftpack 
 
-
 from matplotlib import pyplot as plt
 
 from plio.io.io_gdal import GeoDataset
@@ -28,20 +27,16 @@ from PIL import Image
 
 from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg
 from autocnet.matcher import ciratefi
+from autocnet.spatial import isis 
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
 from autocnet import spatial
 from autocnet.utils.utils import bytescale
 
+from sqlalchemy import inspect
+
 PIL.Image.MAX_IMAGE_PIXELS = sys.float_info.max
-
-isis2np_types = {
-        "UnsignedByte" : "uint8",
-        "SignedWord" : "int16",
-        "Real" : "float64"
-}
-
 
 def check_geom_func(func):
     # TODO: Pain. Stick with one of these and delete this function along with
@@ -369,12 +364,12 @@ def subpixel_transformed_template(sx, sy, dx, dy,
         return [None] * 4
 
     try:
-        s_image_dtype = isis2np_types[pvl.load(s_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+        s_image_dtype = isis.isis2np_types[pvl.load(s_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     except:
         s_image_dtype = None
 
     try:
-        d_template_dtype = isis2np_types[pvl.load(d_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+        d_template_dtype = isis.isis2np_types[pvl.load(d_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     except:
         d_template_dtype = None
 
@@ -500,12 +495,24 @@ def subpixel_template_classic(sx, sy, dx, dy,
 
     image_size = check_image_size(image_size)
     template_size = check_image_size(template_size)
+    print('source image avg: ', s_img.mean())
+    print('dest image avg: ', d_img.mean())
 
     s_roi = roi.Roi(s_img, sx, sy, size_x=image_size[0], size_y=image_size[1])
     d_roi = roi.Roi(d_img, dx, dy, size_x=template_size[0], size_y=template_size[1])
 
+    print('d shape', d_roi.clip().shape)
+    print('d mean: ', d_roi.clip().mean())
+    print(f'd mm: {d_roi.clip().min()} {d_roi.clip().max()}')
+    print(f'{len(isis.get_isis_special_pixels(d_roi.clip()))} chip sps : ', isis.get_isis_special_pixels(d_roi.clip()))
+
     s_image = s_roi.clip()
     d_template = d_roi.clip()
+
+    print('s shape', s_image.shape)
+    print('s mean: ', s_image.mean())
+    print(f's mm: {s_image.min()} {s_image.max()}')
+    print(f'{len(isis.get_isis_special_pixels(s_image))} chip sps: ', isis.get_isis_special_pixels(s_image))
 
     if d_roi.variance == 0:
         return [None] * 4
@@ -601,12 +608,12 @@ def subpixel_template(sx, sy, dx, dy,
         return [None] * 4
 
     try:
-        s_image_dtype = isis2np_types[pvl.load(s_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+        s_image_dtype = isis.isis2np_types[pvl.load(s_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     except:
         s_image_dtype = None
 
     try:
-        d_template_dtype = isis2np_types[pvl.load(d_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+        d_template_dtype = isis.isis2np_types[pvl.load(d_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     except:
         d_template_dtype = None
 
@@ -911,16 +918,11 @@ def geom_match_simple(base_cube,
     t2 = time.time()
     print(f'Estimation of the transformation took {t2-t1} seconds.')
     # read_array not getting correct type by default
-    isis2np_types = {
-                    "UnsignedByte" : "uint8",
-                    "SignedWord" : "int16",
-                    "Real" : "float64"
-    }
 
-    base_type = isis2np_types[pvl.load(base_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    base_type = isis.isis2np_types[pvl.load(base_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     base_arr = base_cube.read_array(dtype=base_type)
 
-    dst_type = isis2np_types[pvl.load(input_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    dst_type = isis.isis2np_types[pvl.load(input_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     dst_arr = input_cube.read_array(dtype=dst_type)
 
     box = (0, 0, max(dst_arr.shape[1], base_arr.shape[1]), max(dst_arr.shape[0], base_arr.shape[0]))
@@ -936,9 +938,12 @@ def geom_match_simple(base_cube,
         axs[1].set_title("Projected Image")
         axs[1].imshow(roi.Roi(bytescale(dst_arr, cmin=0), bcenter_x, bcenter_y, 25, 25).clip(), cmap="Greys_r")
         plt.show()
-    print(base_arr.shape, dst_arr.shape)
     # Run through one step of template matching then one step of phase matching
     # These parameters seem to work best, should pass as kwargs later
+    print('dst_arr mean: ', dst_arr.mean())
+    print(f'dst_arr mm: {dst_arr.min()} {dst_arr.max()}')
+    print(f'special pixels: ', isis.get_isis_special_pixels(dst_arr))
+    
     restemplate = match_func(bcenter_x, bcenter_y, bcenter_x, bcenter_y, bytescale(base_arr, cmin=0), bytescale(dst_arr, cmin=0), **match_kwargs)
     t4 = time.time()
     print(f'Matching took {t4-t3} seconds')
@@ -1110,19 +1115,12 @@ def geom_match_classic(base_cube,
 
     affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
 
-    # read_array not getting correct type by default
-    isis2np_types = {
-                    "UnsignedByte" : "uint8",
-                    "SignedWord" : "int16",
-                    "Real" : "float64"
-    }
-
     base_pixels = list(map(int, [base_corners[0][0], base_corners[0][1], size_x*2, size_y*2]))
-    base_type = isis2np_types[pvl.load(base_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    base_type = isis.isis2np_types[pvl.load(base_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     base_arr = base_cube.read_array(pixels=base_pixels, dtype=base_type)
 
     dst_pixels = list(map(int, [start_x, start_y, stop_x-start_x, stop_y-start_y]))
-    dst_type = isis2np_types[pvl.load(input_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    dst_type = isis.isis2np_types[pvl.load(input_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
     dst_arr = input_cube.read_array(pixels=dst_pixels, dtype=dst_type)
 
     dst_arr = tf.warp(dst_arr, affine)
@@ -1394,9 +1392,9 @@ def subpixel_register_measure(measureid,
 
         try:
             new_x, new_y, dist, metric = geom_match_simple(source_node.geodata, destination_node.geodata,
-                                                        source.sample, source.line,
-                                                        match_func=match_func,
-                                                        template_kwargs=subpixel_template_kwargs)
+                                                            source.sample, source.line,
+                                                            match_func=match_func,
+                                                            template_kwargs=subpixel_template_kwargs)
         except Exception as e:
             print(f'geom_match failed on measure {measureid} with exception -> {e}')
             destination.ignore = True # geom_match failed
@@ -1445,8 +1443,8 @@ def subpixel_register_point(pointid,
                             geom_func='simple',
                             match_func='classic',
                             match_kwargs={},
+                            use_cache=False,
                             verbose=False,
-                            chooser='subpixel_register_point',
                             **kwargs):
 
     """
@@ -1476,7 +1474,13 @@ def subpixel_register_point(pointid,
                 running a matcher. 
     
     match_func : callable
-                 subpixel matching function to use registering measures      
+                 subpixel matching function to use registering measures   
+
+    use_cache : bool
+                If False (default) this func opens a database session and writes points
+                and measures directly to the respective tables. If True, this method writes 
+                messages to the point_insert (defined in ncg.config) redis queue for 
+                asynchronous (higher performance) inserts.   
     """
 
     geom_func=geom_func.lower()
@@ -1495,20 +1499,16 @@ def subpixel_register_point(pointid,
     
     t1 = time.time()
     with ncg.session_scope() as session:
+        measures = session.query(Measures).filter(Measures.pointid == pointid).order_by(Measures.id).all()
         point = session.query(Points).filter(Points.id == pointid).one()
-        measures = point.measures
-        #measures = session.query(Measures).filter(Measures.pointid == pointid).order_by(Measures.id).all()
-
-        t2 = time.time()
-        print(f'Query took {t2-t1} seconds to find the point.')
-
-        # Get the reference measure. Previously this was index 0, but now it is a database tracked attribute
         reference_index = point.reference_index
-        
+        t2 = time.time()
+        print(f'Query took {t2-t1} seconds to find the measures and reference measure.')
+        # Get the reference measure. Previously this was index 0, but now it is a database tracked attribute
         source = measures[reference_index]
 
         print(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
-        print(f'Measure reference index is: {point.reference_index}')
+        print(f'Measure reference index is: {reference_index}')
         source.template_metric = 1
         source.template_shift = 0
         source.phase_error = 0
@@ -1522,86 +1522,114 @@ def subpixel_register_point(pointid,
         t3 = time.time()
         print(f'Query for the image to use as source took {t3-t2} seconds.')
         print(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
+        nodes = {}
+        for measure in measures:
+            res = session.query(Images).filter(Images.id == measure.imageid).one()
+            nodes[measure.imageid] = NetworkNode(node_id=measure.imageid, image_path=res.path)
 
-        resultlog = []
-        for i, measure in enumerate(measures):
-            if i == reference_index:
-                continue
-            
-            currentlog = {'measureid':measure.id,
-                        'status':''}
-            cost = None
-            destinationid = measure.imageid
+        session.expunge_all()
+    
+    resultlog = []
+    updated_measures = []
+    for i, measure in enumerate(measures):
+        if i == reference_index:
+            continue
+        
+        currentlog = {'measureid':measure.id,
+                    'status':''}
+        cost = None
+        destinationid = measure.imageid
 
-            res = session.query(Images).filter(Images.id == destinationid).one()
-            destination_node = NetworkNode(node_id=destinationid, image_path=res.path)
-            destination_node.parent = ncg
+        destination_node = nodes[measure.imageid]
 
-            print('geom_match image:', res.path)
-            print('geom_func', geom_func)
-            print(source_node.geodata, destination_node.geodata, source.apriorisample, source.aprioriline)
-            try:
-                # new geom_match has a incompatible API, until we decide on one, put in if.
-                if (geom_func == geom_match):
-                   new_x, new_y, dist, metric,  _ = geom_func(source_node.geodata, destination_node.geodata,
-                                                        source.apriorisample, source.aprioriline,
-                                                        template_kwargs=match_kwargs,
-                                                        verbose=verbose)
-                else:
-                    new_x, new_y, dist, metric,  _ = geom_func(source_node.geodata, destination_node.geodata,
-                                                        source.apriorisample, source.aprioriline,
-                                                        match_func=match_func,
-                                                        match_kwargs=match_kwargs,
-                                                        verbose=verbose)
-            except Exception as e:
-                print(f'geom_match failed on measure {measure.id} with exception -> {e}')
-                currentlog['status'] = f"geom_match failed on measure {measure.id}"
-                resultlog.append(currentlog)
-                if measure.weight is None:
-                    measure.ignore = True # Geom match failed and no previous sucesses
-                continue
-
-            if new_x == None or new_y == None:
-                currentlog['status'] = f'Failed to register measure {measure.id}.'
-                resultlog.append(currentlog)
-                if measure.weight is None:
-                    measure.ignore = True # Unable to geom match and no previous sucesses
-                continue
-
-            measure.template_metric = metric
-            measure.template_shift = dist
-
-            cost = cost_func(measure.template_shift, measure.template_metric)
-
-            print(f'Current Cost: {cost},  Current Weight: {measure.weight}')
-
-            # Check to see if the cost function requirement has been met
-            if measure.weight and cost <= measure.weight:
-                currentlog['status'] = f'Previous match provided better correlation. {measure.weight} > {cost}.'
-                resultlog.append(currentlog)
-                continue
-
-            if cost <= threshold:
-                currentlog['status'] = f'Cost failed. Distance calculated: {measure.template_shift}. Metric calculated: {measure.template_metric}.'
-                resultlog.append(currentlog)
-                if measure.weight is None:
-                    measure.ignore = True # Threshold criteria not met and no previous sucesses
-                continue
-
-            # Update the measure
-            measure.sample = new_x
-            measure.line = new_y
-            measure.weight = cost
-            measure.choosername = chooser
-
-            # In case this is a second run, set the ignore to False if this
-            # measures passed. Also, set the source measure back to ignore=False
-            measure.ignore = False
-            source.ignore = False
-            currentlog['status'] = f'Success. Distance shifted: {measure.template_shift}. Metric: {measure.template_metric}.'
+        print('geom_match image:', res.path)
+        print('geom_func', geom_func)
+        try:
+            # new geom_match has a incompatible API, until we decide on one, put in if.
+            if (geom_func == geom_match):
+               new_x, new_y, dist, metric,  _ = geom_func(source_node.geodata, destination_node.geodata,
+                                                    source.apriorisample, source.aprioriline,
+                                                    template_kwargs=match_kwargs,
+                                                    verbose=verbose)
+            else:
+                new_x, new_y, dist, metric,  _ = geom_func(source_node.geodata, destination_node.geodata,
+                                                    source.apriorisample, source.aprioriline,
+                                                    match_func=match_func,
+                                                    match_kwargs=match_kwargs,
+                                                    verbose=verbose)
+        except Exception as e:
+            print(f'geom_match failed on measure {measure.id} with exception -> {e}')
+            currentlog['status'] = f"geom_match failed on measure {measure.id}"
             resultlog.append(currentlog)
+            if measure.weight is None:
+                measure.ignore = True # Geom match failed and no previous sucesses
+            updated_measures.append(measure)
+            continue
+
+        if new_x == None or new_y == None:
+            currentlog['status'] = f'Failed to register measure {measure.id}.'
+            resultlog.append(currentlog)
+            if measure.weight is None:
+                measure.ignore = True # Unable to geom match and no previous sucesses
+            updated_measures.append(measure)
+            continue
+
+        measure.template_metric = metric
+        measure.template_shift = dist
+
+        cost = cost_func(measure.template_shift, measure.template_metric)
+
+        print(f'Current Cost: {cost},  Current Weight: {measure.weight}')
+
+        # Check to see if the cost function requirement has been met
+        if measure.weight and cost <= measure.weight:
+            currentlog['status'] = f'Previous match provided better correlation. {measure.weight} > {cost}.'
+            resultlog.append(currentlog)
+            updated_measures.append(measure)
+            continue
+
+        if cost <= threshold:
+            currentlog['status'] = f'Cost failed. Distance calculated: {measure.template_shift}. Metric calculated: {measure.template_metric}.'
+            resultlog.append(currentlog)
+            updated_measures.append(measure)
+            if measure.weight is None:
+                measure.ignore = True # Threshold criteria not met and no previous sucesses
+            continue
+
+        # Update the measure
+        measure.sample = new_x
+        measure.line = new_y
+        measure.weight = cost
+        measure.choosername = chooser
+
+        # In case this is a second run, set the ignore to False if this
+        # measures passed. Also, set the source measure back to ignore=False
+        measure.ignore = False
+        # Maybe source?
+        source.ignore = False
+        updated_measures.append(measure)
+        currentlog['status'] = f'Success. Distance shifted: {measure.template_shift}. Metric: {measure.template_metric}.'
+        resultlog.append(currentlog)
+    
+    # Once here, update the source measure (possibly back to ignore=False)
+    updated_measures.append(source)
+
+    if use_cache:
         t4 = time.time()
-        print(f'Registering {len(measures)} took {t4-t3} seconds.')
+        ncg.redis_queue.rpush(ncg.measure_update_queue,
+                              *[json.dumps(measure.to_dict(_hide=[]), cls=JsonEncoder) for measure in updated_measures])
+        ncg.redis_queue.incr(ncg.measure_update_counter, amount=len(updated_measures))
+        t5 = time.time()
+        print(f'Cache load took {t5-t4} seconds')
+    else:
+        t4 = time.time()
+        # Commit the updates back into the DB
+        with ncg.session_scope() as session:
+            for m in updated_measures:
+                ins = inspect(m)
+                session.add(m)
+        t5 = time.time()
+        print(f'Database update took {t5-t4} seconds.')
     return resultlog
 
 
@@ -1765,8 +1793,6 @@ def register_to_base(pointid,
        point.ref_measure = best_results[1]
     return
     
-
-
 def estimate_logpolar_transform(img1, img2, low_sigma=0.5, high_sigma=30, verbose=False): 
     """
     Estimates the rotation and scale difference for img1 that maps to img2 using phase cross correlation on a logscale projection. 

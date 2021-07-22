@@ -8,6 +8,7 @@ def pattern_match_autoreg(template, image, subpixel_size=3, max_scaler=0.2, metr
     """
     Call an arbitrary pattern matcher using a subpixel approach where a center of gravity using
     the correlation coefficients are used for subpixel alignment.
+    
     Parameters
     ----------
     template : ndarray
@@ -81,6 +82,7 @@ def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED, e
     """
     Call an arbitrary pattern matcher using a subpixel approach where the template and image
     are upsampled using a third order polynomial.
+
     Parameters
     ----------
     template : ndarray
@@ -106,7 +108,8 @@ def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED, e
     strength : float
                The strength of the correlation in the range [-1, 1].
     """
-
+    print('template avg: ', template.mean())
+    print('image avg: ', image.mean())
     if upsampling < 1:
         raise ValueError
 

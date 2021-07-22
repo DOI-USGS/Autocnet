@@ -18,6 +18,100 @@ import numpy as np
 import kalasiris as isis
 import pvl
 
+import kalasiris as kal
+
+isis2np_types = {
+        "UnsignedByte" : "uint8",
+        "SignedWord" : "int16",
+        "Double" : "float64",
+        "Real" : "float32"
+}
+
+np2isis_types = {v: k for k, v in isis2np_types.items()}
+
+
+def get_isis_special_pixels(arr):
+    """
+    Returns coordinates of any ISIS no data pixels. Essentially, 
+    np.argwhere results of where pixels match ISIS special 
+    data types (NIRs, NHRs, HIS, HRS, NULLS).
+
+    Parameters
+    ----------
+    arr : np.array 
+          Array to find special pixels in 
+    
+    Returns
+    -------
+    : sp
+      np.array of coordinates in y,x format containing special pixel coordinates
+
+    """
+    isis_dtype = np2isis_types[str(arr.dtype)]
+    sp_pixels = getattr(kal.specialpixels, isis_dtype)
+
+    null = np.argwhere(arr==sp_pixels.Null)
+    lrs = np.argwhere(arr==sp_pixels.Lrs)
+    lis = np.argwhere(arr==sp_pixels.Lis)
+    his = np.argwhere(arr==sp_pixels.His)
+    hrs = np.argwhere(arr==sp_pixels.Hrs)
+    sp = np.concatenate((null, lrs, lis, his, hrs))
+
+    return sp
+
+
+def get_nodata_bounds(arr):
+    """
+    Get bounds for an image that does not contain any ISIS special pixels. That is,
+    ISIS Nulls, NIRS, NRS, HIS and HRS pixels
+
+    Parameters
+    ----------
+    arr : np.array
+          2D array representing the image 
+
+    Returns
+    -------
+    : left_x 
+      left x coordinate of new bounds 
+
+    : right_x
+      right x coordinate of new bounds 
+    
+    : top_y
+      top y coordinate of new bounds 
+    
+    : bottom _y
+      bottom y coordinates of new bounds 
+    """
+    sp = get_isis_special_pixels(arr)
+    
+    if not sp.any():
+        return 0, arr.shape[1], 0, arr.shape[0]
+    
+    cy, cx = arr.shape[1]//2, arr.shape[0]//2
+    tree = KDTree(sp, metric='euclidean')
+
+    # For finding K neighbors of P1 with shape (1, 3)
+    distances, indices = tree.query(np.array([cy, cx]).reshape(1,2), 1)
+    
+    # these are slightly misshapen by being in nested arrays (e.g. [[n]], [[y,x]])
+    nearest_idx = indices.reshape(1,)
+    neary, nearx = sp[nearest_idx].reshape(2,)
+
+    # subtract 1 to exclude the special pixel
+    x_dist = abs(cx - nearx) - 1
+    y_dist = abs(cy - neary) - 1
+    print(x_dist, y_dist)
+
+    # left_x, right_x, top_y, bottom_y
+    left_x = cx - x_dist
+    right_x = cx + x_dist
+    top_y = cy - y_dist
+    bottom_y = cy + y_dist
+
+    return left_x, right_x, top_y, bottom_y
+
 
 def point_info(
         cube_path: os.PathLike,

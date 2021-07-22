@@ -28,7 +28,7 @@ def parse_args():  # pragma: no cover
 
 def _instantiate_obj(msg, ncg):
     """
-    Instantiate either a NetworkNode or a NetworkEdge that is the 
+    Instantiate either a NetworkNode or a NetworkEdge that is the
     target of processing.
 
     """
@@ -55,12 +55,12 @@ def _instantiate_row(msg, ncg):
     obj = objdict[msg['along']]
     with ncg.session_scope() as session:
         res = session.query(obj).filter(getattr(obj, 'id')==msg['id']).one()
-        session.expunge(res) # Disconnect the object from the session
+        session.expunge_all() # Disconnect the object from the session
     return res
 
 def process(msg):
     """
-    Given a message, instantiate the necessary processing objects and 
+    Given a message, instantiate the necessary processing objects and
     apply some generic function or method.
 
     Parameters
@@ -72,7 +72,7 @@ def process(msg):
     ncg.config_from_dict(msg['config'])
     if msg['along'] in ['node', 'edge']:
         obj = _instantiate_obj(msg, ncg)
-    elif msg['along'] in ['points', 'measures', 'overlaps', 'images']:
+    elif msg['along'] in ['candidategroundpoints', 'points', 'measures', 'overlaps', 'images']:
         obj = _instantiate_row(msg, ncg)
     else:
         obj = msg['along']
@@ -114,10 +114,10 @@ def transfer_message_to_work_queue(queue, queue_from, queue_to):
     ----------
     queue : object
             PyRedis queue
-    
+
     queue_from : str
                  The name of the queue to pop a message from
-    
+
     queue_to : str
                The name of the queue to push a message to
 
@@ -143,13 +143,13 @@ def finalize_message_from_work_queue(queue, queue_name, remove_key):
     remove_key : obj
                  The message to remove from the list
     """
-    # The operation completed. Remove this message from the working queue.  
+    # The operation completed. Remove this message from the working queue.
     queue.lrem(queue_name, 0, remove_key)
 
 def manage_messages(args, queue):
     """
-    This function manages pulling a message from a redis list, atomically pushing 
-    the message to another redis list, launching a generic processing job, 
+    This function manages pulling a message from a redis list, atomically pushing
+    the message to another redis list, launching a generic processing job,
     and finalizing the message by removing it from the intermediary redis list.
 
     This function is an easily testable main for the cluster_submit CLI.
@@ -164,7 +164,7 @@ def manage_messages(args, queue):
 
     """
     # Pop the message from the left queue and push to the right queue; atomic operation
-    msg = transfer_message_to_work_queue(queue, 
+    msg = transfer_message_to_work_queue(queue,
                                          args['processing_queue'],
                                          args['working_queue'])
 
@@ -176,6 +176,9 @@ def manage_messages(args, queue):
     # in the list where the element is the JSON representation of the message. Maybe swap to a hash?
     remove_key = msg
 
+    #Convert the message from binary into a dict
+    msg = json.loads(msg, object_hook=object_hook)
+
     # Apply the algorithm
     response = process(msg)
     # Should go to a logger someday!
@@ -185,7 +188,8 @@ def manage_messages(args, queue):
 
 def main():  # pragma: no cover
     args = vars(parse_args())
-    
     # Get the message
     queue = StrictRedis(host=args['host'], port=args['port'], db=0)
     manage_messages(args, queue)
+
+
