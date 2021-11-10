@@ -20,6 +20,11 @@ from shapely import geometry
 from shapely.geometry import MultiPoint
 from shapely.ops import cascaded_union, polygonize
 
+
+class FailedImport():
+    def __getattribute__(self, name: str):
+        raise ImportError('Module was not imported. No classes, attributes, or variables are available.')
+
 def tile(array_size, tilesize=1000, overlap=500):
     stepsize = tilesize - overlap
     if stepsize < 0:

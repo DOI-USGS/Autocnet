@@ -15,7 +15,12 @@ from pathlib import Path
 import numpy as np
 import numpy.testing as npt
 
-import kalasiris as isis
+
+try:
+    import kalasiris as isis
+except:
+    from autocnet.utils.utils import FailedImport
+    isis = FailedImport()
 
 from autocnet.spatial import isis as si
 
