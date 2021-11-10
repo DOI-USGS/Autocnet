@@ -18,9 +18,9 @@ import numpy as np
 
 try:
     import kalasiris as isis
-except Exception as exception:
+except:
     from autocnet.utils.utils import FailedImport
-    isis = FailedImport(exception)
+    isis = FailedImport()
 
 import pvl
 
@@ -239,7 +239,7 @@ def point_info(
 
         # ISIS's campt needs points in a file
         with isis.fromlist.temp(p_list) as f:
-            cp = isis.campt(
+            cp = campt(
                 cube_path,
                 coordlist=f,
                 allowoutside=allowoutside,
