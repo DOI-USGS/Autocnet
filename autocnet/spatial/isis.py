@@ -239,7 +239,7 @@ def point_info(
 
         # ISIS's campt needs points in a file
         with isis.fromlist.temp(p_list) as f:
-            cp = campt(
+            cp = isis.campt(
                 cube_path,
                 coordlist=f,
                 allowoutside=allowoutside,
