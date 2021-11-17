@@ -1701,6 +1701,7 @@ class NetworkCandidateGraph(CandidateGraph):
             queue=None,
             redis_queue='processing_queue',
             exclude=None,
+            just_stage=False,
             **kwargs):
         """
         A mirror of the apply function from the standard CandidateGraph object. This implementation
@@ -1778,6 +1779,13 @@ class NetworkCandidateGraph(CandidateGraph):
                       The redis queue to push messages to that are then pulled by the
                       cluster job this call launches. Options are: 'processing_queue' (default)
                       or 'working_queue'
+
+        just_stage : bool
+                     If True, push messages to the redis queue for processing, but do not
+                     submit a slurm/sbatch job to the cluster. This is useful when one process
+                     is being used to orchestrate queue population and another process is being
+                     used to process the messages. Default: False.
+
         Returns
         -------
         job_str : str
@@ -1856,6 +1864,10 @@ class NetworkCandidateGraph(CandidateGraph):
             job += ' --queue'  # Use queue mode where jobs run until the queue is empty
         command = f'{condasetup} && {isissetup} && srun {job}'
 
+        # The user does not want to submit the job. Only stage the messages.
+        if just_stage:
+            return command
+
         if queue == None:
             queue = self.config['cluster']['queue']
 
@@ -1866,6 +1878,8 @@ class NetworkCandidateGraph(CandidateGraph):
                      partition=queue,
                      ntasks=ntasks,
                      output=log_dir+f'/autocnet.{function}-%j')
+
+        # Submit the jobs to the cluster   
         if ntasks > 1:
             job_str = submitter.submit(exclude=exclude)
         else:
