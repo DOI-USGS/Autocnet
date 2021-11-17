@@ -1664,7 +1664,6 @@ class NetworkCandidateGraph(CandidateGraph):
             msg['config'] = self.config  # Hacky for now, just passs the whole config dict
             pipeline.rpush(self.processing_queue,
                                 json.dumps(msg, cls=JsonEncoder))
-        assert len(res) == self.queue_length
         pipeline.execute()
         return len(res)
 
