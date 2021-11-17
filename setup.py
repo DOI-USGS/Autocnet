@@ -31,7 +31,8 @@ def setup_package():
             'Programming Language :: Python :: 3.8',
         ],
         entry_points={"console_scripts": [
-        "acn_submit = autocnet.graph.cluster_submit:main"], 
+        "acn_submit = autocnet.graph.cluster_submit:main",
+        "acn_submit_single = autocnet.graph.cluster_submit_single:main"], 
         }
     )
 
