@@ -22,8 +22,10 @@ from shapely.ops import cascaded_union, polygonize
 
 
 class FailedImport():
-    def __getattribute__(self, name: str):
-        raise ImportError('Module was not imported. No classes, attributes, or variables are available.')
+    def __init__(self, exception):
+        self.exception = exception
+    def __getattr__(self, name: str):
+        raise self.exception
 
 def tile(array_size, tilesize=1000, overlap=500):
     stepsize = tilesize - overlap

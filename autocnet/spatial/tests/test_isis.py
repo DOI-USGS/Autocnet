@@ -18,9 +18,9 @@ import numpy.testing as npt
 
 try:
     import kalasiris as isis
-except:
+except Exception as exception:
     from autocnet.utils.utils import FailedImport
-    isis = FailedImport()
+    isis = FailedImport(exception)
 
 from autocnet.spatial import isis as si
 

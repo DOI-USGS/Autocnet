@@ -18,9 +18,9 @@ import numpy as np
 
 try:
     import kalasiris as isis
-except:
+except Exception as exception:
     from autocnet.utils.utils import FailedImport
-    isis = FailedImport()
+    isis = FailedImport(exception)
 
 import pvl
 
