@@ -1,4 +1,6 @@
 import sys
+import json
+
 from autocnet.graph.network import NetworkCandidateGraph
 from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
