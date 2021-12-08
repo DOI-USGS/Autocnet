@@ -36,6 +36,7 @@ from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
+from autocnet.transformation.affine import estimate_affine_transformation
 from autocnet import spatial
 from autocnet.utils.utils import bytescale
 
@@ -771,7 +772,7 @@ def iterative_phase(sx, sy, dx, dy, s_img, d_img, size=(51, 51), reduction=11, c
 
     return dx, dy, metrics
 
-def estimate_affine_transformation(destination_coordinates, source_coordinates):
+'''def estimate_affine_transformation(destination_coordinates, source_coordinates):
     """
     Given a set of destination control points compute the affine transformation
     required to project the source control points into the destination.
@@ -793,7 +794,7 @@ def estimate_affine_transformation(destination_coordinates, source_coordinates):
     source_coordinates = np.asarray(source_coordinates)
 
     return tf.estimate_transform('affine', destination_coordinates, source_coordinates)
-
+'''
 def geom_match_simple(base_cube,
                        input_cube,
                        bcenter_x,
@@ -1982,91 +1983,9 @@ def fourier_mellen(img1, img2, verbose=False, phase_kwargs={}):
 
     return newx, newy, error
 
-def estimate_affine_transformation(base_cube,
-                                   input_cube,
-                                   bcenter_x,
-                                   bcenter_y,
-                                   size_x=60,
-                                   size_y=60):
-    """
-    Using the a priori sensor model, project corner and center points from the base_cube into
-    the input_cube and use these points to estimate an affine transformation.
 
-    Parameters
-    ----------
-    base_cube:  plio.io.io_gdal.GeoDataset
-                source image
-    input_cube: plio.io.io_gdal.GeoDataset
-                destination image; gets matched to the source image
-    bcenter_x:  int
-                sample location of source measure in base_cube
-    bcenter_y:  int
-                line location of source measure in base_cube
-    size_x:     int
-                half-height of the subimage used in the affine transformation
-    size_y:     int
-                half-width of the subimage used in affine transformation
-
-    Returns
-    -------
-    affine : object
-             The affine transformation object
-
-    """
-    t1 = time.time()
-    if not isinstance(input_cube, GeoDataset):
-        raise Exception(f"Input cube must be a geodataset obj, but is type {type(input_cube)}.")
-    if not isinstance(base_cube, GeoDataset):
-        raise Exception(f"Match cube must be a geodataset obj, but is type {type(base_cube)}.")
-
-    base_startx = int(bcenter_x - size_x)
-    base_starty = int(bcenter_y - size_y)
-    base_stopx = int(bcenter_x + size_x)
-    base_stopy = int(bcenter_y + size_y)
-
-    match_size = base_cube.raster_size
-
-    # for now, require the entire window resides inside both cubes.
-    if base_stopx > match_size[0]:
-        raise Exception(f"Window: {base_stopx} > {match_size[0]}, center: {bcenter_x},{bcenter_y}")
-    if base_startx < 0:
-        raise Exception(f"Window: {base_startx} < 0, center: {bcenter_x},{bcenter_y}")
-    if base_stopy > match_size[1]:
-        raise Exception(f"Window: {base_stopy} > {match_size[1]}, center: {bcenter_x},{bcenter_y} ")
-    if base_starty < 0:
-        raise Exception(f"Window: {base_starty} < 0, center: {bcenter_x},{bcenter_y}")
-
-    base_corners = [(base_startx,base_starty),
-                    (base_startx,base_stopy),
-                    (base_stopx,base_stopy),
-                    (base_stopx,base_starty),
-                    (bcenter_x, bcenter_y)]
-    
-    dst_corners = []
-    passing_base_corners = []
-    for x,y in base_corners:
-        try:
-            print('Processing: ', x,y)
-            lon, lat = spatial.isis.image_to_ground(base_cube.file_name, x, y)
-            dst_corners.append(
-                spatial.isis.ground_to_image(input_cube.file_name, lon, lat)
-            )
-            passing_base_corners.append((x, y))
-        except Exception as e: 
-            print(e)
-
-    if len(dst_corners) < 3:
-        raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_corners)} points, but need at least 3.')
-
-    base_gcps = np.array([*passing_base_corners])
-
-    dst_gcps = np.array([*dst_corners])
-
-    affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
-    t2 = time.time()
-    print(f'Estimation of the transformation took {t2-t1} seconds.')
-    return affine
-
+# TODO: This func should be in transformation.affine with 
+# signature (array_to_warp, affine, order=3).
 def affine_warp_image(base_cube, input_cube, affine, order=3):
     """
     Given a base image, an input image, and an affine transformation, return
