@@ -170,3 +170,22 @@ class Roi():
             pixels = [pixels[0], pixels[2], pixels[1]-pixels[0]+1, pixels[3]-pixels[2]+1]
             data = self.data.read_array(pixels=pixels)
         return data
+
+    def clip(self, dtype=None):
+        """
+        Compatibility function that makes a call to the array property.
+        Warning: The dtype passed in via this function resets the dtype attribute of this
+        instance.
+        Parameters
+        ----------
+        dtype : str
+                The datatype to be used when reading the ROI information if the read
+                occurs through the data object using the read_array method. When using
+                this object when the data are a numpy array the dtype has not effect.
+        Returns
+        -------
+         : ndarray
+           The array attribute of this object.
+        """
+        #self.dtype = dtype
+        return self.array

@@ -49,24 +49,26 @@ def test_full_subpixel_registration(ncg, images, point):
                              shared_kwargs=shared_kwargs,
                              ncg=ncg)
 
+        print(measures_to_update)
+
         for measure in measures_to_update:
             if measure['_id'] == 2:
-                assert measure['line'] == 271.06183374089994
-                assert measure['sample'] == 267.0927039064
+                assert measure['line'] == 271.00253223520383
+                assert measure['sample'] == 266.9152655856491
                 assert measure['ignore'] == False
             elif measure['_id'] == 3:
-                assert measure['line'] == 258.7493337409
-                assert measure['sample'] == 258.4677039064
+                assert measure['line'] == 258.6752555930361
+                assert measure['sample'] == 258.80172907976646
                 assert measure['ignore'] == False
         
     with ncg.session_scope() as session:
         m1 = session.query(Measures).filter(Measures.id == 2).one()
         
-        assert m1.line == pytest.approx(271.06183374089994, 6)
-        assert m1.sample == pytest.approx(267.0927039064, 6)
+        assert m1.line == pytest.approx(271.00253223520383, 6)
+        assert m1.sample == pytest.approx(266.9152655856491, 6)
         assert m1.ignore == False
 
         m2 = session.query(Measures).filter(Measures.id == 3).one()
-        assert m2.line == pytest.approx(258.7493337409, 6)
-        assert m2.sample == pytest.approx(258.4677039064, 6)
+        assert m2.line == pytest.approx(258.6752555930361, 6)
+        assert m2.sample == pytest.approx(258.80172907976646, 6)
         assert m2.ignore == False
