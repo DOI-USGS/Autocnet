@@ -8,26 +8,26 @@ from autocnet.spatial import isis
 
 log = logging.getLogger(__name__)
 
-def estimate_affine_transformation(base_cube,
-                                   input_cube,
+def estimate_affine_transformation(reference_image,
+                                   moving_image,
                                    bcenter_x,
                                    bcenter_y,
                                    size_x=60,
                                    size_y=60):
     """
-    Using the a priori sensor model, project corner and center points from the base_cube into
-    the input_cube and use these points to estimate an affine transformation.
+    Using the a priori sensor model, project corner and center points from the reference_image into
+    the moving_image and use these points to estimate an affine transformation.
 
     Parameters
     ----------
-    base_cube:  plio.io.io_gdal.GeoDataset
+    reference_image:  plio.io.io_gdal.GeoDataset
                 source image
-    input_cube: plio.io.io_gdal.GeoDataset
+    moving_image: plio.io.io_gdal.GeoDataset
                 destination image; gets matched to the source image
     bcenter_x:  int
-                sample location of source measure in base_cube
+                sample location of source measure in reference_image
     bcenter_y:  int
-                line location of source measure in base_cube
+                line location of source measure in reference_image
     size_x:     int
                 half-height of the subimage used in the affine transformation
     size_y:     int
@@ -40,17 +40,17 @@ def estimate_affine_transformation(base_cube,
 
     """
     t1 = time.time()
-    if not isinstance(input_cube, GeoDataset):
-        raise Exception(f"Input cube must be a geodataset obj, but is type {type(input_cube)}.")
-    if not isinstance(base_cube, GeoDataset):
-        raise Exception(f"Match cube must be a geodataset obj, but is type {type(base_cube)}.")
+    if not isinstance(moving_image, GeoDataset):
+        raise Exception(f"Input cube must be a geodataset obj, but is type {type(moving_image)}.")
+    if not isinstance(reference_image, GeoDataset):
+        raise Exception(f"Match cube must be a geodataset obj, but is type {type(reference_image)}.")
 
     base_startx = int(bcenter_x - size_x)
     base_starty = int(bcenter_y - size_y)
     base_stopx = int(bcenter_x + size_x)
     base_stopy = int(bcenter_y + size_y)
 
-    match_size = base_cube.raster_size
+    match_size = reference_image.raster_size
 
     # for now, require the entire window resides inside both cubes.
     if base_stopx > match_size[0]:
@@ -66,19 +66,16 @@ def estimate_affine_transformation(base_cube,
     y_coords = [base_starty, base_stopy, base_stopy, base_starty, bcenter_y]
 
     # Dispatch to the sensor to get the a priori pixel location in the input image
-    lons, lats = isis.image_to_ground(base_cube.file_name, x_coords, y_coords, allowoutside=True)
-    xs, ys = isis.ground_to_image(input_cube.file_name, lons, lats, allowoutside=True)
+    lons, lats = isis.image_to_ground(reference_image.file_name, x_coords, y_coords, allowoutside=True)
+    xs, ys = isis.ground_to_image(moving_image.file_name, lons, lats, allowoutside=True)
 
     # Check for any coords that do not project between images
     base_gcps = []
     dst_gcps = []
-    for i, (base_x, base_y) in enumerate(zip(xs, ys)):
+    for i, (base_x, base_y) in enumerate(zip(x_coords, y_coords)):
         if xs[i] is not None and ys[i] is not None:
             dst_gcps.append((xs[i], ys[i]))
             base_gcps.append((base_x, base_y))
-
-    base_gcps = np.asarray(base_gcps)
-    dst_gcps = np.asarray(dst_gcps)
 
     log.debug(f'base_gcps: {base_gcps}')
     log.debug(f'dst_gcps: {dst_gcps}')
