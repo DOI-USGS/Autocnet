@@ -3,9 +3,11 @@ name: Pull-Request-CI
 on:
   pull_request:
     branches:
+      - subpixelapi
       - dev
   push:
     branches:
+      - subpixelapi
       - dev
 
 env:
