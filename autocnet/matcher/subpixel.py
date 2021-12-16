@@ -442,10 +442,8 @@ def subpixel_transformed_template(sx, sy, dx, dy,
 
     return dx, dy, metrics, corrmap
 
-def subpixel_template_classic(sx, sy, dx, dy,
-                              s_img, d_img,
-                              image_size=(251, 251),
-                              template_size=(51,51),
+
+def subpixel_template_classic(reference_roi, moving_roi, affine=tf.AffineTransform(),
                               func=pattern_match,
                               **kwargs):
     """
@@ -486,47 +484,32 @@ def subpixel_template_classic(sx, sy, dx, dy,
     autocnet.matcher.naive_template.pattern_match_autoreg : for the jwargs that can be passed to the autoreg style matcher
     """
 
-    # Image or source is the reference that the template is registered to
+    # In ISIS, the reference image is the search and moving image is the pattern.
 
-    image_size = check_image_size(image_size)
-    template_size = check_image_size(template_size)
-
-    # In ISIS source image is the search and destination image is the pattern.
-    # In ISIS the search is CTX and the pattern is THEMIS
-    # So the data that are being used are swapped between autocnet and ISIS.
-    s_roi = roi.Roi(s_img, sx, sy, size_x=image_size[0], size_y=image_size[1])
-    d_roi = roi.Roi(d_img, dx, dy, size_x=template_size[0], size_y=template_size[1])
-
-    """print('Source: ', sx, sy, d_roi.x, d_roi.y)
-    print('Destination ',dx, dy, s_roi.x, s_roi.y )
-
-    print('d shape', d_roi.clip().shape)
-    print('d mean: ', d_roi.clip().mean())
-    print(f'd mm: {d_roi.clip().min()} {d_roi.clip().max()}')"""
-    #print(f'{len(isis.get_isis_special_pixels(d_roi.clip()))} chip sps : ', isis.get_isis_special_pixels(d_roi.clip()))
-
-    s_image = s_roi.array
-    d_template = d_roi.array
-
-    """print('s shape', s_image.shape)
-    print('s mean: ', s_image.mean())
-    print(f's mm: {s_image.min()} {s_image.max()}')"""
-    #print(f'{len(isis.get_isis_special_pixels(s_image))} chip sps: ', isis.get_isis_special_pixels(s_image))
-
-    if d_roi.variance == 0:
+    ref_clip = reference_roi.clip()
+    moving_clip = moving_roi.clip()
+    
+    moving_clip = tf.warp(moving_clip, affine, order=3)
+    
+    print(moving_clip.var())
+    
+    if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
         return [None] * 4
 
-    if (s_image is None) or (d_template is None):
+    if (ref_clip is None) or (moving_clip is None):
         return None, None, None, None
 
-    shift_x, shift_y, metrics, corrmap = func(img_as_float32(d_template), img_as_float32(s_image), **kwargs)
+    shift_x, shift_y, metrics, corrmap = func(img_as_float32(ref_clip), img_as_float32(moving_clip), **kwargs)
+    
     if shift_x is None:
         return None, None, None, None
-    # Apply the shift and return
-    dx = d_roi.x - shift_x
-    dy = d_roi.y - shift_y
-    return dx, dy, metrics, corrmap
+    
+    print(shift_x, shift_y)
+    new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
+    
+    return new_affine,  metrics, corrmap
+
 
 def subpixel_template(sx, sy, dx, dy,
                       s_img, d_img,
