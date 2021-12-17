@@ -451,33 +451,32 @@ def subpixel_template_classic(reference_roi, moving_roi, affine=tf.AffineTransfo
     compute an x and y offset from the search keypoint to the template keypoint and an associated strength.
     Parameters
     ----------
-    sx : Numeric
-         Source X coordinate
-    sy : Numeric
-         Source y coordinate
-    dx : Numeric
-         The desintation x coordinate
-    dy : Numeric
-         The destination y coordinate
-    s_img : GeoDataset
-            The source image GeoDataset
-    d_img : GeoDataset
-            The destination image GeoDataset
-    image_size : tuple
-                 (xsize, ysize) of the image that is searched within (this should be larger
-                 than the template size)
-    template_size : tuple
-                    (xsize, ysize) of the template to iterate over the image in order
-                    to identify the area(s) of highest correlation.
+    reference_roi : autocnet.roi.Roi
+                    Roi object representing the reference image 
+    
+    moving_roi : autocnet.roi.Roi
+                 Roi object representing the moving image, this image is registered to the reference_roi   
+    
+    affine : skimage.transform.AffineTransform
+             scikit-image Affine transformation, used as a seed transform that 
+
+    func : callable 
+           Some subpixel template matching function 
+    
+    kwargs : dict 
+             keyword args for func 
 
     Returns
     -------
-    x_shift : float
-              Shift in the x-dimension
-    y_shift : float
-              Shift in the y-dimension
+    affine : skimage.transform.AffineTransform
+             Affine transform containing new  
+    
     strength : float
                Strength of the correspondence in the range [-1, 1]
+    
+    corrmap : np.array 
+            
+    
     See Also
     --------
     autocnet.matcher.naive_template.pattern_match : for the kwargs that can be passed to the matcher
