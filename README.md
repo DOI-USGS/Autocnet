@@ -50,7 +50,7 @@ We suggest using Anaconda Python to install Autocnet within a virtual environmen
 ## How to run the test suite locally
 
 1. Install Docker
-2. Get the Postgresql with Postgis container and run it `docker run --name testdb -e POSTGRES_PASSOWRD='NotTheDefault' -e POSTGRES_USER='postgres' -p 5432:5432 -d mdillon/postgis`
+2. Get the Postgresql with Postgis container and run it `docker run --name testdb -e POSTGRES_PASSOWRD='NotTheDefault' -e POSTGRES_USER='postgres' -p 35432:5432 -d mdillon/postgis`
 3. Run the test suite: `pytest autocnet`
 
 ## How to skip long running tests
