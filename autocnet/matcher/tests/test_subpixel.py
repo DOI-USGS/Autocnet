@@ -16,6 +16,7 @@ from imageio import imread
 
 from autocnet.examples import get_path
 import autocnet.matcher.subpixel as sp
+from autocnet.transformation import roi
 
 @pytest.fixture
 def iris_pair(): 
@@ -167,21 +168,26 @@ def test_subpixel_transformed_template_at_edge(apollo_subsets, loc, failure):
                                                         func=func)
             assert nx == 50.5
 
-@pytest.mark.parametrize("convergence_threshold, expected", [(2.0, (50.49, 52.08, -9.5e-20))])
+@pytest.mark.parametrize("convergence_threshold, expected", [(2.0, (50.49, 52.44, -9.5e-20))])
 def test_iterative_phase(apollo_subsets, convergence_threshold, expected):
-    a = apollo_subsets[0]
-    b = apollo_subsets[1]
-    dx, dy, strength = sp.iterative_phase(a.shape[1]/2, a.shape[0]/2,
-                                          b.shape[1]/2, b.shape[1]/2,
-                                          a, b, 
-                                          size=(51,51), 
-                                          convergence_threshold=convergence_threshold,
-                                          upsample_factor=100)
-    assert dx == expected[0]
-    assert dy == expected[1]
+    reference_image = apollo_subsets[0]
+    walking_image = apollo_subsets[1]
+    image_size = (51, 51)
+
+    ref_x, ref_y = reference_image.shape[0]/2, reference_image.shape[1]/2
+    walk_x, walk_y = walking_image.shape[0]/2, walking_image.shape[1]/2
+
+    reference_roi = roi.Roi(reference_image, ref_x, ref_y, size_x=image_size[0], size_y=image_size[1])
+    walking_roi = roi.Roi(walking_image, walk_x, walk_y, size_x=image_size[0], size_y=image_size[1])
+    affine, error, diffphase = sp.iterative_phase(reference_roi,
+                                                  walking_roi,
+                                                  convergence_threshold=convergence_threshold,
+                                                  upsample_factor=100)
+    ref_to_walk = affine.inverse((ref_x, ref_y))[0]
+    assert ref_to_walk[0] == expected[0]
+    assert ref_to_walk[1] == expected[1]
     if expected[2] is not None:
-        # for i in range(len(strength)):
-        assert pytest.approx(strength,6) == expected[2]
+        assert pytest.approx(error,6) == expected[2]
 
 @pytest.mark.parametrize("data, expected", [
     ((21,21), (10, 10)),
@@ -232,13 +238,13 @@ def test_subpixel_template_cooked(x, y, x1, y1, image_size, template_size, expec
     assert dy == expected[1]
 
 @pytest.mark.parametrize("x, y, x1, y1, image_size, expected",[
-    (4, 3, 3, 2, (3,3), (3,2)),
-    (4, 3, 3, 2, (5,5), (3,2)),  # Increase the search image size
-    (4, 3, 3, 2, (5,5), (3,2)), # Increase the template size
-    (4, 3, 2, 2, (5,5), (3,2)), # Move point in the x-axis
-    (4, 3, 4, 3, (5,5), (3,2)), # Move point in the other x-direction
-    (4, 3, 3, 1, (5,5), (3,2)), # Move point negative in the y-axis; also tests size reduction
-    (4, 3, 3, 3, (5,5), (3,2))  # Move point positive in the y-axis
+    (4, 3, 3, 2, (1,1), (3,2)),
+    (4, 3, 3, 2, (2,2), (3,2)),  # Increase the search image size
+    (4, 3, 3, 2, (2,2), (3,2)), # Increase the template size
+    (4, 3, 2, 2, (2,2), (3,2)), # Move point in the x-axis
+    (4, 3, 4, 3, (2,2), (3,2)), # Move point in the other x-direction
+    (4, 3, 3, 1, (2,2), (3,2)), # Move point negative in the y-axis; also tests size reduction
+    (4, 3, 3, 3, (2,2), (3,2))  # Move point positive in the y-axis
 
 ])
 def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
@@ -264,11 +270,11 @@ def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
                         (0, 0, 0, 0, 0, 0, 0),
                         (0, 0, 0, 0, 0, 0, 0)), dtype=np.uint8)
 
-    dx, dy, metrics, _ = sp.subpixel_phase(x, y, x1, y1, 
-                                                 test_image, t_shape,
-                                                 image_size=image_size)
+    reference_roi = roi.Roi(test_image, x, y, size_x=image_size[0], size_y=image_size[1])
+    walking_roi = roi.Roi(t_shape, x1, y1, size_x=image_size[0], size_y=image_size[1])
 
+    affine, metrics, _ = sp.subpixel_phase(reference_roi, walking_roi)
+
+    dx, dy = affine.inverse((x1, y1))[0]
     assert dx == expected[0]
     assert dy == expected[1]
-
-
