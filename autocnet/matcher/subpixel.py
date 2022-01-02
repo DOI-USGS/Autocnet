@@ -36,7 +36,7 @@ from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
-from autocnet.transformation.affine import estimate_affine_transformation
+from autocnet.transformation.affine import estimate_affine_from_sensors
 from autocnet import spatial
 from autocnet.utils.utils import bytescale
 
@@ -846,7 +846,7 @@ def geom_match_simple(reference_image,
         match_func = check_match_func(match_func)
 
     # Estimate the transformation between the two images
-    affine = estimate_affine_transformation(reference_image, moving_image, bcenter_x, bcenter_y)
+    affine = estimate_affine_from_sensors(reference_image, moving_image, bcenter_x, bcenter_y)
     t2 = time.time()
     print(f'Estimation of the transformation took {t2-t1} seconds.')
 
@@ -1230,7 +1230,7 @@ def geom_match(destination_cube,
 
 
     # Estimate the transformation
-    affine = estimate_affine_transformation(destination_corners, source_corners)
+    affine = estimate_affine_from_sensors(destination_corners, source_corners)
 
     # Apply the subpixel matcher with an affine transformation
     restemplate = subpixel_transformed_template(bcenter_x, bcenter_y,
@@ -2083,7 +2083,7 @@ def subpixel_register_point_smart(pointid,
         print('geom_func', geom_func)
         
         try:
-            affine = estimate_affine_transformation(source_node.geodata, 
+            affine = estimate_affine_from_sensors(source_node.geodata, 
                                                         destination_node.geodata,
                                                         source.apriorisample, 
                                                         source.aprioriline)
@@ -2394,7 +2394,7 @@ def validate_candidate_measure(measure_to_register,
         
         print(f'Validating measure: {measure_to_register_id} on image: {source_image.name}')
         try:
-            affine = estimate_affine_transformation(source_node.geodata, destination_node.geodata, sample, line)
+            affine = estimate_affine_from_sensors(source_node.geodata, destination_node.geodata, sample, line)
         except:
             print('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
             return [np.inf] * len(parameters)
