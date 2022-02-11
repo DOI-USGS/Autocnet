@@ -2,7 +2,7 @@ numpy>=1.10.0
 numexpr
 scipy>=0.17.0
 gdal>=1.11.2
-protobuf==3.0.0b2
+protobuf==3.15.0
 networkx
 pandas
 geopandas
