@@ -8,12 +8,12 @@ from autocnet.spatial import isis
 
 log = logging.getLogger(__name__)
 
-def estimate_affine_transformation(reference_image,
-                                   moving_image,
-                                   bcenter_x,
-                                   bcenter_y,
-                                   size_x=60,
-                                   size_y=60):
+def estimate_affine_from_sensors(reference_image,
+                                moving_image,
+                                bcenter_x,
+                                bcenter_y,
+                                size_x=60,
+                                size_y=60):
     """
     Using the a priori sensor model, project corner and center points from the reference_image into
     the moving_image and use these points to estimate an affine transformation.
@@ -86,5 +86,5 @@ def estimate_affine_transformation(reference_image,
 
     affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
     t2 = time.time()
-    print(f'Estimation of the transformation took {t2-t1} seconds.')
+    log.debug(f'Estimation of the transformation took {t2-t1} seconds.')
     return affine

@@ -14,7 +14,7 @@ import sys
 import cv2
 
 from skimage import transform as tf
-from skimage import registration 
+from skimage import registration
 from skimage import filters
 from skimage.util import img_as_float32
 from scipy import fftpack
@@ -32,11 +32,11 @@ from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg
 from autocnet.matcher.mutual_information import mutual_information_match
 from autocnet.matcher import ciratefi
 from autocnet.matcher.mutual_information import mutual_information
-from autocnet.spatial import isis 
+from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
-from autocnet.transformation.affine import estimate_affine_transformation
+from autocnet.transformation.affine import estimate_affine_from_sensors
 from autocnet import spatial
 from autocnet.utils.utils import bytescale
 
@@ -197,10 +197,7 @@ def clip_roi(img, center_x, center_y, size_x=200, size_y=200, dtype="uint64"):
             return None, 0, 0
     return subarray, axr, ayr
 
-def subpixel_phase(sx, sy, dx, dy,
-                   s_img, d_img,
-                   image_size=(51, 51),
-                   **kwargs):
+def subpixel_phase(reference_roi, walking_roi, affine=None, **kwargs):
     """
     Apply the spectral domain matcher to a search and template image. To
     shift the images, the x_shift and y_shift, need to be subtracted from
@@ -210,37 +207,33 @@ def subpixel_phase(sx, sy, dx, dy,
 
     Parameters
     ----------
-    template : ndarray
-               The template used to search
-
-    search : ndarray
-             The search image
+    reference_roi : Object
+                    An Roi object from autocnet, the reference image to use when computing subpixel offsets.
+                    Contains either an ndarray or a GeoDataset Object
+    walking_roi : Object
+                  An Roi object from autocnet, the walking image to move around and make comparisons to
+                  the reference roi. Contains either an ndarray or a GeoDataset Object
+    affine : Object
+             Scikit image affine tranformation. This affine transformation is applied to the walking_roi
+             before any comparisons are made
 
     Returns
     -------
-    x_offset : float
-               Shift in the x-dimension
-
-    y_offset : float
-               Shift in the y-dimension
-
-    strength : tuple
-               With the RMSE error and absolute difference in phase
+    new_affine : Object
+                 Scikit image affine transformation. An updated affine transformation that is the new
+                 translation from the walking_roi to the reference_roi
+    : tuple
+      With the RMSE error and absolute difference in phase
     """
-    image_size = check_image_size(image_size)
+    reference_image = reference_roi.clip()
+    walking_template = walking_roi.clip(affine)
 
-    s_roi = roi.Roi(s_img, sx, sy, size_x=image_size[0], size_y=image_size[1])
-    d_roi = roi.Roi(d_img, dx, dy, size_x=image_size[0], size_y=image_size[1])
+    if reference_image.shape != walking_template.shape:
 
-    s_image = s_roi.array
-    d_template = d_roi.array
-
-    if s_image.shape != d_template.shape:
-
-        s_size = s_image.shape
-        d_size = d_template.shape
-        updated_size_x = int(min(s_size[1], d_size[1]))
-        updated_size_y = int(min(s_size[0], d_size[0]))
+        reference_size = reference_image.shape
+        walking_size = walking_template.shape
+        updated_size_x = int(min(walking_size[1], reference_size[1]))
+        updated_size_y = int(min(walking_size[0], reference_size[0]))
 
         # Have to subtract 1 from even entries or else the round up that
         # occurs when the size is split over the midpoint causes the
@@ -254,21 +247,18 @@ def subpixel_phase(sx, sy, dx, dy,
         # the current maximum image size and reduce from there on potential
         # future iterations.
         size = check_image_size((updated_size_x, updated_size_y))
-        s_roi = roi.Roi(s_img, sx, sy,
-                        size_x=size[0], size_y=size[1])
-        d_roi = roi.Roi(d_img, dx, dy,
-                        size_x=size[0], size_y=size[1])
-        s_image = s_roi.array
-        d_template = d_roi.array
 
-        if (s_image is None) or (d_template is None):
-            return None, None, None
+        reference_roi.size_x, reference_roi.size_y = size
+        walking_roi.size_x, walking_roi.size_y = size
 
-    (shift_y, shift_x), error, diffphase = registration.phase_cross_correlation(s_image, d_template, **kwargs)
-    dx = d_roi.x - shift_x
-    dy = d_roi.y - shift_y
+        reference_image = reference_roi.clip()
+        walking_template = walking_roi.clip(affine)
 
-    return dx, dy, error, None
+    (shift_y, shift_x), error, diffphase = registration.phase_cross_correlation(reference_image,
+                                                                                walking_template,
+                                                                                **kwargs)
+    new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
+    return new_affine, error, diffphase
 
 def subpixel_transformed_template(sx, sy, dx, dy,
                                   s_img, d_img,
@@ -442,10 +432,8 @@ def subpixel_transformed_template(sx, sy, dx, dy,
 
     return dx, dy, metrics, corrmap
 
-def subpixel_template_classic(sx, sy, dx, dy,
-                              s_img, d_img,
-                              image_size=(251, 251),
-                              template_size=(51,51),
+
+def subpixel_template_classic(reference_roi, moving_roi, affine=tf.AffineTransform(),
                               func=pattern_match,
                               **kwargs):
     """
@@ -453,80 +441,64 @@ def subpixel_template_classic(sx, sy, dx, dy,
     compute an x and y offset from the search keypoint to the template keypoint and an associated strength.
     Parameters
     ----------
-    sx : Numeric
-         Source X coordinate
-    sy : Numeric
-         Source y coordinate
-    dx : Numeric
-         The desintation x coordinate
-    dy : Numeric
-         The destination y coordinate
-    s_img : GeoDataset
-            The source image GeoDataset
-    d_img : GeoDataset
-            The destination image GeoDataset
-    image_size : tuple
-                 (xsize, ysize) of the image that is searched within (this should be larger
-                 than the template size)
-    template_size : tuple
-                    (xsize, ysize) of the template to iterate over the image in order
-                    to identify the area(s) of highest correlation.
+    reference_roi : autocnet.roi.Roi
+                    Roi object representing the reference image 
+    
+    moving_roi : autocnet.roi.Roi
+                 Roi object representing the moving image, this image is registered to the reference_roi   
+    
+    affine : skimage.transform.AffineTransform
+             scikit-image Affine transformation, used as a seed transform that 
+
+    func : callable 
+           Some subpixel template matching function 
+    
+    kwargs : dict 
+             keyword args for func 
 
     Returns
     -------
-    x_shift : float
-              Shift in the x-dimension
-    y_shift : float
-              Shift in the y-dimension
+    affine : skimage.transform.AffineTransform
+             Affine transform containing new  
+    
     strength : float
                Strength of the correspondence in the range [-1, 1]
+    
+    corrmap : np.array 
+            
+    
     See Also
     --------
     autocnet.matcher.naive_template.pattern_match : for the kwargs that can be passed to the matcher
     autocnet.matcher.naive_template.pattern_match_autoreg : for the jwargs that can be passed to the autoreg style matcher
     """
 
-    # Image or source is the reference that the template is registered to
+    # In ISIS, the reference image is the search and moving image is the pattern.
 
-    image_size = check_image_size(image_size)
-    template_size = check_image_size(template_size)
-
-    # In ISIS source image is the search and destination image is the pattern.
-    # In ISIS the search is CTX and the pattern is THEMIS
-    # So the data that are being used are swapped between autocnet and ISIS.
-    s_roi = roi.Roi(s_img, sx, sy, size_x=image_size[0], size_y=image_size[1])
-    d_roi = roi.Roi(d_img, dx, dy, size_x=template_size[0], size_y=template_size[1])
-
-    """print('Source: ', sx, sy, d_roi.x, d_roi.y)
-    print('Destination ',dx, dy, s_roi.x, s_roi.y )
-
-    print('d shape', d_roi.clip().shape)
-    print('d mean: ', d_roi.clip().mean())
-    print(f'd mm: {d_roi.clip().min()} {d_roi.clip().max()}')"""
-    #print(f'{len(isis.get_isis_special_pixels(d_roi.clip()))} chip sps : ', isis.get_isis_special_pixels(d_roi.clip()))
-
-    s_image = s_roi.array
-    d_template = d_roi.array
-
-    """print('s shape', s_image.shape)
-    print('s mean: ', s_image.mean())
-    print(f's mm: {s_image.min()} {s_image.max()}')"""
-    #print(f'{len(isis.get_isis_special_pixels(s_image))} chip sps: ', isis.get_isis_special_pixels(s_image))
-
-    if d_roi.variance == 0:
+    ref_clip = reference_roi.clip()
+    moving_clip = moving_roi.clip()
+    
+    moving_clip = tf.warp(moving_clip, affine, order=3)
+    
+    print(moving_clip.var())
+    
+    if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
         return [None] * 4
 
-    if (s_image is None) or (d_template is None):
+    if (ref_clip is None) or (moving_clip is None):
         return None, None, None, None
 
-    shift_x, shift_y, metrics, corrmap = func(img_as_float32(d_template), img_as_float32(s_image), **kwargs)
+    shift_x, shift_y, metrics, corrmap = func(img_as_float32(ref_clip), img_as_float32(moving_clip), **kwargs)
+    
     if shift_x is None:
         return None, None, None, None
-    # Apply the shift and return
-    dx = d_roi.x - shift_x
-    dy = d_roi.y - shift_y
-    return dx, dy, metrics, corrmap
+    
+    print(shift_x, shift_y)
+    new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
+    
+    return new_affine,  metrics, corrmap
+
 
 def subpixel_template(sx, sy, dx, dy,
                       s_img, d_img,
@@ -696,7 +668,7 @@ def subpixel_ciratefi(sx, sy, dx, dy, s_img, d_img, search_size=251, template_si
     dy += (y_offset + t_roi.ayr)
     return dx, dy, strength
 
-def iterative_phase(sx, sy, dx, dy, s_img, d_img, size=(51, 51), reduction=11, convergence_threshold=1.0, max_dist=50, **kwargs):
+def iterative_phase(reference_roi, walking_roi, affine=None, reduction=11, convergence_threshold=0.1, max_dist=50, **kwargs):
     """
     Iteratively apply a subpixel phase matcher to source (s_img) and destination (d_img)
     images. The size parameter is used to set the initial search space. The algorithm
@@ -707,18 +679,12 @@ def iterative_phase(sx, sy, dx, dy, s_img, d_img, size=(51, 51), reduction=11, c
 
     Parameters
     ----------
-    sx : numeric
-         The x position of the center of the template to be matched to
-    sy : numeric
-         The y position of the center of the template to be matched to
-    dx : numeric
-         The x position of the center of the search to be matched from
-    dy : numeric
-         The y position of the center of the search to be matched to
-    s_img : object
-            A plio geodata object from which the template is extracted
-    d_img : object
-            A plio geodata object from which the search is extracted
+    reference_roi : Object
+                    An Roi object from autocnet, the reference image to use when computing subpixel offsets.
+                    Contains either an ndarray or a GeoDataset Object
+    walking_roi : Object
+                  An Roi object from autocnet, the walking image to move around and make comparisons to
+                  the reference roi. Contains either an ndarray or a GeoDataset Object
     size : tuple
            Size of the template in the form (x,y)
     reduction : int
@@ -728,10 +694,6 @@ def iterative_phase(sx, sy, dx, dy, s_img, d_img, size=(51, 51), reduction=11, c
 
     Returns
     -------
-    dx : float
-         The new x value for the match in the destination (d) image
-    dy : float
-         The new y value for the match in the destination (d) image
     metrics : tuple
               A tuple of metrics. In the case of the phase matcher this are difference
               and RMSE in the phase dimension.
@@ -740,32 +702,40 @@ def iterative_phase(sx, sy, dx, dy, s_img, d_img, size=(51, 51), reduction=11, c
     --------
     subpixel_phase : the function that applies a single iteration of the phase matcher
     """
-
     # get initial destination location
-    dsample = dx
-    dline = dy
+    dsample, dline = walking_roi.x, walking_roi.y
+    dx, dy = walking_roi.x, walking_roi.y
+
+    size = (walking_roi.size_x, walking_roi.size_y)
+    original_size = (walking_roi.size_x, walking_roi.size_y)
+
+    subpixel_affine = tf.AffineTransform()
 
     while True:
-        shifted_dx, shifted_dy, metrics, _ = subpixel_phase(sx, sy, dx, dy, s_img, d_img, image_size=size, **kwargs)
-
+        new_subpixel_affine, error, diffphase = subpixel_phase(reference_roi, walking_roi, affine, **kwargs)
         # Compute the amount of move the matcher introduced
-        delta_dx = abs(shifted_dx - dx)
-        delta_dy = abs(shifted_dy - dy)
-        dx = shifted_dx
-        dy = shifted_dy
+        delta_dx, delta_dy = abs(new_subpixel_affine.translation)
+        subpixel_affine += new_subpixel_affine
+        dx, dy = subpixel_affine.inverse((reference_roi.x, reference_roi.y))[0]
+        walking_roi.x, walking_roi.y = dx, dy
 
         # Break if the solution has converged
         size = (size[0] - reduction, size[1] - reduction)
+        walking_roi.size_x, walking_roi.size_y = size
+        reference_roi.size_x, reference_roi.size_y = size
         dist = np.linalg.norm([dsample-dx, dline-dy])
 
         if min(size) < 1:
-            return None, None, (None, None)
+            return None, None, None
         if delta_dx <= convergence_threshold and\
-           delta_dy<= convergence_threshold and\
+           delta_dy <= convergence_threshold and\
            abs(dist) <= max_dist:
-           break
+            break
 
-    return dx, dy, metrics
+    walking_roi.size_x, walking_roi.size_y = original_size
+    reference_roi.size_x, reference_roi.size_y = original_size
+    walking_roi.x, walking_roi.y = dsample, dline
+    return subpixel_affine, error, diffphase
 
 '''def estimate_affine_transformation(destination_coordinates, source_coordinates):
     """
@@ -864,7 +834,7 @@ def geom_match_simple(reference_image,
         match_func = check_match_func(match_func)
 
     # Estimate the transformation between the two images
-    affine = estimate_affine_transformation(reference_image, moving_image, bcenter_x, bcenter_y)
+    affine = estimate_affine_from_sensors(reference_image, moving_image, bcenter_x, bcenter_y)
     t2 = time.time()
     print(f'Estimation of the transformation took {t2-t1} seconds.')
 
@@ -1248,7 +1218,7 @@ def geom_match(destination_cube,
 
 
     # Estimate the transformation
-    affine = estimate_affine_transformation(destination_corners, source_corners)
+    affine = estimate_affine_from_sensors(destination_corners, source_corners)
 
     # Apply the subpixel matcher with an affine transformation
     restemplate = subpixel_transformed_template(bcenter_x, bcenter_y,
@@ -1866,7 +1836,7 @@ def estimate_logpolar_transform(img1, img2, low_sigma=0.5, high_sigma=30, verbos
 
     tf_rotate_from_center = (tf_shift + (tf_rotate + tf_shift_inv))
     return tf.SimilarityTransform((tf_rotate_from_center + tf_scale)._inv_matrix)
-       
+
 def fourier_mellen(img1, img2, verbose=False, phase_kwargs={}):
     """
     Iterative phase registration using a log-polar projection to estimate an affine for scale and roation invariance.
@@ -1939,13 +1909,13 @@ def fourier_mellen(img1, img2, verbose=False, phase_kwargs={}):
     return newx, newy, error
 
 
-# TODO: This func should be in transformation.affine with 
+# TODO: This func should be in transformation.affine with
 # signature (array_to_warp, affine, order=3).
 def affine_warp_image(base_cube, input_cube, affine, order=3):
     """
     Given a base image, an input image, and an affine transformation, return
     the base image and the affine transformed input image.
-    
+
     Parameters
     ----------
     base_cube : GeoDataset
@@ -1958,7 +1928,7 @@ def affine_warp_image(base_cube, input_cube, affine, order=3):
              A scikit image Affine object
 
     order : int
-            The order of the transformation to apply. Default is a 3rd (3) order 
+            The order of the transformation to apply. Default is a 3rd (3) order
             polynomial.
 
     Returns
@@ -1981,7 +1951,7 @@ def affine_warp_image(base_cube, input_cube, affine, order=3):
     box = (0, 0, max(dst_arr.shape[1], base_arr.shape[1]), max(dst_arr.shape[0], base_arr.shape[0]))
     dst_arr = np.array(Image.fromarray(dst_arr).crop(box))
 
-    dst_arr = tf.warp(dst_arr, affine, order=order)      
+    dst_arr = tf.warp(dst_arr, affine, order=order)
     t2 = time.time()
     print(f'Affine warp took {t2-t1} seconds.')
 
@@ -2013,37 +1983,37 @@ def subpixel_register_point_smart(pointid,
     ncg : obj
           the network candidate graph that the point is associated with; used for
           the DB session that is able to access the point.
-    
-    geom_func : callable
-                function used to tranform the source and/or destination image before 
-                running a matcher. 
-    
-    match_func : callable
-                 subpixel matching function to use registering measures   
 
-    parameters : list 
-                 of dicts containing "match_kwargs" used for specified match_func. 
+    geom_func : callable
+                function used to tranform the source and/or destination image before
+                running a matcher.
+
+    match_func : callable
+                 subpixel matching function to use registering measures
+
+    parameters : list
+                 of dicts containing "match_kwargs" used for specified match_func.
                  The passed parameters describe image and template chips that are tested.
                  For example parameters = [
                  {'match_kwargs': {'image_size':(121,121), 'template_size':(61,61)}},
                  {'match_kwargs': {'image_size':(151,151), 'template_size':(67,67)}},
                  {'match_kwargs': {'image_size':(181,181), 'template_size':(73,73)}}]
     """
-    
+
     geom_func=geom_func.lower()
     match_func=match_func.lower()
 
     print(f"Using {geom_func} with the {match_func} matcher.")
-    
+
     match_func = check_match_func(match_func)
     geom_func = check_geom_func(geom_func)
 
     if not ncg.Session:
         raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
-    
+
     if isinstance(pointid, Points):
         pointid = pointid.id
-    
+
     t1 = time.time()
     with ncg.session_scope() as session:
         # Order by is important here because the measures get ids in sequential order when initially placed
@@ -2053,7 +2023,7 @@ def subpixel_register_point_smart(pointid,
         reference_index = point.reference_index
         t2 = time.time()
         print(f'Query took {t2-t1} seconds to find the measures and reference measure.')
-        
+
         # Get the reference measure to instantiate the source node. All other measures will
         # match to the source node.
         source = measures[reference_index]
@@ -2061,7 +2031,7 @@ def subpixel_register_point_smart(pointid,
 
         print(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
         print(f'Measure reference index is: {reference_index}')
-        
+
         # Build a node cache so that this is an encapsulated database call. Then nodes
         # can be pulled from the lookup sans database.
         nodes = {}
@@ -2079,12 +2049,12 @@ def subpixel_register_point_smart(pointid,
     print(nodes)
     # Set the reference image
     source_node = nodes[reference_index_id]
-    
+
     print(f'Source: sample: {source.sample} | line: {source.line}')
     resultlog = []
     updated_measures = []
     for i, measure in enumerate(measures):
-        
+
         # If this is the reference node, do not attempt to match it.
         if i == reference_index:
             continue
@@ -2099,14 +2069,14 @@ def subpixel_register_point_smart(pointid,
 
         print('geom_match image:', destination_node['image_path'])
         print('geom_func', geom_func)
-        
+
         try:
-            affine = estimate_affine_transformation(source_node.geodata, 
-                                                        destination_node.geodata,
-                                                        source.apriorisample, 
-                                                        source.aprioriline)
+            affine = estimate_affine_from_sensors(source_node.geodata, 
+                                                  destination_node.geodata,
+                                                  source.apriorisample,
+                                                  source.aprioriline)
         except Exception as e:
-            print(e) 
+            print(e)
             m = {'id': measure.id,
                  'sample':measure.apriorisample,
                  'line':measure.aprioriline,
@@ -2114,12 +2084,12 @@ def subpixel_register_point_smart(pointid,
                  'choosername':chooser}
             updated_measures.append([None, None, m])
             continue
-        
+
         # Here is where I need to get the two ROIs extracted. Then I need to get the destination ROI affine transformed to the source ROI
-        base_arr, dst_arr = affine_warp_image(source_node.geodata, 
-                                              destination_node.geodata, 
+        base_arr, dst_arr = affine_warp_image(source_node.geodata,
+                                              destination_node.geodata,
                                               affine)
-            
+
         # Compute the baseline metrics using the smallest window
         size_x = np.inf
         size_y = np.inf
@@ -2129,7 +2099,7 @@ def subpixel_register_point_smart(pointid,
                 size_x = match_kwarg['template_size'][0]
             if match_kwarg['template_size'][1] < size_y:
                 size_y = match_kwarg['template_size'][1]
-        
+
         base_roi = roi.Roi(base_arr, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y).array
         dst_roi = roi.Roi(dst_arr, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y).array
 
@@ -2140,7 +2110,7 @@ def subpixel_register_point_smart(pointid,
                     'choosername': chooser}
             updated_measures.append([None, None, m])
             continue
-        
+
         if base_roi.shape != dst_roi.shape:
             print('Unable to process. ROIs are different sizes for MI matcher')
             m = {'id': measure.id,
@@ -2153,7 +2123,7 @@ def subpixel_register_point_smart(pointid,
         dst_roi = img_as_float32(dst_roi)
 
         baseline_mi = mutual_information(base_roi, dst_roi)
-        
+
 
         # Refactor this call to module
         result = cv2.matchTemplate(base_roi, dst_roi, method=cv2.TM_CCOEFF_NORMED)
@@ -2163,19 +2133,19 @@ def subpixel_register_point_smart(pointid,
             match_kwargs = parameter['match_kwargs']
 
             restemplate = match_func(source.apriorisample, source.aprioriline, source.apriorisample, source.aprioriline, base_arr, dst_arr, **match_kwargs)
- 
-            try: 
+
+            try:
                 x,y,maxcorr,temp_corrmap = restemplate
-            except: 
-                # did not return a corrmap 
-                x,y,maxcorr = restemplate 
+            except:
+                # did not return a corrmap
+                x,y,maxcorr = restemplate
                 temp_corrmap = np.empty((size_x, size_y))
                 temp_corrmap[:] = np.nan
-            
+
             if x is None or y is None:
                 print('Unable to match with this parameter set.')
                 continue
-               
+
             base_roi = roi.Roi(base_arr, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y).array
             dst_roi = roi.Roi(dst_arr, x, y, size_x=size_x, size_y=size_y).array
 
@@ -2194,15 +2164,15 @@ def subpixel_register_point_smart(pointid,
                 new_x, new_y = affine([x, y])[0]
                 dist = np.linalg.norm([source.apriorisample-x, source.aprioriline-y])
                 cost = cost_func(dist, metric)
-    
+
                 m = {'id': measure.id,
                     'sample':new_x,
                     'line':new_y,
                     'weight':cost,
                     'choosername':chooser,
                     'template_metric':metric,
-                    'template_shift':dist, 
-                    'mi_metric': mi_metric, 
+                    'template_shift':dist,
+                    'mi_metric': mi_metric,
                     'status': True}
                 print(f'METRIC: {metric}| SAMPLE: {new_x} | LINE: {new_y} | MI: {mi_metric}')
 
@@ -2216,7 +2186,7 @@ import numpy as np
 
 def check_for_shift_consensus(shifts, tol=0.1):
     """
-    Find matched locations from a set of multiple different solutions that have 
+    Find matched locations from a set of multiple different solutions that have
     the same position within some user supplied tolerance. If the distance between
     two measures (shifts) is <= the tolerance, the measures are considered to have
     found consensus.
@@ -2224,10 +2194,10 @@ def check_for_shift_consensus(shifts, tol=0.1):
     This doc string uses 'measure' to describe each solution found by a subpixel
     matching attempt. If n-attempts are made, using n-different parameter sets,
     this function will find shift consensus between those n-different solutions.
-    
-    The function works by computing the full distance matrix between all solutions, 
-    generating a boolean mask for distances less than the tolerance, then generating 
-    a vector of column sums where the sum is the number of inliers, and finally, 
+
+    The function works by computing the full distance matrix between all solutions,
+    generating a boolean mask for distances less than the tolerance, then generating
+    a vector of column sums where the sum is the number of inliers, and finally,
     returning a boolean vector where the column sums are greater than 2.
 
     Parameters
@@ -2249,14 +2219,14 @@ def check_for_shift_consensus(shifts, tol=0.1):
     dists = distance_matrix(shifts, shifts)
     inliers = dists <= tol
     col_sums = np.sum(inliers, 1)
-    # The distance matrix is zero diagonal, so 2+ means one other matcher found 
+    # The distance matrix is zero diagonal, so 2+ means one other matcher found
     # a close location
     return col_sums > 2
-    
-def decider(measures, tol=0.5):  
+
+def decider(measures, tol=0.5):
     """
-    The logical decision function that determines which measures would be updated 
-    with subpixel registration or ignored. The function iterates over the measures, 
+    The logical decision function that determines which measures would be updated
+    with subpixel registration or ignored. The function iterates over the measures,
     looks for shift consensus between subpixel registration runs.
 
     Parameters
@@ -2276,7 +2246,7 @@ def decider(measures, tol=0.5):
     measures_to_set_false : list
                             of meaure ids to be ignored beause theu fail the consensus
                             building approach
-    """    
+    """
     by_id = defaultdict(list)
     measures_to_set_false = []
     for m in measures:
@@ -2285,16 +2255,16 @@ def decider(measures, tol=0.5):
         m = m[2]
         if m['status'] and m['mi_metric'] is not None and m['template_metric'] is not None:
             choosername = m['choosername']
-            by_id[m['id']].append([m['line'], 
-                                  m['sample'], 
-                                  m['mi_metric'], 
-                                  m['template_metric'], 
-                                  baseline_mi, 
-                                  baseline_corr, 
+            by_id[m['id']].append([m['line'],
+                                  m['sample'],
+                                  m['mi_metric'],
+                                  m['template_metric'],
+                                  baseline_mi,
+                                  baseline_corr,
                                   m['template_shift']])
         else:
             measures_to_set_false.append(m['id'])
-            
+
     measures_to_update = []
     for k, v in by_id.items():
         v = np.asarray(v)
@@ -2303,13 +2273,13 @@ def decider(measures, tol=0.5):
         baseline_mi = v[:,4]
         baseline_corr = v[:,5]
         cost = (baseline_mi - mi) + (baseline_corr - corr)
-        
+
         # At least two of the correlators need to have found a soln within 0.5 pixels.
         shift_mask = check_for_shift_consensus(v[:,:2], tol=tol)
-        
+
         # This is formulated as a minimization, so the best is the min cost
         best_cost = np.argmin(cost)
-        
+
         if shift_mask[best_cost] == False:
             # The best cost does not have positional consensus
             measures_to_set_false.append(k)
@@ -2328,8 +2298,8 @@ def decider(measures, tol=0.5):
     # A measure could have one bad regitration and get set false, if a different parameter set passed,
     # remove from the set false list.
     ids_to_update = [d['id'] for d in measures_to_update]
-    measures_to_set_false = [i for i in measures_to_set_false if i not in ids_to_update] 
-    
+    measures_to_set_false = [i for i in measures_to_set_false if i not in ids_to_update]
+
     return measures_to_update, measures_to_set_false
 
 def validate_candidate_measure(measure_to_register,
@@ -2340,7 +2310,7 @@ def validate_candidate_measure(measure_to_register,
                             **kwargs):
     """
     Compute the matching distances, matching the reference measure to the measure
-    originally registered to it. This is an inverse check from the original mathcing. 
+    originally registered to it. This is an inverse check from the original mathcing.
     In other words, the first registration registers A->B to find measure_to_register (B-naught).
     This func then matches B->A (B-prime) and computes the distance between B-naught and B-prime.
 
@@ -2372,15 +2342,15 @@ def validate_candidate_measure(measure_to_register,
     match_func=match_func.lower()
 
     print(f"Using {geom_func} with the {match_func} matcher.")
-    
+
     match_func = check_match_func(match_func)
     geom_func = check_geom_func(geom_func)
 
     if not ncg.Session:
         raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
-    
+
     measure_to_register_id = measure_to_register['id']
-    
+
     t1 = time.time()
     with ncg.session_scope() as session:
         # Get the measure to be registered
@@ -2394,30 +2364,30 @@ def validate_candidate_measure(measure_to_register,
         print(f'Query took {t2-t1} seconds to find the measure and the reference measure.')
 
         # Match the reference measure to the measure_to_register - this is the inverse of the first match attempt
-        # Source is the image that we are seeking to validate, destination is the reference measure. 
+        # Source is the image that we are seeking to validate, destination is the reference measure.
         # This is the inverse of other functions as this is a validator.
-                
+
         source_imageid = measure.imageid
         source_image = session.query(Images).filter(Images.id == source_imageid).one()
         source_node = NetworkNode(node_id=source_imageid, image_path=source_image.path)
         source_node.parent = ncg
-        
+
         destination_imageid = reference_measure.imageid
         destination_image = session.query(Images).filter(Images.id == destination_imageid).one()
         destination_node = NetworkNode(node_id=destination_imageid, image_path=destination_image.path)
         destination_node.parent = ncg
-        
+
         sample = measure_to_register['sample']
         line = measure_to_register['line']
-        
+
         print(f'Validating measure: {measure_to_register_id} on image: {source_image.name}')
         try:
-            affine = estimate_affine_transformation(source_node.geodata, destination_node.geodata, sample, line)
+            affine = estimate_affine_from_sensors(source_node.geodata, destination_node.geodata, sample, line)
         except:
             print('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
             return [np.inf] * len(parameters)
-        base_arr, dst_arr = affine_warp_image(source_node.geodata, 
-                                                  destination_node.geodata, 
+        base_arr, dst_arr = affine_warp_image(source_node.geodata,
+                                                  destination_node.geodata,
                                                   affine)
 
         dists = []
@@ -2425,38 +2395,38 @@ def validate_candidate_measure(measure_to_register,
             match_kwargs = parameter['match_kwargs']
 
             restemplate = match_func(sample, line, sample, line, base_arr, dst_arr, **match_kwargs)
- 
-            try: 
+
+            try:
                 x,y,maxcorr,temp_corrmap = restemplate
-            except: 
-                # did not return a corrmap 
-                x,y,maxcorr = restemplate 
+            except:
+                # did not return a corrmap
+                x,y,maxcorr = restemplate
                 temp_corrmap = np.empty((size_x, size_y))
                 temp_corrmap[:] = np.nan
-            
+
             if x is None or y is None:
                 continue
-        
-        
+
+
             new_x, new_y = affine([x, y])[0]
 
-            dist = np.sqrt((new_y - reference_measure.line) ** 2 + (new_x - reference_measure.sample) ** 2) 
+            dist = np.sqrt((new_y - reference_measure.line) ** 2 + (new_x - reference_measure.sample) ** 2)
             print('Reprojection Distance: ', dist)
             dists.append(dist)
         return dists
 
-def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Session=None):    
+def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Session=None):
     """
-    The entry func for the smart subpixel registration code. This is the user 
+    The entry func for the smart subpixel registration code. This is the user
     side API func for subpixel registering a point using the smart matcher.
 
-    This function runs multiple rounds of subpixel registration on a point 
-    using 'subpixel_register_point_smart', checks for a consensus from the 
-    subpixel registration results, and validates the new location by inverting 
-    the matching direction. This function writes to the database and outputs 
+    This function runs multiple rounds of subpixel registration on a point
+    using 'subpixel_register_point_smart', checks for a consensus from the
+    subpixel registration results, and validates the new location by inverting
+    the matching direction. This function writes to the database and outputs
     the updated and ignored measures for logging purposes.
 
-    This func writes to the databse. The returns are for logging and 
+    This func writes to the databse. The returns are for logging and
     debugging convenience.
 
     Parameters
@@ -2484,7 +2454,7 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Ses
     measures_to_set_false : list
                             of meaure ids to be ignored beause theu fail the consensus
                             building approach
-    
+
     """
     measure_results = subpixel_register_point_smart(pointid, ncg=ncg, parameters=parameters, **shared_kwargs)
     measures_to_update, measures_to_set_false = decider(measure_results)
@@ -2499,13 +2469,13 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Ses
         #if reprojection_distance > 1:
             print(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")
             measures_to_set_false.append(measure['id'])
-    
+
     for measure in measures_to_update:
         measure['_id'] = measure.pop('id', None)
 
     from autocnet.io.db.model import Measures
     from sqlalchemy.sql.expression import bindparam
-    
+
     # Update the measures that passed registration
     with ncg.engine.connect() as conn:
         if measures_to_update:
