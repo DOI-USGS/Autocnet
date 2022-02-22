@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+import logging
 
 from autocnet.utils.serializers import JsonEncoder, object_hook
 from autocnet.graph import cluster_submit
@@ -12,6 +13,7 @@ from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
 from autocnet.io.db.model import Points, JobsHistory
 
+log = logging.getLogger(__name__)
 
 @pytest.fixture
 def args():
@@ -102,9 +104,11 @@ def test_finalize_message_from_work_queue(args, queue, simple_message):
     cluster_submit.finalize_message_from_work_queue(queue, args['working_queue'], remove_key)
     assert queue.llen(args['working_queue']) == 0
     
-def test_no_msg(args, queue):
-    with pytest.warns(UserWarning, match='Expected to process a cluster job, but the message queue is empty.'):
-        cluster_submit.manage_messages(args, queue)
+def test_no_msg(caplog,args, queue):
+    cluster_submit.manage_messages(args, queue)
+    expected_log = 'Expected to process a cluster job, but the message queue is empty.'
+    assert expected_log in caplog.text
+    
 
 
 # Classes and funcs for testing job submission.
@@ -166,6 +170,23 @@ def test_process_row(along, func, msg_additions, mocker):
     assert msg['results'] == True
     
     cluster_submit._instantiate_row.assert_called_once()
+
+@pytest.mark.parametrize()
+def _do_something(log_level):
+    return getattr(log, log_level)(f'Logging at the {log_level}')
+
+def test_do_something(caplog):
+    log_levels = ["critical", "error", "warning", "info", "debug"]
+    
+    for level in log_levels:
+        os.environ["AUTOCNET_LOGLEVEL"] = level
+        _do_something(os.environ["AUTOCNET_LOGLEVEL"])
+
+        for record in caplog.records:
+            # casting the env var and record level to a string for comparison 
+            assert(str(os.environ["AUTOCNET_LOGLEVEL"]).upper() == str(record.levelname).upper())
+            caplog.clear()
+
 
 @pytest.mark.parametrize("along, func, msg_additions",[
                         ([1,2,3,4,5], _do_nothing, {})
