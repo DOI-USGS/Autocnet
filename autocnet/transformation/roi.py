@@ -1,7 +1,7 @@
 from math import modf, floor
 import numpy as np
 
-import pvl
+from skimage import transform as tf
 
 class Roi():
     """
@@ -126,13 +126,13 @@ class Roi():
         top_y = self._y - self.size_y
         bottom_y = self._y + self.size_y
 
-        if self._x - self.size_x < 0:
+        if left_x < 0:
             left_x = 0
-        if self._y - self.size_y < 0:
+        if top_y < 0:
             top_y = 0
-        if self._x + self.size_x > raster_size[0]:
+        if right_x > raster_size[0]:
             right_x = raster_size[0]
-        if self._y + self.size_y > raster_size[1]:
+        if bottom_y > raster_size[1]:
             bottom_y = raster_size[1]
 
         return list(map(int, [left_x, right_x, top_y, bottom_y]))
@@ -170,7 +170,7 @@ class Roi():
             data = self.data.read_array(pixels=pixels)
         return data
 
-    def clip(self, dtype=None):
+    def clip(self, affine=None, dtype=None, mode="reflect"):
         """
         Compatibility function that makes a call to the array property.
         Warning: The dtype passed in via this function resets the dtype attribute of this
@@ -186,5 +186,28 @@ class Roi():
          : ndarray
            The array attribute of this object.
         """
-        #self.dtype = dtype
+        self.dtype = dtype
+
+        if affine:
+            self.size_x *= 2
+            self.size_y *= 2
+
+            array_to_warp = self.array
+
+            # if array_to_warp.shape != ((self.size_y * 2) + 1, (self.size_x * 2) + 1):
+            #     raise ValueError("Unable to enlarge Roi to apply affine transformation." +
+            #                      f" Was only able to extract {array_to_warp.shape}, when " +
+            #                      f"{((self.size_y * 2) + 1, (self.size_x * 2) + 1)} was asked for. Select, " +
+            #                      "a smaller region of interest" )
+
+
+            #Affine transform the larger, moving array
+            transformed_array = tf.warp(array_to_warp, affine, order=3, mode=mode)
+            # print(transformed_array.shape)
+            self.size_x = int(self.size_x / 2)
+            self.size_y = int(self.size_y / 2)
+
+            new_center = np.array(transformed_array.shape)/2
+            return Roi(transformed_array, *new_center, self.size_x, self.size_y).clip()
+
         return self.array
