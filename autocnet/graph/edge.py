@@ -457,12 +457,9 @@ class Edge(dict, MutableMapping):
         d_img = self.destination.geodata
 
         # Determine which algorithm is going ot be used.
-        if method == 'phase':
-            func = sp.iterative_phase
-            nstrengths = 2
-        elif method == 'template':
-            func = sp.subpixel_template
-            nstrengths = 1
+        func = sp.iterative_phase
+        nstrengths = 2
+        
         shifts_x, shifts_y, strengths, new_x, new_y = sp._prep_subpixel(len(matches), nstrengths)
 
         # for each edge, calculate this for each keypoint pair
