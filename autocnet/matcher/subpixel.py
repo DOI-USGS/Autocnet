@@ -913,7 +913,7 @@ def geom_match_simple(base_cube,
 
     affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
     t2 = time.time()
-    print(f'Estimation of the transformation took {t2-t1} seconds.')
+    log.info(f'Estimation of the transformation took {t2-t1} seconds.')
     # read_array not getting correct type by default
 
     base_type = isis.isis2np_types[pvl.load(base_cube.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
@@ -927,7 +927,7 @@ def geom_match_simple(base_cube,
 
     dst_arr = tf.warp(dst_arr, affine, order=3)
     t3 = time.time()
-    print(f'Affine warp took {t3-t2} seconds.')
+    log.info(f'Affine warp took {t3-t2} seconds.')
     if verbose:
         fig, axs = plt.subplots(1, 2)
         axs[0].set_title("Base")
@@ -946,7 +946,7 @@ def geom_match_simple(base_cube,
 
     restemplate = match_func(bcenter_x, bcenter_y, bcenter_x, bcenter_y, base_arr, dst_arr, **match_kwargs)
     t4 = time.time()
-    print(f'Matching took {t4-t3} seconds')
+    log.info(f'Matching took {t4-t3} seconds')
 
     try:
         x,y,maxcorr,temp_corrmap = restemplate
@@ -1097,7 +1097,7 @@ def geom_match_classic(base_cube,
             )
         except CalledProcessError as e:
             if 'Requested position does not project in camera model' in e.stderr:
-                print(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {input_cube.base_name}')
+                log.info(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {input_cube.base_name}')
                 return None, None, None, None, None
 
     base_gcps = np.array([*base_corners])
@@ -1273,8 +1273,8 @@ def geom_match(destination_cube,
         center_x, center_y = spatial.isis.ground_to_image(source_cube.file_name, mlon, mlat)
     except CalledProcessError as e:
             if 'Requested position does not project in camera model' in e.stderr:
-                print(f'Skip geom_match; Region of interest center located at ({mlon}, {mlat}) does not project to image {source_cube.base_name}')
-                print('This should only appear when propagating ground points')
+                log.info(f'Skip geom_match; Region of interest center located at ({mlon}, {mlat}) does not project to image {source_cube.base_name}')
+                log.info('This should only appear when propagating ground points')
                 return None, None, None, None, None
 
     # Compute the mapping between the destination corners and the source_cube corners in
@@ -1288,7 +1288,7 @@ def geom_match(destination_cube,
             )
         except CalledProcessError as e:
             if 'Requested position does not project in camera model' in e.stderr:
-                print(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {source_cube.base_name}')
+                log.info(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {source_cube.base_name}')
                 return None, None, None, None, None
 
 
@@ -1379,7 +1379,7 @@ def subpixel_register_measure(measureid,
         source_node = NetworkNode(node_id=sourceid, image_path=sourceimage.path)
 
         resultlog = []
-        print(f'Attempting to subpixel register measure {measureid}: ({pointid}, {destinationimage.name})')
+        log.info(f'Attempting to subpixel register measure {measureid}: ({pointid}, {destinationimage.name})')
         currentlog = {'measureid': measureid,
                       'status': ''}
 
@@ -1393,7 +1393,7 @@ def subpixel_register_measure(measureid,
                                                             match_func=match_func,
                                                             template_kwargs=subpixel_template_kwargs)
         except Exception as e:
-            print(f'geom_match failed on measure {measureid} with exception -> {e}')
+            log.warning(f'geom_match failed on measure {measureid} with exception -> {e}')
             destination.ignore = True # geom_match failed
             currentlog['status'] = f"Failed to register measure {measureid}"
             resultlog.append(currentlog)
@@ -1483,7 +1483,7 @@ def subpixel_register_point(pointid,
     geom_func=geom_func.lower()
     match_func=match_func.lower()
 
-    print(f"Using {geom_func} with the {match_func} matcher.")
+    log.info(f"Using {geom_func} with the {match_func} matcher.")
 
     match_func = check_match_func(match_func)
     geom_func = check_geom_func(geom_func)
@@ -1500,12 +1500,12 @@ def subpixel_register_point(pointid,
         point = session.query(Points).filter(Points.id == pointid).one()
         reference_index = point.reference_index
         t2 = time.time()
-        print(f'Query took {t2-t1} seconds to find the measures and reference measure.')
+        log.info(f'Query took {t2-t1} seconds to find the measures and reference measure.')
         # Get the reference measure. Previously this was index 0, but now it is a database tracked attribute
         source = measures[reference_index]
 
-        print(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
-        print(f'Measure reference index is: {reference_index}')
+        log.info(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
+        log.info(f'Measure reference index is: {reference_index}')
         source.template_metric = 1
         source.template_shift = 0
         source.phase_error = 0
@@ -1517,8 +1517,8 @@ def subpixel_register_point(pointid,
         source_node = NetworkNode(node_id=sourceid, image_path=sourceres.path)
         source_node.parent = ncg
         t3 = time.time()
-        print(f'Query for the image to use as source took {t3-t2} seconds.')
-        print(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
+        log.info(f'Query for the image to use as source took {t3-t2} seconds.')
+        log.info(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
         nodes = {}
         for measure in measures:
             res = session.query(Images).filter(Images.id == measure.imageid).one()
@@ -1538,8 +1538,8 @@ def subpixel_register_point(pointid,
 
         destination_node = nodes[measure.imageid]
 
-        print('geom_match image:', destination_node['image_path'])
-        print('geom_func', geom_func)
+        log.info('geom_match image:', destination_node['image_path'])
+        log.info('geom_func', geom_func)
         try:
             # new geom_match has a incompatible API, until we decide on one, put in if.
             if (geom_func == geom_match):
@@ -1554,7 +1554,7 @@ def subpixel_register_point(pointid,
                                                     match_kwargs=match_kwargs,
                                                     verbose=verbose)
         except Exception as e:
-            print(f'geom_match failed on measure {measure.id} with exception -> {e}')
+            log.warning(f'geom_match failed on measure {measure.id} with exception -> {e}')
             currentlog['status'] = f"geom_match failed on measure {measure.id}"
             resultlog.append(currentlog)
             if measure.weight is None:
@@ -1575,7 +1575,7 @@ def subpixel_register_point(pointid,
 
         cost = cost_func(measure.template_shift, measure.template_metric)
 
-        print(f'Current Cost: {cost},  Current Weight: {measure.weight}')
+        log.info(f'Current Cost: {cost},  Current Weight: {measure.weight}')
 
         # Check to see if the cost function requirement has been met
         if measure.weight and cost <= measure.weight:
@@ -1616,7 +1616,7 @@ def subpixel_register_point(pointid,
                               *[json.dumps(measure.to_dict(_hide=[]), cls=JsonEncoder) for measure in updated_measures])
         ncg.redis_queue.incr(ncg.measure_update_counter, amount=len(updated_measures))
         t5 = time.time()
-        print(f'Cache load took {t5-t4} seconds')
+        log.info(f'Cache load took {t5-t4} seconds')
     else:
         t4 = time.time()
         # Commit the updates back into the DB
@@ -1625,7 +1625,7 @@ def subpixel_register_point(pointid,
                 ins = inspect(m)
                 session.add(m)
         t5 = time.time()
-        print(f'Database update took {t5-t4} seconds.')
+        log.info(f'Database update took {t5-t4} seconds.')
     return resultlog
 
 def subpixel_register_points(subpixel_template_kwargs={'image_size':(251,251)},
@@ -1706,7 +1706,7 @@ def register_to_base(pointid,
         # Attempt to project the point into the base image
         bpoint = spatial.isis.point_info(base_image.file_name, point.geom.x, point.geom.y, 'ground')
         if bpoint is None:
-            print('unable to find point in ground image')
+            log.warning('unable to find point in ground image')
             # Need to set the point to False
             return
         bline = bpoint.get('Line')
@@ -1731,9 +1731,9 @@ def register_to_base(pointid,
 
             # Attempt to match the base
             try:
-                print(f'prop point: base_image: {base_image}')
-                print(f'prop point: dest_image: {measure_image}')
-                print(f'prop point: (sx, sy): ({measure.sample}, {measure.line})')
+                log.info(f'prop point: base_image: {base_image}')
+                log.info(f'prop point: dest_image: {measure_image}')
+                log.info(f'prop point: (sx, sy): ({measure.sample}, {measure.line})')
                 x, y, dist, metrics = geom_func(base_image, measure_image,
                         bsample, bline,
                         match_func = match_func,
@@ -1750,7 +1750,7 @@ def register_to_base(pointid,
                                  metrics, dist, base_image.file_name, measure_image.file_name])
 
     if verbose:
-      print("Match Results: ", match_results)
+      log.info("Match Results: ", match_results)
 
     # Clean out any instances where None has been return by the geom matcher.
     match_results = np.copy(np.array([res for res in match_results if isinstance(res, list) and all(r is not None for r in res)]))
@@ -1763,17 +1763,17 @@ def register_to_base(pointid,
     costs = [cost_func(match_results[:,3], match[3]) for match in match_results]
 
     if verbose:
-      print("Values:", costs)
+      log.info("Values:", costs)
 
     # column index 3 is the metric returned by the geom matcher
     best_results = match_results[np.argmax(costs)]
 
     if verbose:
-        print("match_results final length: ", len(match_results))
-        print("best_results length: ", len(best_results))
-        print("Full results: ", best_results)
-        print("Winning CORRs: ", best_results[3], "Base Pixel shifts: ", best_results[4])
-        print('\n')
+        log.info("match_results final length: ", len(match_results))
+        log.info("best_results length: ", len(best_results))
+        log.info("Full results: ", best_results)
+        log.info("Winning CORRs: ", best_results[3], "Base Pixel shifts: ", best_results[4])
+        log.info('\n')
 
     if len(best_results[3])==1 or best_results[3] is None:
         raise Exception("Point with id {pointid} has no measure that matches criteria, reference measure will remain unchanged")
@@ -1898,9 +1898,8 @@ def estimate_logpolar_transform(img1, img2, low_sigma=0.5, high_sigma=30, verbos
         fig.suptitle('Working in frequency domain can recover rotation and scaling')
         plt.show()
 
-        print(f"Recovered value for cc rotation: {recovered_angle}")
-        print()
-        print(f"Recovered value for scaling difference: {shift_scale}")
+        log.info(f"Recovered value for cc rotation: {recovered_angle}")
+        log.info(f"Recovered value for scaling difference: {shift_scale}")
 
     # offset by the center of the image, scikit's ceter image rotation is defined by `axis / 2 - 0.5`
     shift_y, shift_x = np.asarray(img1.shape) / 2 - 0.5
@@ -2047,14 +2046,14 @@ def estimate_affine_transformation(base_cube,
     passing_base_corners = []
     for x,y in base_corners:
         try:
-            print('Processing: ', x,y)
+            log.info('Processing: ', x,y)
             lon, lat = spatial.isis.image_to_ground(base_cube.file_name, x, y)
             dst_corners.append(
                 spatial.isis.ground_to_image(input_cube.file_name, lon, lat)
             )
             passing_base_corners.append((x, y))
         except Exception as e: 
-            print(e)
+            log.warning(e)
 
     if len(dst_corners) < 3:
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_corners)} points, but need at least 3.')
@@ -2065,7 +2064,7 @@ def estimate_affine_transformation(base_cube,
 
     affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
     t2 = time.time()
-    print(f'Estimation of the transformation took {t2-t1} seconds.')
+    log.info(f'Estimation of the transformation took {t2-t1} seconds.')
     return affine
 
 def affine_warp_image(base_cube, input_cube, affine, order=3):
@@ -2110,7 +2109,7 @@ def affine_warp_image(base_cube, input_cube, affine, order=3):
 
     dst_arr = tf.warp(dst_arr, affine, order=order)      
     t2 = time.time()
-    print(f'Affine warp took {t2-t1} seconds.')
+    log.info(f'Affine warp took {t2-t1} seconds.')
 
     return base_arr, dst_arr
 
@@ -2160,7 +2159,7 @@ def subpixel_register_point_smart(pointid,
     geom_func=geom_func.lower()
     match_func=match_func.lower()
 
-    print(f"Using {geom_func} with the {match_func} matcher.")
+    log.info(f"Using {geom_func} with the {match_func} matcher.")
     
     match_func = check_match_func(match_func)
     geom_func = check_geom_func(geom_func)
@@ -2179,15 +2178,15 @@ def subpixel_register_point_smart(pointid,
         point = session.query(Points).filter(Points.id == pointid).one()
         reference_index = point.reference_index
         t2 = time.time()
-        print(f'Query took {t2-t1} seconds to find the measures and reference measure.')
+        log.info(f'Query took {t2-t1} seconds to find the measures and reference measure.')
         
         # Get the reference measure to instantiate the source node. All other measures will
         # match to the source node.
         source = measures[reference_index]
         reference_index_id = source.imageid
 
-        print(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
-        print(f'Measure reference index is: {reference_index}')
+        log.info(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
+        log.info(f'Measure reference index is: {reference_index}')
         
         # Build a node cache so that this is an encapsulated database call. Then nodes
         # can be pulled from the lookup sans database.
@@ -2201,13 +2200,13 @@ def subpixel_register_point_smart(pointid,
         session.expunge_all()
 
     t3 = time.time()
-    print(f'Query for the image to use as source took {t3-t2} seconds.')
-    print(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
-    print(nodes)
+    log.info(f'Query for the image to use as source took {t3-t2} seconds.')
+    log.info(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
+    log.info(nodes)
     # Set the reference image
     source_node = nodes[reference_index_id]
     
-    print(f'Source: sample: {source.sample} | line: {source.line}')
+    log.info(f'Source: sample: {source.sample} | line: {source.line}')
     resultlog = []
     updated_measures = []
     for i, measure in enumerate(measures):
@@ -2216,16 +2215,15 @@ def subpixel_register_point_smart(pointid,
         if i == reference_index:
             continue
 
-        print()
-        print(f'Measure: {measure}')
+        log.info(f'Measure: {measure}')
         currentlog = {'measureid':measure.id,
                     'status':''}
         cost = None
 
         destination_node = nodes[measure.imageid]
 
-        print('geom_match image:', destination_node['image_path'])
-        print('geom_func', geom_func)
+        log.info('geom_match image:', destination_node['image_path'])
+        log.info('geom_func', geom_func)
         
         # Apply the transformation
         try:
@@ -2234,7 +2232,7 @@ def subpixel_register_point_smart(pointid,
                                                         source.apriorisample, 
                                                         source.aprioriline)
         except Exception as e:
-            print(e) 
+            log.warning(e) 
             m = {'id': measure.id,
                  'sample':measure.apriorisample,
                  'line':measure.aprioriline,
@@ -2261,7 +2259,7 @@ def subpixel_register_point_smart(pointid,
         dst_roi = roi.Roi(dst_arr, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y).clip()
 
         if np.isnan(base_roi).any() or np.isnan(dst_roi).any():
-            print('Unable to process due to NaN values in the input data.')
+            log.warning('Unable to process due to NaN values in the input data.')
             m = {'id': measure.id,
                     'status': False,
                     'choosername': chooser}
@@ -2269,7 +2267,7 @@ def subpixel_register_point_smart(pointid,
             continue
         
         if base_roi.shape != dst_roi.shape:
-            print('Unable to process. ROIs are different sizes for MI matcher')
+            log.warning('Unable to process. ROIs are different sizes for MI matcher')
             m = {'id': measure.id,
                  'status': False,
                  'choosername': chooser}
@@ -2285,7 +2283,7 @@ def subpixel_register_point_smart(pointid,
         # Refactor this call to module
         result = cv2.matchTemplate(base_roi, dst_roi, method=cv2.TM_CCOEFF_NORMED)
         baseline_corr = result[0][0]
-        print(f'Baseline MI: {baseline_mi} | Baseline Corr: {baseline_corr}')
+        log.info(f'Baseline MI: {baseline_mi} | Baseline Corr: {baseline_corr}')
         for parameter in parameters:
             match_kwargs = parameter['match_kwargs']
 
@@ -2300,7 +2298,7 @@ def subpixel_register_point_smart(pointid,
                 temp_corrmap[:] = np.nan
             
             if x is None or y is None:
-                print('Unable to match with this parameter set.')
+                log.warning('Unable to match with this parameter set.')
                 continue
                
             base_roi = roi.Roi(base_arr, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y).clip()
@@ -2313,7 +2311,7 @@ def subpixel_register_point_smart(pointid,
             mi_metric = mutual_information(base_roi, dst_roi)
 
             if mi_metric is None:
-                print('MI Metric Failure. Returning.')
+                log.warning('MI Metric Failure. Returning.')
                 m = {'id': measure.id,
                      'status': False}
             else:
@@ -2331,7 +2329,7 @@ def subpixel_register_point_smart(pointid,
                     'template_shift':dist, 
                     'mi_metric': mi_metric, 
                     'status': True}
-                print(f'METRIC: {metric}| SAMPLE: {new_x} | LINE: {new_y} | MI: {mi_metric}')
+                log.info(f'METRIC: {metric}| SAMPLE: {new_x} | LINE: {new_y} | MI: {mi_metric}')
 
             updated_measures.append([baseline_mi, baseline_corr, m])
 
@@ -2498,7 +2496,7 @@ def validate_candidate_measure(measure_to_register,
     geom_func=geom_func.lower()
     match_func=match_func.lower()
 
-    print(f"Using {geom_func} with the {match_func} matcher.")
+    log.info(f"Using {geom_func} with the {match_func} matcher.")
     
     match_func = check_match_func(match_func)
     geom_func = check_geom_func(geom_func)
@@ -2518,7 +2516,7 @@ def validate_candidate_measure(measure_to_register,
         reference_measure = point.measures[reference_index]
 
         t2 = time.time()
-        print(f'Query took {t2-t1} seconds to find the measure and the reference measure.')
+        log.info(f'Query took {t2-t1} seconds to find the measure and the reference measure.')
 
         # Match the reference measure to the measure_to_register - this is the inverse of the first match attempt
         # Source is the image that we are seeking to validate, destination is the reference measure. 
@@ -2537,11 +2535,11 @@ def validate_candidate_measure(measure_to_register,
         sample = measure_to_register['sample']
         line = measure_to_register['line']
         
-        print(f'Validating measure: {measure_to_register_id} on image: {source_image.name}')
+        log.info(f'Validating measure: {measure_to_register_id} on image: {source_image.name}')
         try:
             affine = estimate_affine_transformation(source_node.geodata, destination_node.geodata, sample, line)
         except:
-            print('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
+            log.warning('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
             return [np.inf] * len(parameters)
         base_arr, dst_arr = affine_warp_image(source_node.geodata, 
                                                   destination_node.geodata, 
@@ -2568,7 +2566,7 @@ def validate_candidate_measure(measure_to_register,
             new_x, new_y = affine([x, y])[0]
 
             dist = np.sqrt((new_y - reference_measure.line) ** 2 + (new_x - reference_measure.sample) ** 2) 
-            print('Reprojection Distance: ', dist)
+            log.info('Reprojection Distance: ', dist)
             dists.append(dist)
         return dists
 
@@ -2616,15 +2614,13 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Ses
     measure_results = subpixel_register_point_smart(pointid, ncg=ncg, parameters=parameters, **shared_kwargs)
     measures_to_update, measures_to_set_false = decider(measure_results)
 
-    print()
-    print(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
+    log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
     # Validate that the new position has consensus
     for measure in measures_to_update:
-        print()
         reprojection_distances = validate_candidate_measure(measure, parameters=parameters, ncg=ncg, **shared_kwargs)
         if np.sum(np.array(reprojection_distances) < 1) < 2:
         #if reprojection_distance > 1:
-            print(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")
+            log.warning(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")
             measures_to_set_false.append(measure['id'])
     
     for measure in measures_to_update:
