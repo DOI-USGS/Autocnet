@@ -5,7 +5,7 @@ import numpy as np
 from scipy.ndimage.measurements import center_of_mass
 from skimage.transform import AffineTransform
 
-def mutual_information(reference_roi, moving_roi, affine=AffineTransform(), **kwargs):
+def mutual_information(reference_arr, moving_arr, affine=AffineTransform(), **kwargs):
     """
     Computes the correlation coefficient between two images using a histogram
     comparison (Mutual information for joint histograms). The corr_map coefficient
@@ -14,10 +14,10 @@ def mutual_information(reference_roi, moving_roi, affine=AffineTransform(), **kw
     Parameters
     ----------
 
-    reference_roi : Roi
+    reference_arr : ndarray
                     First image to use in the histogram comparison
     
-    moving_roi : Roi
+    moving_arr : ndarray
                    Second image to use in the histogram comparison
     
     
@@ -32,22 +32,17 @@ def mutual_information(reference_roi, moving_roi, affine=AffineTransform(), **kw
     --------
     numpy.histogram2d : for the kwargs that can be passed to the comparison
     """
+   
+    if np.isnan(reference_arr.data).any() or np.isnan(moving_arr.data).any():
+        print('Unable to process due to NaN values in the input data')
+        return
     
-    # grab ndarray from input Roi's 
-    reference_image = reference_roi.clip()
-    walking_template = moving_roi.clip()
+    if reference_arr.shape != moving_arr.shape:
+        print('Unable compute MI. Image sizes are not identical.')
+        return
 
-    # print(f"\nShape's \n{reference_image.shape}\n{walking_template.shape}\n--------")
-    
-    # if reference_roi.ndv == None or moving_roi.ndv == None:
-    if np.isnan(reference_image).any() or np.isnan(walking_template).any():
-        raise Exception('Unable to process due to NaN values in the input data')
-    
-    if reference_roi.size_y != moving_roi.size_y and reference_roi.size_x != moving_roi.size_x:
-    # if reference_image.shape != moving_roi.shape:
-        raise Exception('Unable compute MI. Image sizes are not identical.')
+    hgram, x_edges, y_edges = np.histogram2d(reference_arr.ravel(),moving_arr.ravel(), **kwargs)
 
-    hgram, x_edges, y_edges = np.histogram2d(reference_image.ravel(), walking_template.ravel(), **kwargs)
 
     # Convert bins counts to probability values
     pxy = hgram / float(np.sum(hgram))
@@ -58,7 +53,10 @@ def mutual_information(reference_roi, moving_roi, affine=AffineTransform(), **kw
     nzs = pxy > 0 # Only non-zero pxy values contribute to the sum
     return np.sum(pxy[nzs] * np.log(pxy[nzs] / px_py[nzs]))
 
-def mutual_information_match(d_template, s_image, subpixel_size=3,
+# TODO 
+# need's to take in a ROI and not ndarray's
+# and use one clip (to pass arr later on?)
+def mutual_information_match(moving_roi, reference_roi, subpixel_size=3,
                              func=None, **kwargs):
     """
     Applys the mutual information matcher function over a search image using a
@@ -67,11 +65,11 @@ def mutual_information_match(d_template, s_image, subpixel_size=3,
 
     Parameters
     ----------
-    d_template : ndarray
+    moving_roi : roi 
                  The input search template used to 'query' the destination
                  image
 
-    s_image : ndarray
+    reference_roi : roi
               The image or sub-image to be searched
 
     subpixel_size : int
@@ -83,11 +81,8 @@ def mutual_information_match(d_template, s_image, subpixel_size=3,
 
     Returns
     -------
-    x : float
-        The x offset
-
-    y : float
-        The y offset
+    new_affine :AffineTransform
+                The affine transformation
 
     max_corr : float
                The strength of the correlation in the range [0, 4].
@@ -96,56 +91,41 @@ def mutual_information_match(d_template, s_image, subpixel_size=3,
                Map of corrilation coefficients when comparing the template to
                locations within the search area
     """
+    reference_template = reference_roi.clip()
+    moving_image = moving_roi.clip()
 
     if func == None:
         func = mutual_information
 
-
-    image_size = ((s_image.size_x * 2) + 1, (s_image.size_y * 2) + 1)
-    template_size = ((d_template.size_x * 2) + 1, (d_template.size_y * 2) + 1)
+    image_size = moving_image.shape
+    template_size = reference_template.shape
 
     y_diff = image_size[0] - template_size[0]
     x_diff = image_size[1] - template_size[1]
 
     max_corr = -np.inf
-    corr_map = np.zeros(template_size)
-    max_i = -1  # y
-    max_j = -1  # x
-
-    s_image_extent = s_image.image_extent
-
-    starting_y = s_image_extent[2]
-    ending_y = s_image_extent[3]
-    starting_x = s_image_extent[0]
-    ending_x = s_image_extent[1]
-
-    for i in range(starting_y, ending_y):
-        for j in range(starting_x, ending_x):
-            s_image.x = (j)
-            s_image.y = (i)
-           
-            corr = func(s_image, d_template, **kwargs)
+    corr_map = np.zeros((y_diff+1, x_diff+1))
+    for i in range(y_diff+1):
+        for j in range(x_diff+1):
+            sub_image = moving_image[i:i+template_size[1],  # y
+                                j:j+template_size[0]]  # x
+            corr = func(sub_image, reference_template, **kwargs)
             if corr > max_corr:
                 max_corr = corr
-                max_i = i - s_image_extent[2]
-                max_j = j - s_image_extent[0]
-            
-
-            corr_map[i- s_image_extent[2], j - s_image_extent[0]] = corr
+            corr_map[i, j] = corr
 
     y, x = np.unravel_index(np.argmax(corr_map, axis=None), corr_map.shape)
 
     upper = int(2 + floor(subpixel_size / 2))
     lower = upper - 1
-
     area = corr_map[y-lower:y+upper,
                     x-lower:x+upper]
 
     # Compute the y, x shift (subpixel) using scipys center_of_mass function
     cmass  = center_of_mass(area)
-
-    if area.shape != (subpixel_size+2, subpixel_size+2):
-        return None, None, 0, None
+    if area.shape != (subpixel_size + 2, subpixel_size + 2):
+        return  None, 0, None
+        
 
     subpixel_y_shift = subpixel_size - 1 - cmass[0]
     subpixel_x_shift = subpixel_size - 1 - cmass[1]
@@ -154,4 +134,4 @@ def mutual_information_match(d_template, s_image, subpixel_size=3,
     y += subpixel_y_shift
     x += subpixel_x_shift
     new_affine = AffineTransform(translation=(-x, -y))
-    return new_affine, float(max_corr), corr_map
+    return new_affine, np.max(max_corr), corr_map
