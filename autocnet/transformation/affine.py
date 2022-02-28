@@ -69,6 +69,7 @@ def estimate_affine_from_sensors(reference_image,
     lons, lats = isis.image_to_ground(reference_image.file_name, x_coords, y_coords, allowoutside=True)
     xs, ys = isis.ground_to_image(moving_image.file_name, lons, lats, allowoutside=True)
 
+
     # Check for any coords that do not project between images
     base_gcps = []
     dst_gcps = []
