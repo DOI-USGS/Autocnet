@@ -72,3 +72,5 @@ def test_full_subpixel_registration(ncg, images, point):
         assert m2.line == pytest.approx(258.6752555930361, 6)
         assert m2.sample == pytest.approx(258.80172907976646, 6)
         assert m2.ignore == False
+
+    assert False
