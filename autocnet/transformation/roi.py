@@ -189,11 +189,7 @@ class Roi():
         self.dtype = dtype
 
         if affine:
-            self.size_x *= 2
-            self.size_y *= 2
-
             array_to_warp = self.array
-
             # if array_to_warp.shape != ((self.size_y * 2) + 1, (self.size_x * 2) + 1):
             #     raise ValueError("Unable to enlarge Roi to apply affine transformation." +
             #                      f" Was only able to extract {array_to_warp.shape}, when " +
@@ -203,11 +199,6 @@ class Roi():
 
             #Affine transform the larger, moving array
             transformed_array = tf.warp(array_to_warp, affine, order=3, mode=mode)
-            # print(transformed_array.shape)
-            self.size_x = int(self.size_x / 2)
-            self.size_y = int(self.size_y / 2)
-
-            new_center = np.array(transformed_array.shape)/2
-            return Roi(transformed_array, *new_center, self.size_x, self.size_y).clip()
+            return transformed_array
 
         return self.array
