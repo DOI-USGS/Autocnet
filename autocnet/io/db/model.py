@@ -660,7 +660,7 @@ def try_db_creation(engine, config):
         event.listen(Images.__table__, 'after_create', triggers.valid_geom_trigger)
         event.listen(Base.metadata, 'before_create', triggers.ignore_image_function)
         event.listen(Images.__table__, 'after_create', triggers.ignore_image_trigger)
-        event.listen(Points.__table__, 'before_create', triggers.jsonb_delete_func)
+        #event.listen(Points.__table__, 'before_create', triggers.jsonb_delete_func)
  
         for ddl in triggers.generate_history_triggers(Measures):
             event.listen(Measures.__table__, 'after_create', ddl)
