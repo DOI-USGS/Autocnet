@@ -142,13 +142,13 @@ def test_check_image_size(data, expected):
     assert sp.check_image_size(data) == expected
 
 @pytest.mark.parametrize("x, y, x1, y1, image_size, template_size, expected",[
-    (4, 3, 4, 2, (5,5), (3,3), (0,-1)),
-    (4, 3, 4, 2, (7,7), (3,3), (0,-2)),  # Increase the search image size
-    (4, 3, 4, 2, (7,7), (5,5), (0,-2)), # Increase the template size
-    (4, 3, 3, 2, (7,7), (3,3), (-1,-2)), # Move point in the x-axis
-    (4, 3, 5, 3, (7,7), (3,3), (1,-2)), # Move point in the other x-direction
-    (4, 3, 4, 1, (7,7), (3,3), (0, -2)), # Move point negative in the y-axis
-    (4, 3, 4, 3, (7,7), (3,3), (0,-2))  # Move point positive in the y-axis
+    (4, 3, 4, 3, (3,3), (2,2), (4,3)),
+    (4, 3, 4, 3, (3,3), (2,2), (4,3)),  # Increase the search image size
+    (4, 3, 4, 3, (3,3), (2,2), (4,3)), # Increase the template size
+    (4, 3, 3, 3, (3,3), (2,2), (4,3)), # Move point in the x-axis
+    (4, 3, 5, 4, (3,3), (2,2), (4,3)), # Move point in the other x-direction
+    (4, 3, 4, 2, (3,3), (2,2), (4,3)), # Move point negative in the y-axis
+    (4, 3, 4, 4, (3,3), (2,2), (4,3))  # Move point positive in the y-axis
 
 ])
 def test_subpixel_template_cooked(x, y, x1, y1, image_size, template_size, expected):
@@ -168,17 +168,22 @@ def test_subpixel_template_cooked(x, y, x1, y1, image_size, template_size, expec
 
     # Should yield (-3, 3) offset from image center
     t_shape = np.array(((0, 0, 0, 0, 0, 0, 0, 0, 0),
+                        (0, 0, 0, 0, 0, 0, 0, 0, 0),
                         (0, 0, 0, 1, 1, 1, 0, 0, 0),
                         (0, 0, 0, 0, 1, 0, 0, 0, 0),
                         (0, 0, 0, 0, 1, 0, 0, 0, 0),
+                        (0, 0, 0, 0, 0, 0, 0, 0, 0),
                         (0, 0, 0, 0, 0, 0, 0, 0, 0)), dtype=np.uint8)
 
     ref_roi = roi.Roi(test_image, x, y, *image_size)
     moving_roi = roi.Roi(t_shape, x1, y1, *template_size)
     new_affine, corr, corrmap = sp.subpixel_template(ref_roi, moving_roi, upsampling=1)
-    assert corr >= 0.8  # geq because sometime returning weird float > 1 from OpenCV
-    assert new_affine.translation[0] == expected[0]
-    assert new_affine.translation[1] == expected[1]
+    print(new_affine)
+    nx, ny = new_affine.inverse([x1,y1])[0]
+    # should be 1.0 
+    assert corr >= .99  # geq because sometime returning weird float > 1 from OpenCV
+    assert nx == expected[0]
+    assert ny == expected[1]
 
 @pytest.mark.parametrize("x, y, x1, y1, image_size, expected",[
     (4, 3, 3, 2, (1,1), (3,2)),
@@ -217,8 +222,6 @@ def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
     walking_roi = roi.Roi(t_shape, x1, y1, size_x=image_size[0], size_y=image_size[1])
 
     affine, metrics, _ = sp.subpixel_phase(reference_roi, walking_roi)
-    print(affine)
     dx, dy = affine.inverse((x1, y1))[0]
-    print(affine)
     assert dx == expected[0]
     assert dy == expected[1]

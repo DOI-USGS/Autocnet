@@ -2,6 +2,7 @@ from math import modf, floor
 import numpy as np
 
 from skimage import transform as tf
+from skimage.util import img_as_float32
 
 class Roi():
     """
@@ -134,7 +135,8 @@ class Roi():
             right_x = raster_size[0]
         if bottom_y > raster_size[1]:
             bottom_y = raster_size[1]
-
+        print("extents:", list(map(int, [left_x, right_x, top_y, bottom_y])))
+        print("center:", self.x, self.y, self.size_x, self.size_y) 
         return list(map(int, [left_x, right_x, top_y, bottom_y]))
 
     @property
@@ -168,7 +170,7 @@ class Roi():
             # TODO: I think this will result in an incorrect obj.center when the passed data is a GeoDataset
             pixels = [pixels[0], pixels[2], pixels[1]-pixels[0]+1, pixels[3]-pixels[2]+1]
             data = self.data.read_array(pixels=pixels)
-        return data
+        return img_as_float32(data)
 
     def clip(self, affine=None, dtype=None, mode="reflect"):
         """
@@ -201,4 +203,4 @@ class Roi():
             transformed_array = tf.warp(array_to_warp, affine, order=3, mode=mode)
             return transformed_array
 
-        return self.array
+        return img_as_float32(self.array)

@@ -312,9 +312,7 @@ def subpixel_template(reference_roi, moving_roi, affine=tf.AffineTransform(), mo
     # In ISIS, the reference image is the search and moving image is the pattern.
 
     ref_clip = reference_roi.clip()
-    moving_clip = moving_roi.clip()
-    
-    moving_clip = tf.warp(moving_clip, affine, order=3, mode=mode)
+    moving_clip = moving_roi.clip(affine)
     
     if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
@@ -322,15 +320,14 @@ def subpixel_template(reference_roi, moving_roi, affine=tf.AffineTransform(), mo
 
     if (ref_clip is None) or (moving_clip is None):
         return None, None, None
-
-    shift_x, shift_y, metrics, corrmap = func(img_as_float32(moving_clip), img_as_float32(ref_clip), **kwargs)
+    shift_x, shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
     if shift_x is None:
         return None, None, None
     
     # get shifts in input pixel space
     shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
     new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
-    
+ 
     return new_affine,  metrics, corrmap
 
 
