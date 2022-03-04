@@ -48,7 +48,6 @@ def process(msg):
     msg : dict
           The message that parametrizes the job.
     """
-
     # Deserialize the message
     msg = json.loads(msg, object_hook=object_hook)
 
@@ -91,7 +90,8 @@ def process(msg):
     return msg
 
 def main():
-    process(sys.argv[1])
+    msg = ''.join(sys.argv[1:])
+    process(msg)
 
 if __name__ == '__main__':
     main()
