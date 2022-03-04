@@ -662,11 +662,11 @@ def try_db_creation(engine, config):
         event.listen(Images.__table__, 'after_create', triggers.ignore_image_trigger)
         #event.listen(Points.__table__, 'before_create', triggers.jsonb_delete_func)
  
-        for ddl in triggers.generate_history_triggers(Measures):
-            event.listen(Measures.__table__, 'after_create', ddl)
+        #for ddl in triggers.generate_history_triggers(Measures):
+        #    event.listen(Measures.__table__, 'after_create', ddl)
 
-        for ddl in triggers.generate_history_triggers(Points):
-            event.listen(Points.__table__, 'after_create', ddl)
+        #for ddl in triggers.generate_history_triggers(Points):
+        #    event.listen(Points.__table__, 'after_create', ddl)
 
     Base.metadata.bind = engine
 
