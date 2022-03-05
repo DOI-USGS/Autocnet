@@ -135,7 +135,7 @@ def watch_insert_queue(queue, queue_name, counter_name, engine, stop_event, slee
                     pipe.incr(counter_name)
                 msgs = pipe.execute()
             except:
-                warnings.warn('Failed to push to DB and failed to repopulate queue.)
+                warnings.warn('Failed to push to DB and failed to repopulate queue.')
                 time.sleep(5)
 
 def watch_update_queue(queue, queue_name, counter_name, engine, stop_event, sleep_time=5):

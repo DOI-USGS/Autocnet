@@ -91,7 +91,8 @@ def process(msg):
 
 def main():
     msg = ''.join(sys.argv[1:])
-    process(msg)
-
+    result = process(msg)
+    print(result)
+    
 if __name__ == '__main__':
     main()
