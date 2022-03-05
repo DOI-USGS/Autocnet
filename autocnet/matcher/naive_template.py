@@ -117,6 +117,8 @@ def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED, e
     if upsampling < 1:
         raise ValueError
 
+    print(template)
+    print(image)
     # Fit a 3rd order polynomial to upsample the images
     if upsampling != 1:
         u_template = zoom(template, upsampling, order=3)
@@ -127,6 +129,8 @@ def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED, e
 
     result = cv2.matchTemplate(u_image, u_template, method=metric)
     _, max_corr, min_loc, max_loc = cv2.minMaxLoc(result)
+    
+    print("min/max loc: ", min_loc, max_loc)
 
     if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
         x, y = (min_loc[0], min_loc[1])
@@ -141,6 +145,9 @@ def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED, e
     y += (u_template.shape[0] / 2.)
     x += (u_template.shape[1] / 2.)
 
-    x = (x - ideal_x) / upsampling
-    y = (y - ideal_y) / upsampling
+    print("x,ideal x, ", x, ideal_x, (x - ideal_x) / upsampling)
+    print("y,ideal y, ", y, ideal_y, (y - ideal_y) / upsampling)
+
+    x = (ideal_x - x) / upsampling
+    y = (ideal_y - y) / upsampling
     return x, y, max_corr, result

@@ -127,14 +127,9 @@ class Roi():
         top_y = self._y - self.size_y
         bottom_y = self._y + self.size_y
 
-        if left_x < 0:
-            left_x = 0
-        if top_y < 0:
-            top_y = 0
-        if right_x > raster_size[0]:
-            right_x = raster_size[0]
-        if bottom_y > raster_size[1]:
-            bottom_y = raster_size[1]
+        if left_x < 0 or top_y < 0 or right_x > raster_size[0] or bottom_y > raster_size[1]:
+            raise IndexError(f"Input window size {(self.size_x, self.size_y)}) at center {(self.x, self.y)} is out of the image bounds") 
+
         print("extents:", list(map(int, [left_x, right_x, top_y, bottom_y])))
         print("center:", self.x, self.y, self.size_x, self.size_y) 
         return list(map(int, [left_x, right_x, top_y, bottom_y]))

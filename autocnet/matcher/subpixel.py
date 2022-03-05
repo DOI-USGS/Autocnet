@@ -149,59 +149,6 @@ def check_image_size(imagesize):
     return x,y
 
 
-def clip_roi(img, center_x, center_y, size_x=200, size_y=200, dtype="uint64"):
-    """
-    Given an input image, clip a square region of interest
-    centered on some pixel at some size.
-    Parameters
-    ----------
-    img : ndarray or object
-          The input image to be clipped or an object
-          with a read_array method that takes a pixels
-          argument in the form [xstart, ystart, xstop, ystop]
-    center_x : Numeric
-               The x coordinate to the center of the roi
-    center_y : Numeric
-               The y coordinate to the center of the roi
-    img_size : int
-               1/2 of the total image size. This value is the
-               number of pixels grabbed from each side of the center
-    Returns
-    -------
-    clipped_img : ndarray
-                  The clipped image
-    """
-
-    try:
-        raster_size = img.raster_size
-    except:
-        # x,y form
-        raster_size = img.shape[::-1]
-    axr, ax = modf(center_x)
-    ayr, ay = modf(center_y)
-
-    if ax + size_x > raster_size[0]:
-        size_x = floor(raster_size[0] - center_x)
-    if ax - size_x < 0:
-        size_x = int(ax)
-    if ay + size_y > raster_size[1]:
-        size_y =floor(raster_size[1] - center_y)
-    if ay - size_y < 0:
-        size_y = int(ay)
-
-    # Read from the upper left origin
-    pixels = [ax-size_x, ay-size_y, size_x*2, size_y*2]
-    pixels = list(map(int, pixels))  #
-    if isinstance(img, np.ndarray):
-        subarray = img[pixels[1]:pixels[1] + pixels[3] + 1, pixels[0]:pixels[0] + pixels[2] + 1]
-    else:
-        try:
-            subarray = img.read_array(pixels=pixels, dtype=dtype)
-        except:
-            return None, 0, 0
-    return subarray, axr, ayr
-
-
 def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwargs):
     """
     Apply the spectral domain matcher to a search and template image. To
@@ -262,7 +209,7 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
                                                                                 **kwargs)
     # get shifts in input pixel space 
     shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
-    new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
+    new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
     return new_affine, error, diffphase
 
 
@@ -1563,11 +1510,11 @@ def fourier_mellen(ref_image, moving_image, affine=tf.AffineTransform(), verbose
       Error returned by the iterative phase matcher
     """
     # Get the affine transformation for scale + rotation invariance
-    affine = estimate_logpolar_transform(ref_image.array(), moving_image.array(), verbose=verbose)
+    affine = estimate_logpolar_transform(ref_image.array, moving_image.array, verbose=verbose)
 
     # warp the source image to match the destination
-    ref_warped = tf.warp(ref_image.array(), affine)
-    sx, sy = affine.inverse(np.asarray(ref_image.array().shape)/2)[0]
+    ref_warped = ref_image.clip(affine)
+    sx, sy = affine.inverse(np.asarray(ref_image.array.shape)/2)[0]
 
     # get translation with iterative phase
     newx, newy, error = iterative_phase(sx, sy, sx, sy, ref_warped, moving_image, **phase_kwargs)
@@ -1583,8 +1530,8 @@ def fourier_mellen(ref_image, moving_image, affine=tf.AffineTransform(), verbose
 
         ax[2].imshow(ref_image)
         ax[2].set_title("Image 1")
-        ax[2].axhline(y=ref_image.array().shape[0]/2, color="red", linestyle="-", alpha=1, linewidth=1)
-        ax[2].axvline(x=ref_image.array().shape[1]/2, color="red", linestyle="-", alpha=1, linewidth=1)
+        ax[2].axhline(y=ref_image.array.shape[0]/2, color="red", linestyle="-", alpha=1, linewidth=1)
+        ax[2].axvline(x=ref_image.array.shape[1]/2, color="red", linestyle="-", alpha=1, linewidth=1)
 
         ax[1].imshow(moving_image)
         ax[3].imshow(moving_image)

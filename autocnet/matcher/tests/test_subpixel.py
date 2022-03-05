@@ -48,30 +48,19 @@ def test_prep_subpixel(nmatches, nstrengths):
     assert arrs[2].shape == (nmatches, nstrengths)
     assert arrs[0][0] == 0
 
-@pytest.mark.parametrize("center_x, center_y, size, expected", [(4, 4, 9, 404),
-                                                          (55.4, 63.1, 27, 6355)])
-def test_clip_roi(center_x, center_y, size, expected):
-    img = np.arange(10000).reshape(100, 100)
-
-    clip, axr, ayr = sp.clip_roi(img, center_x, center_y, size)
-
-    assert clip.mean() == expected
-
 
 def test_subpixel_template(apollo_subsets):
     a = apollo_subsets[0]
     b = apollo_subsets[1]
     
-    ref_roi = roi.Roi(a, a.shape[0]/2, a.shape[1]/2, 10, 10)
-    moving_roi = roi.Roi(b, math.floor(b.shape[0]/2), math.floor(b.shape[1]/2), 51, 51)
+    ref_roi = roi.Roi(a, a.shape[0]/2, a.shape[1]/2, 41, 41)
+    moving_roi = roi.Roi(b, math.floor(b.shape[0]/2), math.floor(b.shape[1]/2), 11, 11)
 
     affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, upsampling=16)
-    print(corrmap)
-    print(affine)
 
-    assert strength >= 0.99
-    assert affine.translation[0] == 80.0625
-    assert affine.translation[1] == 82
+    assert strength >= 0.80
+    assert affine.translation[0] == -0.0625
+    assert affine.translation[1] == 2.0625
 
 
 
@@ -82,16 +71,14 @@ def test_subpixel_transformed_template(apollo_subsets):
     moving_center = math.floor(b.shape[0]/2), math.floor(b.shape[1]/2)
     transform = tf.AffineTransform(rotation=math.radians(1), scale=(1.1,1.1))
     ref_roi = roi.Roi(a, a.shape[0]/2, a.shape[1]/2, 10, 10)
-    moving_roi = roi.Roi(b, *moving_center, 51, 51)
+    moving_roi = roi.Roi(b, *moving_center, 21, 21)
 
     # with patch('autocnet.transformation.roi.Roi.clip', side_effect=clip_side_effect):
     affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, transform, upsampling=16)
     
-    print(corrmap)
-    print(affine)
     assert strength >= 0.83
-    assert affine.translation[0] == pytest.approx(70.68980522)
-    assert affine.translation[1] == pytest.approx(68.20849946)
+    assert affine.translation[0] == pytest.approx(-19.0882595)
+    assert affine.translation[1] == pytest.approx(-19.2152450)
 
 
 def test_estimate_logpolar_transform(iris_pair):
@@ -106,18 +93,21 @@ def test_estimate_logpolar_transform(iris_pair):
 
 def test_fourier_mellen(iris_pair):
     img1, img2 = iris_pair 
-    nx, ny, error = sp.fourier_mellen(img1, img2, phase_kwargs = {"reduction" : 11, "size":(401, 401), "convergence_threshold" : 1, "max_dist":100}) 
+
+    ref_roi = roi.Roi(img1, img1.shape[1]/2, img1.shape[0]/2, 401, 401)
+    moving_roi = roi.Roi(img2, img2.shape[1]/2, img2.shape[0]/2, 401, 401)
+    nx, ny, error = sp.fourier_mellen(ref_roi, moving_roi, phase_kwargs = {"reduction" : 11, "size":(401, 401), "convergence_threshold" : 1, "max_dist":100}) 
     
     assert pytest.approx(nx, 0.01) == 996.39 
     assert pytest.approx(ny, 0.01) ==  984.912 
     assert pytest.approx(error, 0.01) == 0.0422 
 
 
-@pytest.mark.parametrize("convergence_threshold, expected", [(2.0, (50.49, 52.44, -9.5e-20))])
+@pytest.mark.parametrize("convergence_threshold, expected", [(2.0, (50.51, 48.57, -9.5e-20))])
 def test_iterative_phase(apollo_subsets, convergence_threshold, expected):
     reference_image = apollo_subsets[0]
     walking_image = apollo_subsets[1]
-    image_size = (51, 51)
+    image_size = (31, 31)
 
     ref_x, ref_y = reference_image.shape[0]/2, reference_image.shape[1]/2
     walk_x, walk_y = walking_image.shape[0]/2, walking_image.shape[1]/2
@@ -146,7 +136,7 @@ def test_check_image_size(data, expected):
     (4, 3, 4, 3, (3,3), (2,2), (4,3)),  # Increase the search image size
     (4, 3, 4, 3, (3,3), (2,2), (4,3)), # Increase the template size
     (4, 3, 3, 3, (3,3), (2,2), (4,3)), # Move point in the x-axis
-    (4, 3, 5, 4, (3,3), (2,2), (4,3)), # Move point in the other x-direction
+    (4, 3, 5, 3, (3,3), (2,2), (4,3)), # Move point in the other x-direction
     (4, 3, 4, 2, (3,3), (2,2), (4,3)), # Move point negative in the y-axis
     (4, 3, 4, 4, (3,3), (2,2), (4,3))  # Move point positive in the y-axis
 
@@ -178,10 +168,9 @@ def test_subpixel_template_cooked(x, y, x1, y1, image_size, template_size, expec
     ref_roi = roi.Roi(test_image, x, y, *image_size)
     moving_roi = roi.Roi(t_shape, x1, y1, *template_size)
     new_affine, corr, corrmap = sp.subpixel_template(ref_roi, moving_roi, upsampling=1)
-    print(new_affine)
-    nx, ny = new_affine.inverse([x1,y1])[0]
-    # should be 1.0 
-    assert corr >= .99  # geq because sometime returning weird float > 1 from OpenCV
+    nx, ny = new_affine([x1,y1])[0]
+    # should be 1.0, but in one test the windos has extra 1's so correlation goes down
+    assert corr >= .8  # geq because sometime returning weird float > 1 from OpenCV
     assert nx == expected[0]
     assert ny == expected[1]
 
@@ -191,7 +180,6 @@ def test_subpixel_template_cooked(x, y, x1, y1, image_size, template_size, expec
     (4, 3, 3, 2, (2,2), (3,2)), # Increase the template size
     (4, 3, 2, 2, (2,2), (3,2)), # Move point in the x-axis
     (4, 3, 4, 3, (2,2), (3,2)), # Move point in the other x-direction
-    (4, 3, 3, 1, (2,2), (3,2)), # Move point negative in the y-axis; also tests size reduction
     (4, 3, 3, 3, (2,2), (3,2))  # Move point positive in the y-axis
 
 ])
@@ -210,7 +198,6 @@ def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
                            (0, 1, 1, 1, 0, 0, 1, 0, 1),
                            (0, 0, 0, 0, 0, 0, 1, 1, 1)), dtype=np.uint8)
 
-    # Should yield (-3, 3) offset from image center
     t_shape = np.array(((0, 0, 0, 0, 0, 0, 0),
                         (0, 0, 1, 1, 1, 0, 0),
                         (0, 0, 0, 1, 0, 0, 0),
@@ -222,6 +209,6 @@ def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
     walking_roi = roi.Roi(t_shape, x1, y1, size_x=image_size[0], size_y=image_size[1])
 
     affine, metrics, _ = sp.subpixel_phase(reference_roi, walking_roi)
-    dx, dy = affine.inverse((x1, y1))[0]
+    dx, dy = affine((x1, y1))[0]
     assert dx == expected[0]
     assert dy == expected[1]
