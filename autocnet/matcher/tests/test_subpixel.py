@@ -70,15 +70,15 @@ def test_subpixel_transformed_template(apollo_subsets):
 
     moving_center = math.floor(b.shape[0]/2), math.floor(b.shape[1]/2)
     transform = tf.AffineTransform(rotation=math.radians(1), scale=(1.1,1.1))
-    ref_roi = roi.Roi(a, a.shape[0]/2, a.shape[1]/2, 10, 10)
-    moving_roi = roi.Roi(b, *moving_center, 21, 21)
+    ref_roi = roi.Roi(a, a.shape[0]/2, a.shape[1]/2, 40, 40)
+    moving_roi = roi.Roi(b, *moving_center, 11, 11)
 
     # with patch('autocnet.transformation.roi.Roi.clip', side_effect=clip_side_effect):
     affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, transform, upsampling=16)
     
     assert strength >= 0.83
-    assert affine.translation[0] == pytest.approx(-19.0882595)
-    assert affine.translation[1] == pytest.approx(-19.2152450)
+    assert affine.translation[0] == pytest.approx(-0.670806588)
+    assert affine.translation[1] == pytest.approx(0.636804177)
 
 
 def test_estimate_logpolar_transform(iris_pair):
