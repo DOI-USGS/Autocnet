@@ -273,7 +273,7 @@ def subpixel_template(reference_roi, moving_roi, affine=tf.AffineTransform(), mo
     
     # get shifts in input pixel space
     shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
-    new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
+    new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
  
     return new_affine,  metrics, corrmap
 
