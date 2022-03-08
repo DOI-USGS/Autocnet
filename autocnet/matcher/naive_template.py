@@ -148,6 +148,6 @@ def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED, e
     print("x,ideal x, ", x, ideal_x, (x - ideal_x) / upsampling)
     print("y,ideal y, ", y, ideal_y, (y - ideal_y) / upsampling)
 
-    x = (ideal_x - x) / upsampling
-    y = (ideal_y - y) / upsampling
+    x = (x - ideal_x) / upsampling
+    y = (y - ideal_y) / upsampling
     return x, y, max_corr, result
