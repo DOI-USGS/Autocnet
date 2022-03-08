@@ -36,7 +36,7 @@ from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
-from autocnet.transformation.affine import estimate_affine_from_sensors
+from autocnet.transformation.affine import estimate_local_affine
 from autocnet import spatial
 from autocnet.utils.utils import bytescale
 
@@ -1711,10 +1711,12 @@ def subpixel_register_point_smart(pointid,
         print('geom_func', geom_func)
 
         try:
-            affine = estimate_affine_from_sensors(source_node.geodata, 
-                                                  destination_node.geodata,
-                                                  source.apriorisample,
-                                                  source.aprioriline)
+            affine = estimate_local_affine(source_node.geodata, 
+                                           destination_node.geodata,
+                                           source.apriorisample,
+                                           source.aprioriline,
+                                           60,
+                                           60)
         except Exception as e:
             print(e)
             m = {'id': measure.id,
@@ -1724,11 +1726,6 @@ def subpixel_register_point_smart(pointid,
                  'choosername':chooser}
             updated_measures.append([None, None, m])
             continue
-
-        # Here is where I need to get the two ROIs extracted. Then I need to get the destination ROI affine transformed to the source ROI
-        base_arr, dst_arr = affine_warp_image(source_node.geodata,
-                                              destination_node.geodata,
-                                              affine)
 
         # Compute the baseline metrics using the smallest window
         size_x = np.inf
@@ -1740,10 +1737,14 @@ def subpixel_register_point_smart(pointid,
             if match_kwarg['template_size'][1] < size_y:
                 size_y = match_kwarg['template_size'][1]
 
-        base_roi = roi.Roi(base_arr, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y).array
-        dst_roi = roi.Roi(dst_arr, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y).array
+        reference_roi = roi.Roi(source_node.geodata, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y)
+        moving_roi = roi.Roi(destination_node.geodata, measure.apriorisample, measure.aprioriline, size_x=size_x, size_y=size_y)
 
-        if np.isnan(base_roi).any() or np.isnan(dst_roi).any():
+        _, baseline_corr, _ = subpixel_template(reference_roi, 
+                                                moving_roi,
+                                                affine=affine)
+        
+        """if np.isnan(base_roi).any() or np.isnan(dst_roi).any():
             print('Unable to process due to NaN values in the input data.')
             m = {'id': measure.id,
                     'status': False,
@@ -1762,26 +1763,26 @@ def subpixel_register_point_smart(pointid,
         base_roi = img_as_float32(base_roi)
         dst_roi = img_as_float32(dst_roi)
 
-        baseline_mi = mutual_information(base_roi, dst_roi)
-
-
-        # Refactor this call to module
-        result = cv2.matchTemplate(base_roi, dst_roi, method=cv2.TM_CCOEFF_NORMED)
-        baseline_corr = result[0][0]
+        baseline_mi = mutual_information(base_roi, dst_roi)"""
+        baseline_mi = 0
         print(f'Baseline MI: {baseline_mi} | Baseline Corr: {baseline_corr}')
         for parameter in parameters:
             match_kwargs = parameter['match_kwargs']
 
-            restemplate = match_func(source.apriorisample, source.aprioriline, source.apriorisample, source.aprioriline, base_arr, dst_arr, **match_kwargs)
-
-            try:
-                x,y,maxcorr,temp_corrmap = restemplate
-            except:
-                # did not return a corrmap
-                x,y,maxcorr = restemplate
-                temp_corrmap = np.empty((size_x, size_y))
-                temp_corrmap[:] = np.nan
-
+            reference_roi = roi.Roi(source_node.geodata,
+                                    source.apriorisample,
+                                    source.aprioriline,
+                                    size_x=match_kwargs['image_size'][0],
+                                    size_y=match_kwargs['image_size'][1])
+            moving_roi = roi.Roi(destination_node.geodata,
+                                 measure.apriorisample,
+                                 measure.aprioriline,
+                                 size_x=match_kwargs['template_size'][0],
+                                 size_y=match_kwargs['template_size'][1])
+            updated_affine, maxcorr, temp_corrmap = subpixel_template(reference_roi,
+                                                    moving_roi,
+                                                    affine=affine)
+            """
             if x is None or y is None:
                 print('Unable to match with this parameter set.')
                 continue
@@ -1793,17 +1794,19 @@ def subpixel_register_point_smart(pointid,
             base_roi = img_as_float32(base_roi)
             dst_roi = img_as_float32(dst_roi)
 
-            mi_metric = mutual_information(base_roi, dst_roi)
-
+            mi_metric = mutual_information(base_roi, dst_roi)"""
+            mi_metric = 0.0
             if mi_metric is None:
                 print('MI Metric Failure. Returning.')
                 m = {'id': measure.id,
                      'status': False}
             else:
                 metric = maxcorr
-                new_x, new_y = affine([x, y])[0]
-                dist = np.linalg.norm([source.apriorisample-x, source.aprioriline-y])
+                new_x, new_y = updated_affine([measure.sample, measure.line])[0]
+                dist = np.linalg.norm([measure.sample-new_x, 
+                                      measure.line-new_y])
                 cost = cost_func(dist, metric)
+                print(new_x, new_y, dist)
 
                 m = {'id': measure.id,
                     'sample':new_x,
