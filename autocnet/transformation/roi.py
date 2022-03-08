@@ -2,6 +2,7 @@ from math import modf, floor
 import numpy as np
 
 from skimage import transform as tf
+from skimage.util import img_as_float32
 
 class Roi():
     """
@@ -126,15 +127,11 @@ class Roi():
         top_y = self._y - self.size_y
         bottom_y = self._y + self.size_y
 
-        if left_x < 0:
-            left_x = 0
-        if top_y < 0:
-            top_y = 0
-        if right_x > raster_size[0]:
-            right_x = raster_size[0]
-        if bottom_y > raster_size[1]:
-            bottom_y = raster_size[1]
+        if left_x < 0 or top_y < 0 or right_x > raster_size[0] or bottom_y > raster_size[1]:
+            raise IndexError(f"Input window size {(self.size_x, self.size_y)}) at center {(self.x, self.y)} is out of the image bounds") 
 
+        print("extents:", list(map(int, [left_x, right_x, top_y, bottom_y])))
+        print("center:", self.x, self.y, self.size_x, self.size_y) 
         return list(map(int, [left_x, right_x, top_y, bottom_y]))
 
     @property
@@ -168,7 +165,7 @@ class Roi():
             # TODO: I think this will result in an incorrect obj.center when the passed data is a GeoDataset
             pixels = [pixels[0], pixels[2], pixels[1]-pixels[0]+1, pixels[3]-pixels[2]+1]
             data = self.data.read_array(pixels=pixels)
-        return data
+        return img_as_float32(data)
 
     def clip(self, affine=None, dtype=None, mode="reflect"):
         """
@@ -189,11 +186,7 @@ class Roi():
         self.dtype = dtype
 
         if affine:
-            self.size_x *= 2
-            self.size_y *= 2
-
             array_to_warp = self.array
-
             # if array_to_warp.shape != ((self.size_y * 2) + 1, (self.size_x * 2) + 1):
             #     raise ValueError("Unable to enlarge Roi to apply affine transformation." +
             #                      f" Was only able to extract {array_to_warp.shape}, when " +
@@ -203,11 +196,6 @@ class Roi():
 
             #Affine transform the larger, moving array
             transformed_array = tf.warp(array_to_warp, affine, order=3, mode=mode)
-            # print(transformed_array.shape)
-            self.size_x = int(self.size_x / 2)
-            self.size_y = int(self.size_y / 2)
+            return transformed_array
 
-            new_center = np.array(transformed_array.shape)/2
-            return Roi(transformed_array, *new_center, self.size_x, self.size_y).clip()
-
-        return self.array
+        return img_as_float32(self.array)

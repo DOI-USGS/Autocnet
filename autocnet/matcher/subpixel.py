@@ -61,9 +61,10 @@ def check_geom_func(func):
 
     raise Exception(f"{func} not a valid geometry function.")
 
+
 def check_match_func(func):
     match_funcs = {
-        "classic": subpixel_template_classic,
+        "classic": subpixel_template,
         "phase": iterative_phase,
         "template": subpixel_template,
         "mutualinformation": mutual_information_match
@@ -76,6 +77,7 @@ def check_match_func(func):
         return match_funcs[func]
 
     raise Exception(f"{func} not a valid matching function.")
+
 
 # TODO: look into KeyPoint.size and perhaps use to determine an appropriately-sized search/template.
 def _prep_subpixel(nmatches, nstrengths=2):
@@ -118,6 +120,7 @@ def _prep_subpixel(nmatches, nstrengths=2):
 
     return shifts_x, shifts_y, strengths, new_x, new_y
 
+
 def check_image_size(imagesize):
     """
     Given an x,y tuple, ensure that the values
@@ -145,59 +148,8 @@ def check_image_size(imagesize):
     y = floor(y/2)
     return x,y
 
-def clip_roi(img, center_x, center_y, size_x=200, size_y=200, dtype="uint64"):
-    """
-    Given an input image, clip a square region of interest
-    centered on some pixel at some size.
-    Parameters
-    ----------
-    img : ndarray or object
-          The input image to be clipped or an object
-          with a read_array method that takes a pixels
-          argument in the form [xstart, ystart, xstop, ystop]
-    center_x : Numeric
-               The x coordinate to the center of the roi
-    center_y : Numeric
-               The y coordinate to the center of the roi
-    img_size : int
-               1/2 of the total image size. This value is the
-               number of pixels grabbed from each side of the center
-    Returns
-    -------
-    clipped_img : ndarray
-                  The clipped image
-    """
 
-    try:
-        raster_size = img.raster_size
-    except:
-        # x,y form
-        raster_size = img.shape[::-1]
-    axr, ax = modf(center_x)
-    ayr, ay = modf(center_y)
-
-    if ax + size_x > raster_size[0]:
-        size_x = floor(raster_size[0] - center_x)
-    if ax - size_x < 0:
-        size_x = int(ax)
-    if ay + size_y > raster_size[1]:
-        size_y =floor(raster_size[1] - center_y)
-    if ay - size_y < 0:
-        size_y = int(ay)
-
-    # Read from the upper left origin
-    pixels = [ax-size_x, ay-size_y, size_x*2, size_y*2]
-    pixels = list(map(int, pixels))  #
-    if isinstance(img, np.ndarray):
-        subarray = img[pixels[1]:pixels[1] + pixels[3] + 1, pixels[0]:pixels[0] + pixels[2] + 1]
-    else:
-        try:
-            subarray = img.read_array(pixels=pixels, dtype=dtype)
-        except:
-            return None, 0, 0
-    return subarray, axr, ayr
-
-def subpixel_phase(reference_roi, walking_roi, affine=None, **kwargs):
+def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwargs):
     """
     Apply the spectral domain matcher to a search and template image. To
     shift the images, the x_shift and y_shift, need to be subtracted from
@@ -210,26 +162,25 @@ def subpixel_phase(reference_roi, walking_roi, affine=None, **kwargs):
     reference_roi : Object
                     An Roi object from autocnet, the reference image to use when computing subpixel offsets.
                     Contains either an ndarray or a GeoDataset Object
-    walking_roi : Object
+    moving_roi : Object
                   An Roi object from autocnet, the walking image to move around and make comparisons to
                   the reference roi. Contains either an ndarray or a GeoDataset Object
     affine : Object
-             Scikit image affine tranformation. This affine transformation is applied to the walking_roi
+             Scikit image affine tranformation. This affine transformation is applied to the moving_roi
              before any comparisons are made
 
     Returns
     -------
     new_affine : Object
                  Scikit image affine transformation. An updated affine transformation that is the new
-                 translation from the walking_roi to the reference_roi
+                 translation from the moving_roi to the reference_roi
     : tuple
       With the RMSE error and absolute difference in phase
     """
     reference_image = reference_roi.clip()
-    walking_template = walking_roi.clip(affine)
-
+    walking_template = moving_roi.clip(affine)
+    
     if reference_image.shape != walking_template.shape:
-
         reference_size = reference_image.shape
         walking_size = walking_template.shape
         updated_size_x = int(min(walking_size[1], reference_size[1]))
@@ -249,191 +200,20 @@ def subpixel_phase(reference_roi, walking_roi, affine=None, **kwargs):
         size = check_image_size((updated_size_x, updated_size_y))
 
         reference_roi.size_x, reference_roi.size_y = size
-        walking_roi.size_x, walking_roi.size_y = size
+        moving_roi.size_x, moving_roi.size_y = size
 
         reference_image = reference_roi.clip()
-        walking_template = walking_roi.clip(affine)
-
+        walking_template = moving_roi.clip(affine)
     (shift_y, shift_x), error, diffphase = registration.phase_cross_correlation(reference_image,
                                                                                 walking_template,
                                                                                 **kwargs)
-    new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
+    # get shifts in input pixel space 
+    shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
+    new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
     return new_affine, error, diffphase
 
-def subpixel_transformed_template(sx, sy, dx, dy,
-                                  s_img, d_img,
-                                  transform,
-                                  image_size=(251, 251),
-                                  template_size=(51, 51),
-                                  template_buffer=5,
-                                  func=pattern_match,
-                                  verbose=False,
-                                  **kwargs):
-    """
-    Uses a pattern-matcher on subsets of two images determined from the passed-in keypoints and optional sizes to
-    compute an x and y offset from the search keypoint to the template keypoint and an associated strength.
 
-    Parameters
-    ----------
-    sx : Numeric
-         Source X coordinate
-
-    sy : Numeric
-         Source y coordinate
-
-    dx : Numeric
-         The desintation x coordinate
-
-    dy : Numeric
-         The destination y coordinate
-
-    s_img : GeoDataset
-            The source image GeoDataset
-
-    d_img : GeoDataset
-            The destination image GeoDataset
-
-    transform : object
-                A skiage transform object that has scale. The transform object is
-                used to project the template into the image.
-
-    image_size : tuple
-                 (xsize, ysize) of the image that is searched within (this should be larger
-                 than the template size)
-
-    template_size : tuple
-                    (xsize, ysize) of the template to iterate over the image in order
-                    to identify the area(s) of highest correlation.
-
-    template_buffer : int
-                      The inverse buffer applied to the transformed template image. When
-                      the warp is applied to project from the template into the image, some
-                      amount of no data exists around the edges. This variable is used to clip
-                      some number of pixels off the edges of the template. The higher the rotation
-                      the higher this value should be.
-
-    func : callable
-           The function used to pattern match
-
-    verbose : bool
-              If true, generate plots of the matches
-
-    Returns
-    -------
-    x_shift : float
-               Shift in the x-dimension
-
-    y_shift : float
-               Shift in the y-dimension
-
-    strength : float
-               Strength of the correspondence in the range [-1, 1]
-
-    corrmap : ndarray
-              An n,m array of correlation coefficients
-
-    See Also
-    --------
-    autocnet.matcher.naive_template.pattern_match : for the kwargs that can be passed to the matcher
-    autocnet.matcher.naive_template.pattern_match_autoreg : for the jwargs that can be passed to the autoreg style matcher
-    """
-    image_size = check_image_size(image_size)
-    template_size = check_image_size(template_size)
-
-    template_size_x = int(template_size[0] * transform.scale[0])
-    template_size_y = int(template_size[1] * transform.scale[1])
-
-    s_roi = roi.Roi(s_img, sx, sy, size_x=image_size[0], size_y=image_size[1])
-    d_roi = roi.Roi(d_img, dx, dy, size_x=template_size_x, size_y=template_size_y)
-
-    if not s_roi.is_valid or not d_roi.is_valid:
-        return [None] * 4
-
-    try:
-        s_image_dtype = isis.isis2np_types[pvl.load(s_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
-    except:
-        s_image_dtype = None
-
-    try:
-        d_template_dtype = isis.isis2np_types[pvl.load(d_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
-    except:
-        d_template_dtype = None
-
-    s_image = bytescale(s_roi.array)
-    d_template = bytescale(d_roi.array)
-
-    if verbose:
-        fig, axs = plt.subplots(1, 5, figsize=(20,10))
-        # Plot of the original image and template
-        axs[0].imshow(s_image, cmap='Greys')
-        axs[0].set_title('Destination')
-        axs[1].imshow(d_template, cmap='Greys')
-        axs[1].set_title('Original Source')
-
-    # Build the transformation chance
-    shift_x, shift_y = d_roi.center
-
-    tf_rotate = tf.AffineTransform(rotation=transform.rotation, shear=transform.shear)
-    tf_shift = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
-    tf_shift_inv = tf.SimilarityTransform(translation=[shift_x, shift_y])
-
-    # Define the full chain and the inverse
-    trans = (tf_shift + (tf_rotate + tf_shift_inv))
-    itrans = trans.inverse
-
-    # Now apply the affine transformation
-    transformed_roi = tf.warp(d_template,
-                                itrans,
-                                order=3)
-
-    # Scale the source arr to the destination array size
-    scale_y, scale_x = transform.scale
-    template_shape_y, template_shape_x = d_template.shape
-    scaled_roi = tf.resize(transformed_roi, (int(template_shape_x/scale_x), int(template_shape_y/scale_x)))
-
-    # Clip the transformed template to avoid no data around around the edges
-    buffered_template = scaled_roi[template_buffer:-template_buffer,template_buffer:-template_buffer]
-
-    # Apply the matcher on the transformed array
-    shift_x, shift_y, metrics, corrmap = func(bytescale(buffered_template), s_image, **kwargs)
-
-    # Hard check here to see if we are on the absolute edge of the template
-    max_coord = np.unravel_index(corrmap.argmax(), corrmap.shape)[::-1]
-    if 0 in max_coord or corrmap.shape[0]-1 == max_coord[0] or corrmap.shape[1]-1 == max_coord[1]:
-        warnings.warn('Maximum correlation is at the edge of the template. Results are ambiguous.', UserWarning)
-        return [None] * 4
-
-    if verbose:
-        axs[2].imshow(transformed_roi, cmap='Greys')
-        axs[2].set_title('Affine Transformed Source')
-        axs[3].imshow(buffered_template, cmap='Greys')
-        axs[3].set_title('Scaled and Buffered Source')
-        axs[4].imshow(corrmap)
-        axs[4].set_title('Correlation')
-        plt.show()
-
-    # Project the center into the affine space
-    projected_center = itrans(d_roi.center)[0]
-
-    # Shifts need to be scaled back into full resolution, affine space
-    shift_x *= scale_x
-    shift_y *= scale_y
-
-    # Apply the shifts (computed using the warped image) to the affine space center
-    new_projected_x = projected_center[0] - shift_x
-    new_projected_y = projected_center[1] - shift_y
-
-    # Project the updated location back into image space
-    new_unprojected_x, new_unprojected_y = trans([new_projected_x, new_projected_y])[0]
-
-    # Apply the shift
-    dx = d_roi.x - (d_roi.center[0] - new_unprojected_x)
-    dy = d_roi.y - (d_roi.center[1] - new_unprojected_y)
-
-    return dx, dy, metrics, corrmap
-
-
-def subpixel_template_classic(reference_roi, moving_roi, affine=tf.AffineTransform(),
+def subpixel_template(reference_roi, moving_roi, affine=tf.AffineTransform(), mode='reflect',
                               func=pattern_match,
                               **kwargs):
     """
@@ -449,6 +229,9 @@ def subpixel_template_classic(reference_roi, moving_roi, affine=tf.AffineTransfo
     
     affine : skimage.transform.AffineTransform
              scikit-image Affine transformation, used as a seed transform that 
+
+    mode : str
+           Mode passed into warp used to determine how to pad null pixels from affine transform. See skimage.transform.warp 
 
     func : callable 
            Some subpixel template matching function 
@@ -476,146 +259,24 @@ def subpixel_template_classic(reference_roi, moving_roi, affine=tf.AffineTransfo
     # In ISIS, the reference image is the search and moving image is the pattern.
 
     ref_clip = reference_roi.clip()
-    moving_clip = moving_roi.clip()
-    
-    moving_clip = tf.warp(moving_clip, affine, order=3)
-    
-    print(moving_clip.var())
+    moving_clip = moving_roi.clip(affine)
     
     if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
-        return [None] * 4
+        return [None] * 3
 
     if (ref_clip is None) or (moving_clip is None):
-        return None, None, None, None
-
-    shift_x, shift_y, metrics, corrmap = func(img_as_float32(ref_clip), img_as_float32(moving_clip), **kwargs)
-    
+        return None, None, None
+    shift_x, shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
     if shift_x is None:
-        return None, None, None, None
+        return None, None, None
     
-    print(shift_x, shift_y)
-    new_affine = tf.AffineTransform(translation=(shift_x, shift_y))
-    
+    # get shifts in input pixel space
+    shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
+    new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
+ 
     return new_affine,  metrics, corrmap
 
-
-def subpixel_template(sx, sy, dx, dy,
-                      s_img, d_img,
-                      image_size=(251, 251),
-                      template_size=(51,51),
-                      func=pattern_match,
-                      verbose=False,
-                      **kwargs):
-    """
-    Uses a pattern-matcher on subsets of two images determined from the passed-in keypoints and optional sizes to
-    compute an x and y offset from the search keypoint to the template keypoint and an associated strength.
-
-    Parameters
-    ----------
-    sx : Numeric
-         Source X coordinate
-
-    sy : Numeric
-         Source y coordinate
-
-    dx : Numeric
-         The desintation x coordinate
-
-    dy : Numeric
-         The destination y coordinate
-
-    s_img : GeoDataset
-            The source image GeoDataset
-
-    d_img : GeoDataset
-            The destination image GeoDataset
-
-    image_size : tuple
-                 (xsize, ysize) of the image that is searched within (this should be larger
-                 than the template size)
-
-    template_size : tuple
-                    (xsize, ysize) of the template to iterate over the image in order
-                    to identify the area(s) of highest correlation.
-
-    func : callable
-           The function used to pattern match
-
-    verbose : bool
-              If true, generate plots of the matches
-
-    Returns
-    -------
-    x_shift : float
-               Shift in the x-dimension
-
-    y_shift : float
-               Shift in the y-dimension
-
-    strength : float
-               Strength of the correspondence in the range [-1, 1]
-
-    corrmap : ndarray
-              An n,m array of correlation coefficients
-
-    See Also
-    --------
-    autocnet.matcher.naive_template.pattern_match : for the kwargs that can be passed to the matcher
-    autocnet.matcher.naive_template.pattern_match_autoreg : for the jwargs that can be passed to the autoreg style matcher
-    """
-    image_size = check_image_size(image_size)
-    template_size = check_image_size(template_size)
-
-    template_size_x = template_size[0]
-    template_size_y = template_size[1]
-
-    s_roi = roi.Roi(s_img, sx, sy, size_x=image_size[0], size_y=image_size[1])
-    d_roi = roi.Roi(d_img, dx, dy, size_x=template_size_x, size_y=template_size_y)
-
-    if d_roi.variance == 0:
-        return [None] * 4
-
-    if not s_roi.is_valid or not d_roi.is_valid:
-        return [None] * 4
-
-    try:
-        s_image_dtype = isis.isis2np_types[pvl.load(s_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
-    except:
-        s_image_dtype = None
-
-    try:
-        d_template_dtype = isis.isis2np_types[pvl.load(d_img.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
-    except:
-        d_template_dtype = None
-
-    s_image = s_roi.array
-    d_template = d_roi.array
-
-    if (s_image is None) or (d_template is None):
-        return None, None, None, None
-
-    # Apply the matcher function
-    shift_x, shift_y, metrics, corrmap = func(d_template, s_image, **kwargs)
-
-    if verbose:
-        fig, axs = plt.subplots(1, 3, figsize=(20,10))
-        axs[0].imshow(s_image, cmap='Greys')
-        axs[1].imshow(d_template, cmap='Greys')
-        axs[3].imshow(corrmap)
-        plt.show()
-
-    # Hard check here to see if we are on the absolute edge of the template
-    max_coord = np.unravel_index(corrmap.argmax(), corrmap.shape)[::-1]
-    if 0 in max_coord or corrmap.shape[0]-1 == max_coord[0] or corrmap.shape[1]-1 == max_coord[1]:
-        warnings.warn('Maximum correlation is at the edge of the template. Results are ambiguous.', UserWarning)
-        return [None] * 4
-
-    # Apply the shift to the center of the ROI object
-    dx = d_roi.x - shift_x
-    dy = d_roi.y - shift_y
-
-    return dx, dy, metrics, corrmap
 
 def subpixel_ciratefi(sx, sy, dx, dy, s_img, d_img, search_size=251, template_size=51, **kwargs):
     """
@@ -668,7 +329,8 @@ def subpixel_ciratefi(sx, sy, dx, dy, s_img, d_img, search_size=251, template_si
     dy += (y_offset + t_roi.ayr)
     return dx, dy, strength
 
-def iterative_phase(reference_roi, walking_roi, affine=None, reduction=11, convergence_threshold=0.1, max_dist=50, **kwargs):
+
+def iterative_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), reduction=11, convergence_threshold=0.1, max_dist=50, **kwargs):
     """
     Iteratively apply a subpixel phase matcher to source (s_img) and destination (d_img)
     images. The size parameter is used to set the initial search space. The algorithm
@@ -682,7 +344,7 @@ def iterative_phase(reference_roi, walking_roi, affine=None, reduction=11, conve
     reference_roi : Object
                     An Roi object from autocnet, the reference image to use when computing subpixel offsets.
                     Contains either an ndarray or a GeoDataset Object
-    walking_roi : Object
+    moving_roi : Object
                   An Roi object from autocnet, the walking image to move around and make comparisons to
                   the reference roi. Contains either an ndarray or a GeoDataset Object
     size : tuple
@@ -703,25 +365,25 @@ def iterative_phase(reference_roi, walking_roi, affine=None, reduction=11, conve
     subpixel_phase : the function that applies a single iteration of the phase matcher
     """
     # get initial destination location
-    dsample, dline = walking_roi.x, walking_roi.y
-    dx, dy = walking_roi.x, walking_roi.y
+    dsample, dline = moving_roi.x, moving_roi.y
+    dx, dy = moving_roi.x, moving_roi.y
 
-    size = (walking_roi.size_x, walking_roi.size_y)
-    original_size = (walking_roi.size_x, walking_roi.size_y)
+    size = (moving_roi.size_x, moving_roi.size_y)
+    original_size = (moving_roi.size_x, moving_roi.size_y)
 
     subpixel_affine = tf.AffineTransform()
 
     while True:
-        new_subpixel_affine, error, diffphase = subpixel_phase(reference_roi, walking_roi, affine, **kwargs)
+        new_subpixel_affine, error, diffphase = subpixel_phase(reference_roi, moving_roi, affine, **kwargs)
         # Compute the amount of move the matcher introduced
         delta_dx, delta_dy = abs(new_subpixel_affine.translation)
         subpixel_affine += new_subpixel_affine
         dx, dy = subpixel_affine.inverse((reference_roi.x, reference_roi.y))[0]
-        walking_roi.x, walking_roi.y = dx, dy
+        moving_roi.x, moving_roi.y = dx, dy
 
         # Break if the solution has converged
         size = (size[0] - reduction, size[1] - reduction)
-        walking_roi.size_x, walking_roi.size_y = size
+        moving_roi.size_x, moving_roi.size_y = size
         reference_roi.size_x, reference_roi.size_y = size
         dist = np.linalg.norm([dsample-dx, dline-dy])
 
@@ -732,34 +394,12 @@ def iterative_phase(reference_roi, walking_roi, affine=None, reduction=11, conve
            abs(dist) <= max_dist:
             break
 
-    walking_roi.size_x, walking_roi.size_y = original_size
+    moving_roi.size_x, moving_roi.size_y = original_size
     reference_roi.size_x, reference_roi.size_y = original_size
-    walking_roi.x, walking_roi.y = dsample, dline
+    moving_roi.x, moving_roi.y = dsample, dline
     return subpixel_affine, error, diffphase
 
-'''def estimate_affine_transformation(destination_coordinates, source_coordinates):
-    """
-    Given a set of destination control points compute the affine transformation
-    required to project the source control points into the destination.
 
-    Parameters
-    ----------
-    destination_coordinates : array-like
-                              An n,2 data structure containing the destination control points
-
-    source_coordinates : array-like
-                         An n,2 data structure containing the source control points
-
-    Returns
-    -------
-     : object
-       An skimage affine transform object
-    """
-    destination_coordinates = np.asarray(destination_coordinates)
-    source_coordinates = np.asarray(source_coordinates)
-
-    return tf.estimate_transform('affine', destination_coordinates, source_coordinates)
-'''
 def geom_match_simple(reference_image,
                        moving_image,
                        bcenter_x,
@@ -1837,7 +1477,7 @@ def estimate_logpolar_transform(img1, img2, low_sigma=0.5, high_sigma=30, verbos
     tf_rotate_from_center = (tf_shift + (tf_rotate + tf_shift_inv))
     return tf.SimilarityTransform((tf_rotate_from_center + tf_scale)._inv_matrix)
 
-def fourier_mellen(img1, img2, verbose=False, phase_kwargs={}):
+def fourier_mellen(ref_image, moving_image, affine=tf.AffineTransform(), verbose=False, phase_kwargs={}):
     """
     Iterative phase registration using a log-polar projection to estimate an affine for scale and roation invariance.
 
@@ -1845,11 +1485,11 @@ def fourier_mellen(img1, img2, verbose=False, phase_kwargs={}):
     Parameters
     ----------
 
-    img1: np.ndarray
-          The source image, this is the image that is used as a base as img2 is registered to the center on img1
+    ref_image: np.ndarray
+               The source image, this is the image that is used as a base as img2 is registered to the center on img1
 
-    img2: np.ndarray
-          The image that will be moved to match img1
+    moving_image: np.ndarray
+                  The image that will be moved to match img1
 
     verbose : bool
               If true, prints out information detailing the registration process
@@ -1861,40 +1501,40 @@ def fourier_mellen(img1, img2, verbose=False, phase_kwargs={}):
     -------
 
     : float
-      The new x coordinate for img2 that registers to the center of img1
+      The new x coordinate for moving_image that registers to the center of center_image
 
     : float
-      The new y coordinate for img2 that registers to the center of img1
+      The new y coordinate for moving_image that registers to the center of center_image
 
     : float
       Error returned by the iterative phase matcher
     """
     # Get the affine transformation for scale + rotation invariance
-    affine = estimate_logpolar_transform(img1, img2, verbose=verbose)
+    affine = estimate_logpolar_transform(ref_image.array, moving_image.array, verbose=verbose)
 
     # warp the source image to match the destination
-    img1_warped = tf.warp(img1, affine)
-    sx, sy = affine.inverse(np.asarray(img1.shape)/2)[0]
+    ref_warped = ref_image.clip(affine)
+    sx, sy = affine.inverse(np.asarray(ref_image.array.shape)/2)[0]
 
     # get translation with iterative phase
-    newx, newy, error = iterative_phase(sx, sy, sx, sy, img1_warped, img2, **phase_kwargs)
+    newx, newy, error = iterative_phase(sx, sy, sx, sy, ref_warped, moving_image, **phase_kwargs)
 
     if verbose:
         fig, axes = plt.subplots(2, 2, figsize=(8, 8))
         ax = axes.ravel()
 
-        ax[0].imshow(img1_warped)
+        ax[0].imshow(ref_warped)
         ax[0].set_title("Image 1 Transformed")
         ax[0].axhline(y=sy, color="red", linestyle="-", alpha=1, linewidth=1)
         ax[0].axvline(x=sx, color="red", linestyle="-", alpha=1, linewidth=1)
 
-        ax[2].imshow(img1)
+        ax[2].imshow(ref_image)
         ax[2].set_title("Image 1")
-        ax[2].axhline(y=img1.shape[0]/2, color="red", linestyle="-", alpha=1, linewidth=1)
-        ax[2].axvline(x=img1.shape[1]/2, color="red", linestyle="-", alpha=1, linewidth=1)
+        ax[2].axhline(y=ref_image.array.shape[0]/2, color="red", linestyle="-", alpha=1, linewidth=1)
+        ax[2].axvline(x=ref_image.array.shape[1]/2, color="red", linestyle="-", alpha=1, linewidth=1)
 
-        ax[1].imshow(img2)
-        ax[3].imshow(img2)
+        ax[1].imshow(moving_image)
+        ax[3].imshow(moving_image)
 
         if not newx or not newy:
             ax[1].set_title("Image 2 REGISTRATION FAILED")
