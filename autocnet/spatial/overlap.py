@@ -168,7 +168,7 @@ def place_points_in_overlap(overlap,
     geom = overlap.geom
     valid = compgeom.distribute_points_in_geom(geom, **distribute_points_kwargs, **kwargs)
     if not valid.any():
-        log.warning('Failed to distribute points in overlap')
+        warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
 
     print(f'Have {len(valid)} potential points to place in overlap {overlap.id}.')
@@ -201,10 +201,13 @@ def place_points_in_overlap(overlap,
             if cam_type == "isis":
                 try:
                     sample, line = isis.ground_to_image(node["image_path"], lon, lat)
-                except CalledProcessError as e:
-                    if 'Requested position does not project in camera model' in e.stderr:
-                        print(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
-                        continue
+                except:
+                    continue
+
+                #except CalledProcessError as e:
+                #    if 'Requested position does not project in camera model' in e.stderr:
+                #        print(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
+                #        continue
             if cam_type == "csm":
                 lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
                 x, y, z = reproject([lon_og, lat_og, height],
@@ -310,9 +313,9 @@ def place_points_in_overlap(overlap,
                 # to find the most interesting feature.
                 try:
                     sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
-                except CalledProcessError as e:
-                    if 'Requested position does not project in camera model' in e.stderr:
-                        print(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
+                #except CalledProcessError as e:
+                except:  # CalledProcessError is not catching the ValueError that this try/except is attempting to handle.
+                    print(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
                     # If the current_index is greater than the reference_index, the change in list size does
                     # not impact the positional index of the reference. If current_index is less than the
                     # reference_index, then the reference_index needs to de-increment by one for each time
