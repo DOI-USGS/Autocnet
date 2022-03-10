@@ -36,12 +36,12 @@ def test_full_subpixel_registration(ncg, images, point):
                  'chooser':'smart_subpixel_registration'}
 
         parameters = [
-            {'match_kwargs': {'image_size':(121,121), 'template_size':(61,61)}},
-            {'match_kwargs': {'image_size':(151,151), 'template_size':(67,67)}},
-            {'match_kwargs': {'image_size':(181,181), 'template_size':(73,73)}},
-            {'match_kwargs': {'image_size':(221,221), 'template_size':(81,81)}},
-            {'match_kwargs': {'image_size':(251,251), 'template_size':(89,89)}},
-            {'match_kwargs': {'image_size':(281,281), 'template_size':(98,98)}}
+            {'match_kwargs': {'image_size':(61,61), 'template_size':(31,31)}},
+            {'match_kwargs': {'image_size':(75,75), 'template_size':(33,33)}},
+            {'match_kwargs': {'image_size':(91,91), 'template_size':(37,37)}},
+            {'match_kwargs': {'image_size':(111,111), 'template_size':(41,41)}},
+            {'match_kwargs': {'image_size':(125,125), 'template_size':(45,45)}},
+            {'match_kwargs': {'image_size':(141,141), 'template_size':(49,49)}}
         ]
 
         measures_to_update, measures_to_set_false = smart_register_point(1, 

@@ -208,14 +208,17 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
                                                                                 walking_template,
                                                                                 **kwargs)
     # get shifts in input pixel space 
-    shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
-    new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
+    shift_x, shift_y = affine([shift_x, shift_y])[0]
+    new_affine = tf.AffineTransform(translation=(-shift_y, -shift_x))
     return new_affine, error, diffphase
 
 
-def subpixel_template(reference_roi, moving_roi, affine=tf.AffineTransform(), mode='reflect',
-                              func=pattern_match,
-                              **kwargs):
+def subpixel_template(reference_roi, 
+                      moving_roi, 
+                      affine=tf.AffineTransform(), 
+                      mode='reflect',
+                      func=pattern_match,
+                      **kwargs):
     """
     Uses a pattern-matcher on subsets of two images determined from the passed-in keypoints and optional sizes to
     compute an x and y offset from the search keypoint to the template keypoint and an associated strength.
@@ -260,7 +263,7 @@ def subpixel_template(reference_roi, moving_roi, affine=tf.AffineTransform(), mo
 
     ref_clip = reference_roi.clip()
     moving_clip = moving_roi.clip(affine)
-    
+    print(affine)
     if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
         return [None] * 3
@@ -270,7 +273,7 @@ def subpixel_template(reference_roi, moving_roi, affine=tf.AffineTransform(), mo
     shift_x, shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
     if shift_x is None:
         return None, None, None
-    
+    print(shift_x, shift_y)
     # get shifts in input pixel space
     shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
     new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
@@ -1715,8 +1718,8 @@ def subpixel_register_point_smart(pointid,
                                            destination_node.geodata,
                                            source.apriorisample,
                                            source.aprioriline,
-                                           60,
-                                           60)
+                                           30,
+                                           30)
         except Exception as e:
             print(e)
             m = {'id': measure.id,
@@ -1737,8 +1740,16 @@ def subpixel_register_point_smart(pointid,
             if match_kwarg['template_size'][1] < size_y:
                 size_y = match_kwarg['template_size'][1]
 
-        reference_roi = roi.Roi(source_node.geodata, source.apriorisample, source.aprioriline, size_x=size_x, size_y=size_y)
-        moving_roi = roi.Roi(destination_node.geodata, measure.apriorisample, measure.aprioriline, size_x=size_x, size_y=size_y)
+        reference_roi = roi.Roi(source_node.geodata, 
+                                source.apriorisample, 
+                                source.aprioriline, 
+                                size_x=size_x, 
+                                size_y=size_y)
+        moving_roi = roi.Roi(destination_node.geodata, 
+                             measure.apriorisample, 
+                             measure.aprioriline, 
+                             size_x=size_x, 
+                             size_y=size_y)
 
         _, baseline_corr, _ = subpixel_template(reference_roi, 
                                                 moving_roi,
@@ -1766,6 +1777,7 @@ def subpixel_register_point_smart(pointid,
         baseline_mi = mutual_information(base_roi, dst_roi)"""
         baseline_mi = 0
         print(f'Baseline MI: {baseline_mi} | Baseline Corr: {baseline_corr}')
+        print(affine)
         for parameter in parameters:
             match_kwargs = parameter['match_kwargs']
 
@@ -1780,8 +1792,9 @@ def subpixel_register_point_smart(pointid,
                                  size_x=match_kwargs['template_size'][0],
                                  size_y=match_kwargs['template_size'][1])
             updated_affine, maxcorr, temp_corrmap = subpixel_template(reference_roi,
-                                                    moving_roi,
-                                                    affine=affine)
+                                                                      moving_roi,
+                                                                      affine=affine)
+            print(updated_affine)
             """
             if x is None or y is None:
                 print('Unable to match with this parameter set.')
@@ -1803,10 +1816,9 @@ def subpixel_register_point_smart(pointid,
             else:
                 metric = maxcorr
                 new_x, new_y = updated_affine([measure.sample, measure.line])[0]
-                dist = np.linalg.norm([measure.sample-new_x, 
-                                      measure.line-new_y])
+                dist = np.linalg.norm([measure.line-new_x, 
+                                      measure.sample-new_y])
                 cost = cost_func(dist, metric)
-                print(new_x, new_y, dist)
 
                 m = {'id': measure.id,
                     'sample':new_x,

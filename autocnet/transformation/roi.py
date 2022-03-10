@@ -130,14 +130,12 @@ class Roi():
         if left_x < 0 or top_y < 0 or right_x > raster_size[0] or bottom_y > raster_size[1]:
             raise IndexError(f"Input window size {(self.size_x, self.size_y)}) at center {(self.x, self.y)} is out of the image bounds") 
 
-        print("extents:", list(map(int, [left_x, right_x, top_y, bottom_y])))
-        print("center:", self.x, self.y, self.size_x, self.size_y) 
         return list(map(int, [left_x, right_x, top_y, bottom_y]))
 
     @property
     def center(self):
         ie = self.image_extent
-        return (ie[1] - ie[0])/2.+0.5, (ie[3]-ie[2])/2.+0.5
+        return (ie[1] - ie[0])/2., (ie[3]-ie[2])/2.
 
     @property
     def is_valid(self):
