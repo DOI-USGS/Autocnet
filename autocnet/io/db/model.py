@@ -427,7 +427,8 @@ class Points(Base, BaseMixin):
                                 spatial_index=False))
     measures = relationship('Measures', 
                             order_by="asc(Measures.id)", 
-                            backref=backref('point', lazy='joined'))
+                            backref=backref('point', lazy='joined'),
+                            passive_deletes=True)
     reference_index = Column("referenceIndex", Integer, default=0)
     _residuals = Column("residuals", ARRAY(Float))
     _maxresidual = Column("maxResidual", Float)
@@ -568,8 +569,8 @@ class MeasureType(enum.IntEnum):
 class Measures(BaseMixin, Base):
     __tablename__ = 'measures'
     id = Column(Integer,primary_key=True, autoincrement=True)
-    pointid = Column(Integer, ForeignKey('points.id'), nullable=False, index=True)
-    imageid = Column(Integer, ForeignKey('images.id'), index=True)
+    pointid = Column(Integer, ForeignKey('points.id', ondelete='CASCADE'), nullable=False, index=True)
+    imageid = Column(Integer, ForeignKey('images.id', ondelete='CASCADE'), index=True)
     serial = Column("serialnumber", String, nullable=False)
     _measuretype = Column("measureType", IntEnum(MeasureType), nullable=False)  # [0,3]  # Enum as above
     ignore = Column("measureIgnore", Boolean, default=False)
