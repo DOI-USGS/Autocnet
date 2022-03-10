@@ -248,6 +248,8 @@ def point_info(
             )
 
         camres = pvl.loads(cp.stdout)
+        if 'campt' in camres.keys():
+            camres = camres['campt']
         for r in camres.getall("GroundPoint"):
             if r['Error'] is None:
                 # convert all pixels to PLIO pixels from ISIS
@@ -258,7 +260,6 @@ def point_info(
                 raise ValueError(
                     f"ISIS campt completed, but reported an error: {r['Error']}"
                 )
-
     if isinstance(x, (abc.Sequence, np.ndarray)):
         return results
     else:
