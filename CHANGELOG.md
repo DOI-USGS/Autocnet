@@ -34,6 +34,10 @@ release.
 -->
 ## [Unreleased]
 
+
+
+## [0.7.0]()
+
 ### Added
 - Added a mutual information matcher [#559](https://github.com/USGS-Astrogeology/autocnet/pull/559)
 - Added residual column information to the Points model
