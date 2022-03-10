@@ -193,6 +193,7 @@ def manage_messages(args, queue):
         #Convert the message from binary into a dict
         msgdict = json.loads(msg, object_hook=object_hook)
 
+        
         # should replace this with some logging logic later
         # rather than redirecting std out
         stdout = StringIO()
@@ -200,12 +201,11 @@ def manage_messages(args, queue):
             # Apply the algorithm
             response = process(msgdict)
             # Should go to a logger someday! (today is that day!)
-            log.info(response)
+            print(response)
             
         out = stdout.getvalue()
         # print to get everything on the logs in the directory
         print(out)
-
         sys.stdout.flush()
         stdout.flush()
 
