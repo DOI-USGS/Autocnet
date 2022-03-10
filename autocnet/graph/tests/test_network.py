@@ -1,5 +1,6 @@
 import copy
 import os
+import logging
 import time
 import sys
 
@@ -21,6 +22,7 @@ from .. import node
 
 sys.path.insert(0, os.path.abspath('..'))
 
+LOGGER = logging.getLogger(__name__)
 
 @pytest.fixture()
 def graph():
@@ -153,10 +155,11 @@ def test_add_node_by_name(reduced_geo):
     assert reduced_geo.nodes[3]["data"]["image_name"] == c
     assert reduced_geo.nodes[1].keys() == reduced_geo.nodes[2].keys() == reduced_geo.nodes[3].keys()
 
-def test_add_node_nonexistent(geo_graph):
+def test_add_node_nonexistent(geo_graph, caplog):
     # Test when "image_name" not found
-    with pytest.warns(UserWarning):
+    with caplog.at_level(logging.WARNING):
         geo_graph.add_node(image_name="nonexistent.jpg")
+        assert 'Cannot find nonexistent.jpg' in caplog.text
 
 def test_add_edge():
     basepath = get_path('Apollo15')
@@ -178,11 +181,13 @@ def test_add_edge():
     assert g.edges[2, 3]["data"].destination == g.nodes[3]["data"]
     assert g.edges[1, 2].keys() == g.edges[1, 3].keys() == g.edges[2, 3].keys()
 
-def test_add_edge_missing_img(reduced_geo):
+def test_add_edge_missing_img(reduced_geo, caplog):
     c = 'AS15-M-0299_crop.cub'
     basepath = get_path('Apollo15')
-    with pytest.warns(UserWarning):
+        # Test when "image_name" not found
+    with caplog.at_level(logging.WARNING):
         reduced_geo.add_node(image_name=c, basepath=basepath, adjacency=["nonexistent.jpg"])
+        assert 'nonexistent.jpg not found in the graph' in caplog.text
 
 def test_equal(candidategraph):
     cg = copy.deepcopy(candidategraph)
