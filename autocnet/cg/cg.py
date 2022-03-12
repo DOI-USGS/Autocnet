@@ -530,7 +530,7 @@ def distribute_points_in_geom(geom, method="classic",
         ew = True
 
     # Decision Tree
-    if ratio < 0.16 and geom.area < 0.01:
+    if ratio < 0.1 and geom.area < 0.01:
         # Class: Slivers - ignore.
         return np.array([])
     elif geom.area <= 0.004 and ratio >= 0.25:
