@@ -2,6 +2,7 @@ import time
 import logging
 import json
 from subprocess import CalledProcessError
+import warnings
 
 from redis import StrictRedis
 import numpy as np
