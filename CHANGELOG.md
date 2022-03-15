@@ -34,7 +34,11 @@ release.
 -->
 ## [Unreleased]
 
+## [0.7.1]()
 
+### Fixed
+- Fixed connection issues where too many connections to AWS RDW were causing connetions failures by adding an exponential sleep over five retries.
+- Fixed missing import in place points in overlap that was causing a failure when attempting to throw a warning.
 
 ## [0.7.0]()
 
