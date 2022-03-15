@@ -6,7 +6,7 @@ import math
 import os
 from shutil import copyfile
 import threading
-from time import gmtime, strftime, time
+from time import gmtime, strftime, time, sleep
 import logging
 from itertools import combinations
 
@@ -1472,10 +1472,19 @@ class NetworkCandidateGraph(CandidateGraph):
 
     def _setup_database(self):
         db = self.config['database']
-        self.Session, self.engine = new_connection(self.config['database'])
+        # A non-linear timeout if the DB is spinning up or loaded with many connections.
+        sleeptime = 2
+        retries = 0
+        while retries < 5:
+            try:
+                self.Session, self.engine = new_connection(self.config['database'])
 
-        # Attempt to create the database (if it does not exist)
-        try_db_creation(self.engine, self.config)
+                # Attempt to create the database (if it does not exist)
+                try_db_creation(self.engine, self.config)
+                break
+            except:
+                retries += 1
+                sleep(retries ** sleeptime)
 
     def _setup_edges(self):
         with self.session_scope() as session:
