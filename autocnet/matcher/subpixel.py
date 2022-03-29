@@ -263,7 +263,6 @@ def subpixel_template(reference_roi,
 
     ref_clip = reference_roi.clip()
     moving_clip = moving_roi.clip(affine)
-    print(affine)
     if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
         return [None] * 3
@@ -273,11 +272,30 @@ def subpixel_template(reference_roi,
     shift_x, shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
     if shift_x is None:
         return None, None, None
-    print(shift_x, shift_y)
-    # get shifts in input pixel space
-    shift_x, shift_y = affine.inverse([shift_x, shift_y])[0]
-    new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
- 
+
+    # Shift x and shift y are computed in the affine space.
+    moving_clip_center = (np.array(moving_clip.shape[:2][::-1])-1)/2.
+    print(moving_clip_center)
+
+    new_x = moving_clip_center[0] + shift_x
+    new_y = moving_clip_center[1] + shift_y
+    print('Pre-transform', shift_x, shift_y, moving_clip.shape, moving_clip_center, new_x, new_y, affine)
+
+    # convert shifts in input pixel space
+    image_space_new_x, image_space_new_y = affine([new_x, new_y])[0]
+    print('Image Space NEW', image_space_new_x, image_space_new_y)
+
+    x_shift_in_image = image_space_new_x - moving_roi.center[0]
+    y_shift_in_image = image_space_new_y - moving_roi.center[1]
+
+    new_affine = tf.AffineTransform(affine.params)
+    new_affine.translation = (x_shift_in_image,y_shift_in_image)
+
+    """new_affine = tf.AffineTransform(translation=(x_shift_in_image,
+                                                 y_shift_in_image),
+                                    rotation=tf.AffineTransform(affine).rotation,
+                                    shear=tf.AffineTransform(affine).shear)"""
+
     return new_affine,  metrics, corrmap
 
 
@@ -1815,7 +1833,7 @@ def subpixel_register_point_smart(pointid,
                      'status': False}
             else:
                 metric = maxcorr
-                new_x, new_y = updated_affine([measure.sample, measure.line])[0]
+                new_x, new_y = updated_affine.inverse([measure.sample, measure.line])[0]
                 dist = np.linalg.norm([measure.line-new_x, 
                                       measure.sample-new_y])
                 cost = cost_func(dist, metric)

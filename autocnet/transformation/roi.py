@@ -135,7 +135,7 @@ class Roi():
     @property
     def center(self):
         ie = self.image_extent
-        return (ie[1] - ie[0])/2., (ie[3]-ie[2])/2.
+        return ((ie[1] - ie[0])-1)/2., ((ie[3]-ie[2])-1)/2.
 
     @property
     def is_valid(self):
@@ -165,7 +165,7 @@ class Roi():
             data = self.data.read_array(pixels=pixels)
         return img_as_float32(data)
 
-    def clip(self, affine=None, dtype=None, mode="reflect"):
+    def clip(self, affine=None, dtype=None, mode="constant"):
         """
         Compatibility function that makes a call to the array property.
         Warning: The dtype passed in via this function resets the dtype attribute of this
@@ -191,9 +191,7 @@ class Roi():
             #                      f"{((self.size_y * 2) + 1, (self.size_x * 2) + 1)} was asked for. Select, " +
             #                      "a smaller region of interest" )
 
-
-            #Affine transform the larger, moving array
-            transformed_array = tf.warp(array_to_warp, affine, order=3, mode=mode)
+            transformed_array = tf.warp(array_to_warp, affine.inverse, order=3, mode=mode, cval=0)
             return transformed_array
 
         return img_as_float32(self.array)

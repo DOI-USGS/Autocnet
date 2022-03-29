@@ -141,10 +141,12 @@ def estimate_local_affine(reference_image, moving_image, center_x, center_y, siz
 
     # This rotates about the center of the image
     shift_x, shift_y = moving_roi.center
-    tf_shift = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
-    tf_shift_inv = tf.SimilarityTransform(translation=[shift_x, shift_y])
+    tf_shift = tf.SimilarityTransform(translation=[shift_x, shift_y])
+    tf_shift_inv = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
     
-    # Define the full chain
-    trans = (tf_shift + (tf_rotate + tf_shift_inv))
+    # Define the full chain multiplying the transformations (read right to left),
+    # this is 'shift to the center', apply the rotation, shift back
+    # to the origin.
+    trans = tf_shift_inv + tf_rotate + tf_shift
 
     return trans

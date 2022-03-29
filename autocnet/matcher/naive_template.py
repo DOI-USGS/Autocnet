@@ -126,25 +126,33 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
         u_template = template
         u_image = image
 
-    h, w = u_template.shape[:2]
-
-    print(u_image)
-    print(u_template)
-
     result = cv2.matchTemplate(u_image, u_template, method=metric)
-    print(result)
 
     _, max_corr, min_loc, max_loc = cv2.minMaxLoc(result)
     
     if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
-        x = (min_loc[0] + w//2) / upsampling
-        y = (min_loc[1] + h//2) / upsampling
+        x = min_loc[0]
+        y = min_loc[1]
     else:
-        x = ((max_loc[0] + w//2)) / upsampling
-        y = ((max_loc[1] + h//2)) / upsampling
+        x = max_loc[0]
+        y = max_loc[1]
 
-    print('things', x, y, max_loc, h, w)
-    return x, y, max_corr, result
+    # Transform from the results array shape to the template shape
+    x = x - (result.shape[1] - u_template.shape[1]) // 2
+    y = y - (result.shape[0] - u_template.shape[0]) // 2
+
+    # Recenter the origin from the upper left to the center of the template
+    ideal_x = u_template.shape[1] // 2
+    ideal_y = u_template.shape[0] // 2
+
+    x -= ideal_x
+    y -= ideal_y
+
+    y /= upsampling
+    x /= upsampling
+
+
+    return -x, -y, max_corr, result
 
     # -1 because the returned results array is W-w+1 and H-h+1 in shape, 
     # where W, H are the width and height of the image and w,h are the 
