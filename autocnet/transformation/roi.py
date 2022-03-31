@@ -135,7 +135,7 @@ class Roi():
     @property
     def center(self):
         ie = self.image_extent
-        return ((ie[1] - ie[0])-1)/2., ((ie[3]-ie[2])-1)/2.
+        return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
 
     @property
     def is_valid(self):
