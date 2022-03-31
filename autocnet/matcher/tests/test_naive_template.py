@@ -79,8 +79,8 @@ class TestNaiveTemplate(unittest.TestCase):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._t_shape,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, -3)
-        self.assertEqual(result_y, -3)
+        self.assertEqual(result_x, 3)
+        self.assertEqual(result_y, 3)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
 
@@ -88,8 +88,8 @@ class TestNaiveTemplate(unittest.TestCase):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._rect_shape,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, 3)
-        self.assertEqual(result_y, 4)
+        self.assertEqual(result_x, -3)
+        self.assertEqual(result_y, -4)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
 
@@ -97,8 +97,8 @@ class TestNaiveTemplate(unittest.TestCase):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._square_shape,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, -2)
-        self.assertEqual(result_y, 4)
+        self.assertEqual(result_x, 2)
+        self.assertEqual(result_y, -4)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
 
@@ -106,8 +106,8 @@ class TestNaiveTemplate(unittest.TestCase):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._vertical_line,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, 3)
-        self.assertEqual(result_y, -5)
+        self.assertEqual(result_x, -3)
+        self.assertEqual(result_y, 5)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
     
