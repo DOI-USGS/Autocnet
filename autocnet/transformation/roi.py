@@ -144,7 +144,11 @@ class Roi():
         no null pixels (as defined by the no data value (ndv)) are
         present.
         """
-        return self.ndv not in self.array
+        print(self.ndv)
+        if self.ndv == None:
+            return True
+        return np.isclose(self.ndv,self.array).all()
+        
 
     @property
     def variance(self):

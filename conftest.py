@@ -150,17 +150,19 @@ def node_c(geodata_c):
 #TODO: Can these be a single parameterized fixture - so much boilerplate!
 @pytest.fixture(scope='session')
 def geodata_a():
-    arr = np.ones((100,100))
-    arr[5,5] = -3.40282266e+38
-    a = Mock(spec=GeoDataset, raster_size=[10,10], no_data_value=-3.40282266e+38)
+    arr = np.ones((101,101))
+    ndv =  -3.40282266e+38
+    arr[50,50] = ndv
+    a = Mock(spec=GeoDataset, raster_size=[101,101], no_data_value=ndv)
     a.pixel_to_latlon = MagicMock(side_effect=lambda x, y: (x, y))    
     a.read_array = MagicMock(return_value=arr)
+    a.array = MagicMock(return_value=arr)
     return a
 
 @pytest.fixture(scope='session')
 def geodata_b():
-    arr = np.ones((100,100))
-    b = Mock(spec=GeoDataset, raster_size=[10,10])
+    arr = np.ones((1000,1000), dtype=np.float32)
+    b = Mock(spec=GeoDataset, raster_size=[1000,1000], ndv=None)
     b.pixel_to_latlon = MagicMock(side_effect=lambda x, y: (x, y))
     b.read_array = MagicMock(return_value=arr)
     return b
