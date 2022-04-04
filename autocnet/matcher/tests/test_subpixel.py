@@ -105,8 +105,8 @@ def test_subpixel_transformed_template(apollo_subsets, delta_x, delta_y, rotatio
 
     new_affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, affine, upsampling=8)
 
-    new_x, new_y = new_affine((moving_roi.x,
-                               moving_roi.y))[0]
+    new_x, new_y = new_affine((moving_roi._x,
+                               moving_roi._y))[0]
     
     assert pytest.approx(new_x, abs=1/5) == expected[0]
     assert pytest.approx(new_y, abs=1/5) == expected[1]
