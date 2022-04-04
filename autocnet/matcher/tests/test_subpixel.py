@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from skimage import transform as tf
+from scipy.ndimage.interpolation import rotate
 from skimage.util import img_as_float   
 from skimage import color 
 from skimage import data
@@ -18,6 +19,23 @@ from imageio import imread
 from autocnet.examples import get_path
 import autocnet.matcher.subpixel as sp
 from autocnet.transformation import roi
+
+def rot(image, xy, angle):
+    """
+    This function rotates an image about the center and also computes the new
+    pixel coordinates of the previous image center.
+
+    This function is intentionally external to the AutoCNet API so that
+    it can be used to generate test data without any dependence on AutoCNet.
+    """
+    im_rot = rotate(image,angle) 
+    org_center = (np.array(image.shape[:2][::-1])-1)/2.
+    rot_center = (np.array(im_rot.shape[:2][::-1])-1)/2.
+    org = xy-org_center
+    a = np.deg2rad(angle)
+    new = np.array([org[0]*np.cos(a) + org[1]*np.sin(a),
+            -org[0]*np.sin(a) + org[1]*np.cos(a) ])
+    return im_rot, new, new+rot_center
 
 @pytest.fixture
 def iris_pair(): 
@@ -48,38 +66,51 @@ def test_prep_subpixel(nmatches, nstrengths):
     assert arrs[2].shape == (nmatches, nstrengths)
     assert arrs[0][0] == 0
 
+delta_xs = [0.25, 1.5, 2.75, -0.25, -1.5, -2.75, 5]# 3.14, -3.14, 4.7, -4.7]
+delta_ys = [0.25, 1.5, 2.75, -0.25, -1.5, -2.75, 5]#3.14, -3.14, 4.7, -4.7]
+rotation_angles = [0, 2.5, -2.5, -5, 5] #[0, 5]# 2.22, -2.22, 5, -5, 10, -10, 23.68, -23.68]
+@pytest.mark.parametrize("delta_x", delta_xs)
+@pytest.mark.parametrize("delta_y", delta_ys)
+@pytest.mark.parametrize("rotation_angle", rotation_angles)
+def test_subpixel_transformed_template(apollo_subsets, delta_x, delta_y, rotation_angle):
+    reference_image = apollo_subsets[0]
+    moving_image = apollo_subsets[0]
 
-def test_subpixel_template(apollo_subsets):
-    a = apollo_subsets[0]
-    b = apollo_subsets[1]
+    x = 50
+    y = 51
+    x1 = 50 + delta_x
+    y1 = 51 + delta_y  
+
+    # Artifically rotate the b array by an arbitrary rotation angle.
+    rotated_array, new, (rx1, ry1) = rot(moving_image, (x1, y1), rotation_angle)
+    _, _, expected = rot(moving_image, (x, y), rotation_angle)  
     
-    ref_roi = roi.Roi(a, a.shape[0]/2, a.shape[1]/2, 41, 41)
-    moving_roi = roi.Roi(b, math.floor(b.shape[0]/2), math.floor(b.shape[1]/2), 11, 11)
+    # Since this is not testing the quality of the matcher given different
+    # reference and moving image sizes, just hard code to be something large, 
+    # and something a fair bit smaller.
+    ref_roi = roi.Roi(reference_image, x, y, 39, 39)
+    moving_roi = roi.Roi(rotated_array, rx1, ry1, 33, 33)
 
-    affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, upsampling=16)
+    # Compute the affine transformation. This is how the affine is computed in the code, so replicated here.
+    # If the AutoCNet code changes, this will highlight a breaking change.
+    t_size = moving_roi.array.shape[:2][::-1]
+    shift_y = (t_size[0] - 1) / 2.
+    shift_x = (t_size[1] - 1) / 2.
 
-    assert strength >= 0.80
-    assert affine.translation[0] == -0.0625
-    assert affine.translation[1] == 2.0625
+    tf_rotate = tf.AffineTransform(rotation=np.radians(rotation_angle))
+    tf_shift = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
+    tf_shift_inv = tf.SimilarityTransform(translation=[shift_x, shift_y])
+    # The '+' overload that is '@' matrix multiplication is read or applied left to right.
+    affine = tf_shift + (tf_rotate + tf_shift_inv)
 
+    new_affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, affine, upsampling=8)
 
-
-def test_subpixel_transformed_template(apollo_subsets):
-    a = apollo_subsets[0]
-    b = apollo_subsets[1]
-
-    moving_center = math.floor(b.shape[0]/2), math.floor(b.shape[1]/2)
-    transform = tf.AffineTransform(rotation=math.radians(1), scale=(1.1,1.1))
-    ref_roi = roi.Roi(a, a.shape[0]/2, a.shape[1]/2, 40, 40)
-    moving_roi = roi.Roi(b, *moving_center, 11, 11)
-
-    # with patch('autocnet.transformation.roi.Roi.clip', side_effect=clip_side_effect):
-    affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, transform, upsampling=16)
+    new_x, new_y = new_affine((moving_roi.x,
+                               moving_roi.y))[0]
     
-    assert strength >= 0.83
-    assert affine.translation[0] == pytest.approx(-0.670806588)
-    assert affine.translation[1] == pytest.approx(0.636804177)
-
+    assert pytest.approx(new_x, abs=1/5) == expected[0]
+    assert pytest.approx(new_y, abs=1/5) == expected[1]
+    
 
 def test_estimate_logpolar_transform(iris_pair):
     img1, img2 = iris_pair 
@@ -206,9 +237,10 @@ def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
                         (0, 0, 0, 0, 0, 0, 0)), dtype=np.uint8)
 
     reference_roi = roi.Roi(test_image, x, y, size_x=image_size[0], size_y=image_size[1])
-    walking_roi = roi.Roi(t_shape, x1, y1, size_x=image_size[0], size_y=image_size[1])
+    moving_roi = roi.Roi(t_shape, x1, y1, size_x=image_size[0], size_y=image_size[1])
 
-    affine, metrics, _ = sp.subpixel_phase(reference_roi, walking_roi)
-    dx, dy = affine((x1, y1))[0]
+    affine, metrics, _ = sp.subpixel_phase(reference_roi, moving_roi)
+    dx, dy = affine((moving_roi.x, moving_roi.y))[0]
+
     assert dx == expected[0]
     assert dy == expected[1]

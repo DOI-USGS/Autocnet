@@ -51,7 +51,7 @@ class Roi():
 
     @property
     def x(self):
-        return self._x + self.axr
+        return self._x #+ self.axr
 
     @x.setter
     def x(self, x):
@@ -59,7 +59,7 @@ class Roi():
 
     @property
     def y(self):
-        return self._y + self.ayr
+        return self._y #+ self.ayr
 
     @y.setter
     def y(self, y):

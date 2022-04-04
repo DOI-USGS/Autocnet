@@ -126,58 +126,27 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
         u_template = template
         u_image = image
 
-    result = cv2.matchTemplate(u_image, u_template, method=metric)
+    corrmap = cv2.matchTemplate(u_image, u_template, method=metric)
 
-    _, max_corr, min_loc, max_loc = cv2.minMaxLoc(result)
+    # Pad the result array with values outside the valid correlation range
+    width = (np.asarray(u_template.shape) - np.asarray(corrmap.shape)) // 2
     
     if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
-        x = min_loc[0]
-        y = min_loc[1]
+        result = np.pad(corrmap, width, mode='constant', constant_values=2)
+        matched_y, matched_x = np.unravel_index(np.argmin(result), result.shape)
     else:
-        x = max_loc[0]
-        y = max_loc[1]
+        result = np.pad(corrmap, width, mode='constant', constant_values=-2)
+        matched_y, matched_x = np.unravel_index(np.argmax(result), result.shape)
+    
+    # The center of the template is the origin
+    original_y = (u_template.shape[0] - 1) // 2
+    original_x = (u_template.shape[1] - 1) // 2
 
-    # Transform from the results array shape to the template shape
-    x = x - (result.shape[1] - u_template.shape[1]) // 2
-    y = y - (result.shape[0] - u_template.shape[0]) // 2
+    # Compute the shift, if any, between the template center and the
+    # best correlation index
+    shift_x = (original_x - matched_x) / upsampling
+    shift_y = (original_y - matched_y) / upsampling
 
-    # Recenter the origin from the upper left to the center of the template
-    ideal_x = u_template.shape[1] // 2
-    ideal_y = u_template.shape[0] // 2
+    max_corr = result[matched_y, matched_x]
 
-    x -= ideal_x
-    y -= ideal_y
-
-    y /= upsampling
-    x /= upsampling
-
-
-    return -x, -y, max_corr, result
-
-    # -1 because the returned results array is W-w+1 and H-h+1 in shape, 
-    # where W, H are the width and height of the image and w,h are the 
-    # width and height of the template
-
-    print(u_template.shape, u_image.shape, result.shape, x,y)
-    print(u_image.shape, u_template.shape, max_loc)
-
-
-    # the max_loc array is of shape W-w+1, H-h+1, where W, H are the width
-    # and height of the image and w,h are the width and height of the template
-
-    print(x / upsampling - 1, y / upsampling - 1)
-
-
-    # Compute the idealized shift (image center)
-    ideal_y = (u_image.shape[0] + 1) / 2. - 0.5
-    ideal_x = (u_image.shape[1] + 1) / 2. - 0.5
-
-    # Compute the shift from template upper left to template center
-    y += (u_template.shape[0] / 2.)
-    x += (u_template.shape[1] / 2.)
-
-    # 
-    x = (x - ideal_x) / upsampling
-    y = ((y - ideal_y) / upsampling) + 1
-    print(x, y)
-    return x, y, max_corr, result
+    return shift_x, shift_y , max_corr, corrmap

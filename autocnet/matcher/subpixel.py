@@ -209,14 +209,14 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
                                                                                 **kwargs)
     # get shifts in input pixel space 
     shift_x, shift_y = affine([shift_x, shift_y])[0]
-    new_affine = tf.AffineTransform(translation=(-shift_y, -shift_x))
+    new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
     return new_affine, error, diffphase
 
 
 def subpixel_template(reference_roi, 
                       moving_roi, 
                       affine=tf.AffineTransform(), 
-                      mode='reflect',
+                      mode='constant',
                       func=pattern_match,
                       **kwargs):
     """
@@ -269,34 +269,32 @@ def subpixel_template(reference_roi,
 
     if (ref_clip is None) or (moving_clip is None):
         return None, None, None
-    shift_x, shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
-    if shift_x is None:
+    matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
+ 
+    if matcher_shift_x is None:
         return None, None, None
+        
+    # Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
+    new_affine_transformed_center_x = moving_roi.center[0] + matcher_shift_x  #Center is indices.
+    new_affine_transformed_center_y = moving_roi.center[1] + matcher_shift_y
 
-    # Shift x and shift y are computed in the affine space.
-    moving_clip_center = (np.array(moving_clip.shape[:2][::-1])-1)/2.
-    print(moving_clip_center)
+    # Invert the affine transformation of the new center. This result is plotted in the second figure as a red dot.
+    inverse_transformed_affine_center_x, inverse_transformed_affine_center_y = affine.inverse((new_affine_transformed_center_x, new_affine_transformed_center_y))[0]
+    #print(inverse_transformed_affine_center_x, inverse_transformed_affine_center_y)
 
-    new_x = moving_clip_center[0] + shift_x
-    new_y = moving_clip_center[1] + shift_y
-    print('Pre-transform', shift_x, shift_y, moving_clip.shape, moving_clip_center, new_x, new_y, affine)
+    # Take the original x,y (moving_roi.x, moving_roi.y) and subtract the delta between the original ROI center and the newly computed center.
+    # The 
+    #new_x = moving_roi.x - (moving_roi.center[0] - inverse_transformed_affine_center_x) 
+    #new_y = moving_roi.y - (moving_roi.center[1] - inverse_transformed_affine_center_y)
 
-    # convert shifts in input pixel space
-    image_space_new_x, image_space_new_y = affine([new_x, new_y])[0]
-    print('Image Space NEW', image_space_new_x, image_space_new_y)
+    # These are the inverse of the translation so that the caller can use affine() to
+    # apply the proper translation. Otherwise, the caller would need to use affine.inverse
+    translation_x = -(moving_roi.center[0] - inverse_transformed_affine_center_x)
+    translation_y = -(moving_roi.center[1] - inverse_transformed_affine_center_y)
 
-    x_shift_in_image = image_space_new_x - moving_roi.center[0]
-    y_shift_in_image = image_space_new_y - moving_roi.center[1]
+    new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
 
-    new_affine = tf.AffineTransform(affine.params)
-    new_affine.translation = (x_shift_in_image,y_shift_in_image)
-
-    """new_affine = tf.AffineTransform(translation=(x_shift_in_image,
-                                                 y_shift_in_image),
-                                    rotation=tf.AffineTransform(affine).rotation,
-                                    shear=tf.AffineTransform(affine).shear)"""
-
-    return new_affine,  metrics, corrmap
+    return new_affine, metrics, corrmap
 
 
 def subpixel_ciratefi(sx, sy, dx, dy, s_img, d_img, search_size=251, template_size=51, **kwargs):

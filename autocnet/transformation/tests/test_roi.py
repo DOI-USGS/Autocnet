@@ -22,19 +22,6 @@ def test_center(array_with_nodata):
     roi = Roi(array_with_nodata, 5, 5, size_x=5, size_y=5)
     assert roi.center == (5,5)
 
-@pytest.mark.parametrize("x, y, axr, ayr",[
-                         (10.1, 10.1, .1, .1),
-                         (10.5, 10.5, .5, .5),
-                         (10.9, 10.9, .9, .9)
-    ])
-def test_roi_remainder(x, y, axr, ayr):
-    gd = np.zeros((10,10))
-    roi = Roi(gd, x, y)
-    pytest.approx(roi.axr, axr)
-    pytest.approx(roi.ayr, ayr)
-    assert roi.x == x
-    assert roi.y == y
-
 @pytest.mark.parametrize("x, y, size_arr, size_roi, expected",[
     (50, 50, (100,100), (10,10), [40,60,40,60]),
     (15, 15, (100, 100), (15, 15), [0, 30, 0, 30]),
