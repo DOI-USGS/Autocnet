@@ -12,6 +12,7 @@ dependencies:
   - fakeredis
   - geoalchemy2
   - geopandas
+  - gdal
   - hiredis
   - hoggorm
   - imageio

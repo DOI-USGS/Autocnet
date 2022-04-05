@@ -1,12 +1,51 @@
-name: autocnet
 channels:
   - conda-forge
-  - default
+  - usgs-astrogeology
+  - menpo
 
 dependencies:
-  - cmake
-  - nbsphinx
-  - networkx
+  - python>=3
+  - coveralls
+  - csmapi
+  - cyvlfeat
+  - dill
+  - fakeredis
+  - geoalchemy2
+  - geopandas
+  - gdal
+  - hiredis
+  - hoggorm
+  - imageio
+  - ipykernel
+  - jupyter
+  - kalasiris
+  - knoten>= 0.2.0,<1.0
+  - ncurses
+  - networkx >=2, <3
+  - numpy
+  - opencv <= 3.5
+  - pillow
+  - pip
+  - plio>=1.3
+  - plurmy
+  - psycopg2
+  - proj>=7.0.0,<8
+  - pvl>=1.0
+  - pyproj
+  - pytest
+  - pytest-cov
+  - pytest-mock
+  - richdem
+  - scikit-image>=0.17
+  - scikit-learn
+  - scipy<=1.2.1
+  - shapely
   - sphinx
-  - sqlalchemy
-  - yaml
+  - sphinxcontrib-napoleon
+  - sphinx-markdown-tables
+  - nbsphinx
+  - sqlalchemy>=1.4,<1.5
+  - sqlalchemy-utils>=0.37.0
+  - redis-py
+  - usgscsm
+  - vlfeat
