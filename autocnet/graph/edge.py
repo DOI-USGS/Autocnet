@@ -394,7 +394,8 @@ class Edge(dict, MutableMapping):
 
     def compute_homography(self, method='ransac', clean_keys=[], pid=None, maskname='homography', **kwargs):
         """
-        For each edge in the (sub) graph, compute the homography
+        For each edge in the (sub) graph, compute the homography.
+
         Parameters
         ----------
         outlier_algorithm : object
@@ -1264,10 +1265,9 @@ class NetworkEdge(Edge):
 
         Parameters
         ----------
-        outlier_method: str
-                        method used to determine outliers.
-                        Current methods:
-                           - interquartile range ('IQR') of line/sample shift
+        outlier_method: {'IQR',}
+                        method used to determine outliers. Options are: 
+                          - interquartile range ('IQR') of line/sample shift
 
         Returns
         -------

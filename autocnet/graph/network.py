@@ -1000,6 +1000,8 @@ class CandidateGraph(nx.Graph):
         """
         Computes a voronoi weight for each edge in a given graph.
         Can function as is, but is slightly optimized for complete subgraphs.
+
+        Parameters
         ----------
         kwargs : dict
                       keyword arguments that get passed to compute_voronoi
@@ -2226,21 +2228,24 @@ class NetworkCandidateGraph(CandidateGraph):
         -----
         Here, we provide usage examples for a few, potentially common use cases.
 
-        ## Spatial Query
+        Spatial Query
+        =============
         This example selects those images that intersect a given bounding polygon.  The polygon is
         specified as a Well Known Text LINESTRING with the first and last points being the same.
         The query says, select the geom (the bounding polygons in the database) that
         intersect the user provided polygon (the LINESTRING) in the given spatial reference system
-        (SRID), 949900.
+        (SRID), 949900. ::
 
-        SELECT * FROM Images WHERE ST_INTERSECTS(geom, ST_Polygon(ST_GeomFromText('LINESTRING(159 10, 159 11, 160 11, 160 10, 159 10)'),949900)) = TRUE
+            SELECT * FROM Images WHERE ST_INTERSECTS(geom, ST_Polygon(ST_GeomFromText('LINESTRING(159 10, 159 11, 160 11, 160 10, 159 10)'),949900)) = TRUE
 
-        ## Select from a specific orbit
+        Select from a specific orbit
+        ============================
         This example selects those images that are from a particular orbit. In this case,
         the regex string pulls all P##_* orbits and creates a graph from them. This method
-        does not guarantee that the graph is fully connected.
+        does not guarantee that the graph is fully connected. ::
 
-        SELECT * FROM Images WHERE (split_part(path, '/', 6) ~ 'P[0-9]+_.+') = True
+          SELECT * FROM Images WHERE (split_part(path, '/', 6) ~ 'P[0-9]+_.+') = True
+
         """
 
         composite_query = '''WITH i as ({}) SELECT i1.id
@@ -2647,6 +2652,7 @@ class NetworkCandidateGraph(CandidateGraph):
         distirbute_points_kwargs : dict
                                    Of arguments that are passed on the the
                                    distribute_points_in_geom argument in autocnet.cg.cg
+        
         Returns
         -------
         valid : np.ndarray
@@ -2655,7 +2661,8 @@ class NetworkCandidateGraph(CandidateGraph):
         Examples
         --------
         To use this method, one can first define the spacing of ground points in the north-
-        south and east-west directions using the `distribute_points_kwargs` keyword argument:
+        south and east-west directions using the `distribute_points_kwargs` keyword argument::
+
             def ns(x):
                 from math import ceil
                 return ceil(round(x,1)*3)
@@ -2663,16 +2670,18 @@ class NetworkCandidateGraph(CandidateGraph):
                 from math import ceil
                 return ceil(round(x,1)*3)
 
-        Next these arguments can be passed in in order to generate the grid of points:
+        Next these arguments can be passed in in order to generate the grid of points::
+
             distribute_points_kwargs = {'nspts_func':ns, 'ewpts_func':ew, 'method':'classic'}
             valid = ncg.distribute_ground_uniform(distribute_points_kwargs=distribute_points_kwargs)
 
         At this point, it is possible to visualize the valid points inside of a Jupyter notebook. This
         is frequently convenient when combined with the `ncg.union` property that displays the unioned
         geometries in the NetworkCandidateGraph.
+
         Finally, the valid points can be propagated using apply. The code below will use the defined base
         to find the most interesting ground feature in the region of the valid point and write that point
-        to the table defined by CandidateGroundPoints (autocnet.io.db.model):
+        to the table defined by CandidateGroundPoints (autocnet.io.db.model)::
 
             base = 'mc11_oxia_palus_dir_final.cub'
             ncg.apply('matcher.ground.find_most_interesting_ground', on=valid, args=(base,))

@@ -6,6 +6,5 @@
    connection
    controlnetwork
    model
-   redis_queue
    triggers
    wrappers
