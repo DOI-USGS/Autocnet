@@ -154,62 +154,62 @@ def propagate_point(Session,
 
     Parameters
     ----------
-    Session   : sqlalchemy.sessionmaker
-                session maker associated with the database you want to propagate to
+    Session : sqlalchemy.sessionmaker
+              session maker associated with the database you want to propagate to
 
-    config    : dict
-                configuation file associated with database you want to propagate to
-                In the form: {'username':'somename',
-                              'password':'somepassword',
-                              'host':'somehost',
-                              'pgbouncer_port':6543,
-                              'name':'somename'}
+    config : dict
+             configuration file associated with database you want to propagate to
+             In the form: {'username':'somename',
+                           'password':'somepassword',
+                           'host':'somehost',
+                           'pgbouncer_port':6543,
+                           'name':'somename'}
 
-    dem       : surface
-                surface model of target body
+    dem : surface
+          surface model of target body
 
-    lon       : np.float
-                longitude of point you want to project
+    lon : np.float
+          longitude of point you want to project
 
-    lat       : np.float
-                planetocentric latitude of point you want to project
+    lat : np.float
+          planetocentric latitude of point you want to project
 
-    pointid   : int
-                clerical input used to trace point from generate_ground_points output
+    pointid : int
+             clerical input used to trace point from generate_ground_points output
 
-    paths     : list of str
-                absolute paths pointing to the image(s) from which you want to try porpagating the point
+    paths : list of str
+            absolute paths pointing to the image(s) from which you want to try propagating the point 
+    
+    lines : list of np.float
+            a priori line(s) corresponding to point projected in 'paths' image(s 
 
-    lines     : list of np.float
-                apriori line(s) corresponding to point projected in 'paths' image(s)
+    samples : list of np.float
+              a priori sample(s) corresponding to point projected in 'paths' image(s 
 
-    samples   : list of np.float
-                apriori sample(s) corresponding to point projected in 'paths' image(s)
+    size_x : int
+             half width of GeoDataset that is cut from full image and affinely transfromed in geom_match;
+             must be larger than 1/2 template_kwargs 'image_size 
 
-    size_x    : int
-                half width of GeoDataset that is cut from full image and affinely transfromed in geom_match;
-                must be larger than 1/2 template_kwargs 'image_size'
-
-    size_y    : int
-                half height of GeoDataset that is cut from full image and affinely transfromed in geom_match;
-                must be larger than 1/2 template_kwargs 'image_size'
+    size_y : int
+             half height of GeoDataset that is cut from full image and affinely transfromed in geom_match;
+             must be larger than 1/2 template_kwargs 'image_size'
 
     template_kwargs : dict
                       kwargs passed through to control matcher.subpixel_template()
 
-    verbose   : boolean
-                If True, this will print out the results of each propagation, including prints of the
-                matcher areas and their correlation map.
+    verbose : boolean
+              If True, this will print out the results of each propagation, including prints of the
+              matcher areas and their correlation map.
 
-    cost      : anonymous function
-                determines to which image(s) the point should be propagated. x corresponds to a list
-                of all match correlation metrics, while y corresponds to each indiviudal element
-                of the x array.
-                Example:
-                cost = lambda x,y: y == np.max(x) will get you one result corresponding to the image that
-                has the maximum correlation with the source image
-                cost = lambda x,y: y > 0.6 will propagate the point to all images whose correlation
-                result is greater than 0.6
+    cost : anonymous function
+           determines to which image(s) the point should be propagated. x corresponds to a list
+           of all match correlation metrics, while y corresponds to each individual element
+           of the x array.
+           Example:
+           cost = lambda x,y: y == np.max(x) will get you one result corresponding to the image that
+           has the maximum correlation with the source image
+           cost = lambda x,y: y > 0.6 will propagate the point to all images whose correlation
+           result is greater than 0.6
 
 
     Returns
@@ -337,39 +337,38 @@ def propagate_control_network(Session,
     Loops over a base control network's measure information (line, sample, image path) and uses image matching
     algorithms (autocnet.matcher.subpixel.geom_match) to find the corresponding line(s)/sample(s) in database images.
 
-
     Parameters
     ----------
-    Session   : sqlalchemy.sessionmaker
-                session maker associated with the database containing the images you want to propagate to
+    Session : sqlalchemy.sessionmaker
+              session maker associated with the database containing the images you want to propagate to
 
-    config    : dict
-                configuation file associated with database containing the images you want to propagate to
-                In the form: {'username':'somename',
-                              'password':'somepassword',
-                              'host':'somehost',
-                              'pgbouncer_port':6543,
-                              'name':'somename'}
+    config : dict
+             configuation file associated with database containing the images you want to propagate to
+             In the form: {'username':'somename',
+                          'password':'somepassword',
+                          'host':'somehost',
+                          'pgbouncer_port':6543,
+                          'name':'somename'}
 
-    dem       : surface
-                surface model of target body
+    dem : surface
+          surface model of target body
 
     base_cnet : pd.DataFrame
                 Dataframe representing the points you want to propagate. Must contain 'line', 'sample' location of
                 the measure and the 'path' to the corresponding image
 
-    verbose   : boolean
-                Increase the level of print outs/plots recieved during propagation
+    verbose : boolean
+              Increase the level of print outs/plots recieved during propagation
 
-    cost      : anonymous function
-                determines to which image(s) the point should be propagated. x corresponds to a list
-                of all match correlation metrics, while y corresponds to each indiviudal element
-                of the x array.
-                Example:
-                cost = lambda x,y: y == np.max(x) will get you one result corresponding to the image that
-                has the maximum correlation with the source image
-                cost = lambda x,y: y > 0.6 will propegate the point to all images whose correlation
-                result is greater than 0.6
+    cost : anonymous function
+           determines to which image(s) the point should be propagated. x corresponds to a list
+           of all match correlation metrics, while y corresponds to each indiviudal element
+           of the x array.
+           Example:
+           cost = lambda x,y: y == np.max(x) will get you one result corresponding to the image that
+           has the maximum correlation with the source image
+           cost = lambda x,y: y > 0.6 will propegate the point to all images whose correlation
+           result is greater than 0.6
 
 
     Returns

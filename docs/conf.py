@@ -15,21 +15,6 @@
 
 import sys
 import os
-from unittest.mock import MagicMock
-
-
-#autodoc_mock_imports = ['proj4', 'gdal', 'osr','ogr', 'cv2', 'scikit-image',
-#                        'skimage', 'skimage.feature', 'sklearn', 'osgeo', 'plio']
-
-'''
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-            return Mock()
-
-MOCK_MODULES = ['proj4', 'gdal', 'osr','ogr', 'cv2', 'scikit-image', 'skimage', 'skimage.feature', 'sklearn', 'osgeo']
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
-'''
 
 # If extensions (or modules to document with autodoc) are in another
 # directory, add these directories to sys.path here. If the directory is
@@ -45,71 +30,23 @@ sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 sys.path.insert(0, os.path.abspath('../'))
 
-for mod_name in (
-	"csmapi",
-	"cv2",
-	"dill",
-	"geoalchemy2",
-	"geoalchemy2.shape",
-	"geopandas",
-	"kalasiris",
-	"knoten",
-	"knoten.csm",
-	"matplotlib",
-	"matplotlib.pyplot",
-	"numpy",
-	"ogr",
-	"osgeo",
-	"pandas",
-	"pandas.core",
-	"pandas.core.indexing",
-	"PIL",
-	"plio",
-	"plio.io",
-	"plio.io.io_gdal",
-	"plio.io.io_controlnetwork",
-	"plio.io.isis_serial_number",
-	"plio.utils",
-	"plurmy",
-	"psycopg2",
-	"psycopg2.extensions",
-	"pvl",
-	"pyproj",
-	"redis",
-	"scipy",
-	"scipy.spatial",
-	"scipy.spatial.distance",
-	"scipy.special",
-	"scipy.stats",
-	"scipy.ndimage",
-	"scipy.ndimage.interpolation",
-	"shapely",
-	"shapely.affinity",
-	"shapely.geometry",
-	"shapely.ops",
-	"shapely.wkt",
-	"shapely.wkb",
-	"skimage",
-	"skimage.transform",
-	"sklearn",
-	"sklearn.cluster",
-	"sklearn.neighbors",
-	"sqlalchemy_utils",
-	"yaml"
-):
-	sys.modules[mod_name]= MagicMock()
 import autocnet
 
 # -- General configuration ---------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = '1.3'
+needs_sphinx = '4.5'
 nbsphinx_allow_errors = True
 nbsphinx_execute = 'never'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx.ext.napoleon', 'nbsphinx', 'sphinx.ext.mathjax']
+extensions = ['sphinx.ext.autodoc', 
+              'sphinx.ext.viewcode', 
+              'sphinx.ext.napoleon', 
+              'nbsphinx', 
+              'sphinx.ext.mathjax', 
+              'sphinx_markdown_tables']
 
 # NumpyDoc Options
 numpydoc_show_class_members = True
@@ -331,9 +268,9 @@ man_pages = [
 texinfo_documents = [
     ('index', 'autocnet',
      u'AutoCNet Documentation',
-     u'Jay Laura',
+     u'USGS Astrogeology',
      'autocnet',
-     'One line description of project.',
+     'Tools for image co-registration and control network generation for photogrammetric image adjustment of planetary (non-Earth) observations.',
      'Miscellaneous'),
 ]
 

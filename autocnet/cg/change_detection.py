@@ -538,7 +538,7 @@ def rv_detector(im1, im2, search_size, pattern_size=None, threshold=.999):
     RV coefficient based change detection. This computes an RV coefficient on a sliding window 
     and correlates low scores below the input threshold to expected change.  
     
-    **WARNING*: The time complexity for this is `1 + (search_size - pattern_size))^2` per overlapping pixel between im1 and im2. So larger the differemce between the search and pattern size, it causes compute time to increase exponentially. 
+    **WARNING**: The time complexity for this is `1 + (search_size - pattern_size))^2` per overlapping pixel between im1 and im2. So larger the differemce between the search and pattern size, it causes compute time to increase exponentially. 
 
     Parameters
     ----------
