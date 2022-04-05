@@ -44,10 +44,12 @@ ORDER BY measures."pointid", measures."id";
         """
         Given a set of points/measures in an autocnet database, generate an ISIS
         compliant control network.
+
         Parameters
         ----------
         path : str
                The full path to the output network.
+
         flistpath : str
                     (Optional) the path to the output filelist. By default
                     the outout filelist path is genrated programatically
@@ -56,7 +58,6 @@ ORDER BY measures."pointid", measures."id";
         sql : str
               The sql query to execute in the database.
         """
-        print(sql)
         
         df = pd.read_sql(sql, engine)
 
