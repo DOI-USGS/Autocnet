@@ -289,8 +289,8 @@ def subpixel_template(reference_roi,
 
     # These are the inverse of the translation so that the caller can use affine() to
     # apply the proper translation. Otherwise, the caller would need to use affine.inverse
-    translation_x = -(moving_roi.center[0] - inverse_transformed_affine_center_x)
-    translation_y = -(moving_roi.center[1] - inverse_transformed_affine_center_y)
+    translation_x = -(moving_roi.center[0] - inverse_transformed_affine_center_x) + moving_roi.axr
+    translation_y = -(moving_roi.center[1] - inverse_transformed_affine_center_y) + moving_roi.ayr
 
     new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
 

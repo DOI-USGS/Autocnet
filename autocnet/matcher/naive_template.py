@@ -130,12 +130,11 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
 
     # Pad the result array with values outside the valid correlation range
     width = (np.asarray(u_template.shape) - np.asarray(corrmap.shape)) // 2
-    
+    print(width)
+    result = np.pad(corrmap, width, mode='constant')  # pads zeros
     if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
-        result = np.pad(corrmap, width, mode='constant', constant_values=2)
         matched_y, matched_x = np.unravel_index(np.argmin(result), result.shape)
     else:
-        result = np.pad(corrmap, width, mode='constant', constant_values=-2)
         matched_y, matched_x = np.unravel_index(np.argmax(result), result.shape)
     
     # The center of the template is the origin

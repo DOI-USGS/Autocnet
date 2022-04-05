@@ -121,6 +121,8 @@ class Roi():
             # Numpy array in y,x form
             raster_size = self.data.shape[::-1]
 
+        # Should this modify (+-) and then round to whole pixel?
+
         # what is the extent that can actually be extracted?
         left_x = self._x - self.size_x
         right_x = self._x + self.size_x

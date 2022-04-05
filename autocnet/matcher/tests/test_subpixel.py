@@ -66,8 +66,8 @@ def test_prep_subpixel(nmatches, nstrengths):
     assert arrs[2].shape == (nmatches, nstrengths)
     assert arrs[0][0] == 0
 
-delta_xs = [0.25, 1.5, 2.75, -0.25, -1.5, -2.75, 5]# 3.14, -3.14, 4.7, -4.7]
-delta_ys = [0.25, 1.5, 2.75, -0.25, -1.5, -2.75, 5]#3.14, -3.14, 4.7, -4.7]
+delta_xs = [0, 0.25, 1.5, 2.75, -0.25, -1.5, -2.75, 5]# 3.14, -3.14, 4.7, -4.7]
+delta_ys = [0, 0.25, 1.5, 2.75, -0.25, -1.5, -2.75, 5]#3.14, -3.14, 4.7, -4.7]
 rotation_angles = [0, 2.5, -2.5, -5, 5] #[0, 5]# 2.22, -2.22, 5, -5, 10, -10, 23.68, -23.68]
 @pytest.mark.parametrize("delta_x", delta_xs)
 @pytest.mark.parametrize("delta_y", delta_ys)
@@ -76,10 +76,13 @@ def test_subpixel_transformed_template(apollo_subsets, delta_x, delta_y, rotatio
     reference_image = apollo_subsets[0]
     moving_image = apollo_subsets[0]
 
+    # The reference image needs to be rotated if the moving image is going to be
+    # artifically rotated and then a match attempted.
+
     x = 50
     y = 51
-    x1 = 50 + delta_x
-    y1 = 51 + delta_y  
+    x1 = 50 + delta_x  #50.25
+    y1 = 51 + delta_y  #50.25
 
     # Artifically rotate the b array by an arbitrary rotation angle.
     rotated_array, new, (rx1, ry1) = rot(moving_image, (x1, y1), rotation_angle)
@@ -105,11 +108,11 @@ def test_subpixel_transformed_template(apollo_subsets, delta_x, delta_y, rotatio
 
     new_affine, strength, corrmap = sp.subpixel_template(ref_roi, moving_roi, affine, upsampling=8)
 
-    new_x, new_y = new_affine((moving_roi._x,
-                               moving_roi._y))[0]
+    new_x, new_y = new_affine((moving_roi.x,
+                               moving_roi.y))[0]
     
-    assert pytest.approx(new_x, abs=1/5) == expected[0]
-    assert pytest.approx(new_y, abs=1/5) == expected[1]
+    assert pytest.approx(new_x, abs=1/100) == expected[0]
+    assert pytest.approx(new_y, abs=1/100) == expected[1]
     
 
 def test_estimate_logpolar_transform(iris_pair):
