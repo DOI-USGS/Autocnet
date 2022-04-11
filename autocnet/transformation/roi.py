@@ -67,7 +67,7 @@ class Roi():
 
     @x.setter
     def x(self, x):
-        self._whole_x = round(x, 0)
+        self._whole_x = floor(x)
         self._remainder_x = x - self._whole_x
         return self._whole_x + self._remainder_x
 
@@ -77,7 +77,7 @@ class Roi():
 
     @y.setter
     def y(self, y):
-        self._whole_y = round(y, 0)
+        self._whole_y = floor(y)
         self._remainder_y = y - self._whole_y
 
     @property
@@ -147,7 +147,7 @@ class Roi():
         #if left_x < 0 or top_y < 0 or right_x > raster_size[0] or bottom_y > raster_size[1]:
         #    raise IndexError(f"Input window size {(self.size_x, self.size_y)}) at center {(self.x, self.y)} is out of the image bounds") 
 
-        return list(map(int, [left_x, right_x, top_y, bottom_y]))
+        return [left_x, right_x, top_y, bottom_y]
 
     @property
     def center(self):
@@ -203,8 +203,8 @@ class Roi():
         if (np.asarray(pixels) - self.buffer < 0).any():
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
-        if isinstance(self.data, np.ndarray):
-            data = self.data[pixels[2]-self.buffer:pixels[3]+1+self.buffer,
+        if isinstance(self.data, np.ndarray): # 33x33 buffer = 3
+            data = self.data[pixels[2]-self.buffer:pixels[3]+1+self.buffer,  #(10-3): (43 + 3) 39x39 of real data, non-interpolated 
                              pixels[0]-self.buffer:pixels[1]+1+self.buffer]
         else:
             # Have to reformat to [xstart, ystart, xnumberpixels, ynumberpixels]
@@ -216,12 +216,12 @@ class Roi():
             data = self.data.read_array(pixels=pixels)
         
         # Now that the whole pixel array has been read, interpolate the array to align pixel edges
-        xi = np.linspace(self.buffer + self._remainder_x, 
-                         self.buffer + self._remainder_x + (self.size_x*2), 
-                         self.size_x*2+1)
-        yi = np.linspace(self.buffer + self._remainder_y, 
-                         self.buffer + self._remainder_y + (self.size_y*2), 
-                         self.size_y*2+1)
+        xi = np.linspace(self._remainder_x, 
+                         (self.buffer*2) + self._remainder_x + (self.size_x*2), 
+                         (self.size_x*2+1)+(self.buffer*2)) 
+        yi = np.linspace(self._remainder_y, 
+                         (self.buffer*2) + self._remainder_y + (self.size_y*2), 
+                         (self.size_y*2+1)+(self.buffer*2))
 
         pixel_locked = ndimage.map_coordinates(data, 
                                        np.meshgrid(xi, yi, indexing='ij'),
