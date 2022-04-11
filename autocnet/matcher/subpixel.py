@@ -270,11 +270,23 @@ def subpixel_template(reference_roi,
     if (ref_clip is None) or (moving_clip is None):
         return None, None, None
     matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
- 
     if matcher_shift_x is None:
         return None, None, None
-        
-    # Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
+
+    print(matcher_shift_x, matcher_shift_y)
+
+    # Transformation of the ROI center if the clip applies a non-identity affine transformation    
+    affine_transformed_center_x, affine_transformed_center_y = affine((moving_roi.center[0], moving_roi.center[1]))[0]
+    
+    
+    new_center_x = affine_transformed_center_x + matcher_shift_x
+    new_center_y = affine_transformed_center_y + matcher_shift_y
+    translation_x, translation_y = affine.inverse((new_center_x, new_center_y))[0]
+
+    new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
+
+
+    """# Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
     new_affine_transformed_center_x = moving_roi.center[0] + matcher_shift_x  #Center is indices.
     new_affine_transformed_center_y = moving_roi.center[1] + matcher_shift_y
 
@@ -289,10 +301,12 @@ def subpixel_template(reference_roi,
 
     # These are the inverse of the translation so that the caller can use affine() to
     # apply the proper translation. Otherwise, the caller would need to use affine.inverse
-    translation_x = -(moving_roi.center[0] - inverse_transformed_affine_center_x) + moving_roi.axr
-    translation_y = -(moving_roi.center[1] - inverse_transformed_affine_center_y) + moving_roi.ayr
+    translation_x = -(moving_roi.center[0] - inverse_transformed_affine_center_x) 
+    translation_y = -(moving_roi.center[1] - inverse_transformed_affine_center_y)"""
 
-    new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
+    #translation_x, translation_y = affine.inverse((matcher_shift_x, matcher_shift_y))[0]
+
+    #new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
 
     return new_affine, metrics, corrmap
 
