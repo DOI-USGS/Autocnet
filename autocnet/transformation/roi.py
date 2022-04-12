@@ -46,20 +46,25 @@ class Roi():
         self.data = data
         self.x = x
         self.y = y
-        self._affine = tf.AffineTransform(translation=(self._remainder_x, 
-                                                       self._remainder_y))
         self.size_x = size_x
         self.size_y = size_y
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
 
+    def roi_coords_to_image_coords(self, x, y):
+        """
+        Given coordinates in ROI pixel space, return the coordinates in
+        image coordinate space.
+        """
+        return self.affine((x, y))[0]
+
     @property
     def affine(self):
         """
         This affine sets the origin of the ROI to be (0,0).
         """
-        return self._affine
+        return tf.AffineTransform(translation=(self.x, self.y))
 
     @property
     def x(self):
@@ -151,9 +156,8 @@ class Roi():
 
     @property
     def center(self):
-        return (0,0)
-        #ie = self.image_extent
-        #return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
+        ie = self.image_extent
+        return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
 
     @property
     def is_valid(self):

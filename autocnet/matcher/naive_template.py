@@ -135,7 +135,7 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
     if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
         matched_y, matched_x = np.unravel_index(np.argmin(result), result.shape)
     else:
-        matched_y, matched_x = np.unravel_index(np.argmax(result), result.shape)
+        matched_x, matched_y = np.unravel_index(np.argmax(result), result.shape)
     
     # The center of the template is the origin
     original_y = (u_template.shape[0] - 1) // 2

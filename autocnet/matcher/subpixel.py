@@ -261,8 +261,7 @@ def subpixel_template(reference_roi,
 
     # In ISIS, the reference image is the search and moving image is the pattern.
 
-    ref_clip = reference_roi.clip()
-    moving_clip = moving_roi.clip(affine)
+ 
     if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
         return [None] * 3
@@ -273,9 +272,15 @@ def subpixel_template(reference_roi,
     if matcher_shift_x is None:
         return None, None, None
 
-    print(matcher_shift_x, matcher_shift_y)
+    new_image_x, new_image_y = moving_roi.roi_coords_to_image_coords(matcher_shift_x, matcher_shift_y)
+    print('Shifts: ', matcher_shift_x, matcher_shift_y, metrics)
+    print(new_image_x, new_image_y)
 
-    # Transformation of the ROI center if the clip applies a non-identity affine transformation    
+    new_affine = tf.AffineTransform(translation=(new_image_x - moving_roi.x,
+                                                 new_image_y - moving_roi.y))
+
+    return new_affine, metrics, corrmap
+    """    # Transformation of the ROI center if the clip applies a non-identity affine transformation    
     affine_transformed_center_x, affine_transformed_center_y = affine((moving_roi.center[0], moving_roi.center[1]))[0]
     
     
@@ -283,10 +288,10 @@ def subpixel_template(reference_roi,
     new_center_y = affine_transformed_center_y + matcher_shift_y
     translation_x, translation_y = affine.inverse((new_center_x, new_center_y))[0]
 
-    new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
+    new_affine = tf.AffineTransform(translation=(translation_x, translation_y))"""
 
 
-    """# Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
+    # Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
     new_affine_transformed_center_x = moving_roi.center[0] + matcher_shift_x  #Center is indices.
     new_affine_transformed_center_y = moving_roi.center[1] + matcher_shift_y
 
@@ -302,11 +307,11 @@ def subpixel_template(reference_roi,
     # These are the inverse of the translation so that the caller can use affine() to
     # apply the proper translation. Otherwise, the caller would need to use affine.inverse
     translation_x = -(moving_roi.center[0] - inverse_transformed_affine_center_x) 
-    translation_y = -(moving_roi.center[1] - inverse_transformed_affine_center_y)"""
+    translation_y = -(moving_roi.center[1] - inverse_transformed_affine_center_y)
 
-    #translation_x, translation_y = affine.inverse((matcher_shift_x, matcher_shift_y))[0]
+    """#translation_x, translation_y = affine.inverse((matcher_shift_x, matcher_shift_y))[0]"""
 
-    #new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
+    new_affine = tf.AffineTransform(translation=(translation_x, translation_y))
 
     return new_affine, metrics, corrmap
 
