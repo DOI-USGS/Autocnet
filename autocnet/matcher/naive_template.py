@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from scipy.ndimage.interpolation import zoom
 from skimage.transform import rescale
+from skimage.util import img_as_float32
 from scipy.ndimage.measurements import center_of_mass
 
 
@@ -86,6 +87,43 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
     Call an arbitrary pattern matcher using a subpixel approach where the template and image
     are upsampled using a third order polynomial.
 
+    This function assumes that the image center (0,0) and template center (0,0) are the a priori
+    coordinates. This function returns the offset to the center of the template such that the 
+    template is brought into alignment with the image.
+
+    For example, if the image to be searched appears as follow:
+
+    0, 0, 0, 0, 0, 0, 0, 1, 0
+    0, 0, 0, 0, 0, 0, 0, 1, 0
+    1, 1, 1, 0, 0, 0, 0, 1, 0
+    0, 1, 0, 0, 0, 0, 0, 0, 0
+    0, 1, 0, 0, 0, 0, 0, 0, 0
+    0, 0, 0, 0, 0, 0, 0, 0, 0
+    0, 0, 0, 0, 0, 0, 0, 0, 0
+    0, 0, 0, 0, 0, 0, 0, 0, 0
+    0, 0, 0, 0, 0, 0, 1, 1, 1
+    0, 1, 1, 1, 0, 0, 1, 0, 1
+    0, 1, 0, 1, 0, 0, 1, 0, 1
+    0, 1, 1, 1, 0, 0, 1, 0, 1
+    0, 0, 0, 0, 0, 0, 1, 1, 1
+
+    and the template image is 
+
+    1, 1, 1
+    0, 1, 0
+    0, 1, 0 
+
+     the expected shift from the center of the search image to have template image align is -3 in
+     the y-direction and -3 in the x-direction. Conversely, if the search image is:
+
+    1, 1, 1
+    1, 0, 1
+    1, 0, 1
+    1, 0, 1
+    1, 1, 1         
+
+    the expected shift is 4 in the y-direction and 3 in the x-direction.
+
     Parameters
     ----------
     template : ndarray
@@ -120,32 +158,31 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
 
     # Fit a 3rd order polynomial to upsample the images
     if upsampling != 1:
-        u_template = rescale(template, upsampling, order=1, mode='edge', preserve_range=True)
-        u_image = rescale(image, upsampling, order=1, mode='edge', preserve_range=True)
+        u_template = img_as_float32(rescale(template, upsampling, order=3, mode='edge'))
+        u_image = img_as_float32(rescale(image, upsampling, order=3, mode='edge'))
     else:
         u_template = template
         u_image = image
-
     corrmap = cv2.matchTemplate(u_image, u_template, method=metric)
+    
+
+    width = (np.asarray(u_image.shape) - np.asarray(corrmap.shape)) // 2  # This needs to be an integer
 
     # Pad the result array with values outside the valid correlation range
-    width = (np.asarray(u_template.shape) - np.asarray(corrmap.shape)) // 2
-    
-    result = np.pad(corrmap, width, mode='constant')  # pads zeros
+    result = np.pad(corrmap, 
+                    ((width[0], width[0]),(width[1], width[1])),
+                    mode='constant')  # pads zeros
+
     if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
         matched_y, matched_x = np.unravel_index(np.argmin(result), result.shape)
     else:
-        matched_x, matched_y = np.unravel_index(np.argmax(result), result.shape)
-    
-    # The center of the template is the origin
-    original_y = (u_template.shape[0] - 1) // 2
-    original_x = (u_template.shape[1] - 1) // 2
-
-    # Compute the shift, if any, between the template center and the
-    # best correlation index
-    shift_x = (original_x - matched_x) / upsampling
-    shift_y = (original_y - matched_y) / upsampling 
+        matched_y, matched_x = np.unravel_index(np.argmax(result), result.shape)
 
     max_corr = result[matched_y, matched_x]
+
+    # Since the center of the image is (0,0), shift the datum from the upper left to the center.
+    u_image_center_y, u_image_center_x = (np.asarray(u_image.shape) - 1) // 2
+    shift_y = (matched_y - u_image_center_y) / upsampling
+    shift_x = (matched_x - u_image_center_x) / upsampling
 
     return shift_x, shift_y , max_corr, corrmap
