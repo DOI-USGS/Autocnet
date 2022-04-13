@@ -227,10 +227,11 @@ class Roi():
                          (self.buffer*2) + self._remainder_y + (self.size_y*2), 
                          (self.size_y*2+1)+(self.buffer*2))
 
+        # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
         pixel_locked = ndimage.map_coordinates(data, 
-                                       np.meshgrid(xi, yi, indexing='ij'),
-                                       mode='constant',
-                                       cval=0.0,
+                                       np.meshgrid(yi, xi, indexing='ij'),
+                                       mode=mode,
+                                       cval=-10.0,
                                        order=3)
 
         if affine:
@@ -240,7 +241,7 @@ class Roi():
             #                      f"{((self.size_y * 2) + 1, (self.size_x * 2) + 1)} was asked for. Select, " +
             #                      "a smaller region of interest" )
 
-            pixel_locked = tf.warp(pixel_locked, affine.inverse, order=3, mode=mode, cval=0)
+            pixel_locked = tf.warp(pixel_locked, affine.inverse, order=3, mode=mode, cval=-10)
 
         if self.buffer != 0:
             return img_as_float32(pixel_locked[self.buffer:-self.buffer, 
