@@ -143,9 +143,11 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
     Returns
     -------
     x : float
-        The x offset
+        The x offset of the template center the image center, the inverse of this shift will 
+        need to be applied to the template as a correction.
     y : float
-        The y offset
+        The y offset of the template center to the image center, the inverse of this shift
+        will need to be applied to the template as a correction.
     max_corr : float
                The strength of the correlation in the range [-1, 1].
     result : ndarray
@@ -165,24 +167,14 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
         u_image = image
     corrmap = cv2.matchTemplate(u_image, u_template, method=metric)
     
-
-    width = (np.asarray(u_image.shape) - np.asarray(corrmap.shape)) // 2  # This needs to be an integer
-
-    # Pad the result array with values outside the valid correlation range
-    result = np.pad(corrmap, 
-                    ((width[0], width[0]),(width[1], width[1])),
-                    mode='constant')  # pads zeros
-
     if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
-        matched_y, matched_x = np.unravel_index(np.argmin(result), result.shape)
+        matched_y, matched_x = np.unravel_index(np.argmin(corrmap), corrmap.shape)
     else:
-        matched_y, matched_x = np.unravel_index(np.argmax(result), result.shape)
+        matched_y, matched_x = np.unravel_index(np.argmax(corrmap), corrmap.shape)
 
-    max_corr = result[matched_y, matched_x]
+    max_corr = corrmap[matched_y, matched_x]
 
-    # Since the center of the image is (0,0), shift the datum from the upper left to the center.
-    u_image_center_y, u_image_center_x = (np.asarray(u_image.shape) - 1) // 2
-    shift_y = (matched_y - u_image_center_y) / upsampling
-    shift_x = (matched_x - u_image_center_x) / upsampling
+    shift_x = (matched_x - ((corrmap.shape[1]-1)/2)) / upsampling
+    shift_y = (matched_y - ((corrmap.shape[0]-1)/2)) / upsampling
 
     return shift_x, shift_y , max_corr, corrmap
