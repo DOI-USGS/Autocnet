@@ -90,8 +90,8 @@ def test_canned_affine_transformations(reference_image, moving_image, delta_x, d
     # Get the reference ROIs from the full images above. The reference is a straight clip.
     # The moving array is taken from the rotated array with x1, y1 being the updated x1, y1 coordinates
     # after rotation.
-    ref_roi = roi.Roi(reference_image, x, y, *image_size)
-    moving_roi = roi.Roi(rotated_array, rx1, ry1, *template_size)  #rx1, rx2 in autocnet would be the a priori coordinates. Yup!
+    ref_roi = roi.Roi(reference_image, x, y, *image_size, buffer=0)
+    moving_roi = roi.Roi(rotated_array, rx1, ry1, *template_size, buffer=0)  #rx1, rx2 in autocnet would be the a priori coordinates. Yup!
 
     # Compute the affine transformation. This is how the affine is computed in the code, so replicated here.
     # If the AutoCNet code changes, this will highlight a breaking change.

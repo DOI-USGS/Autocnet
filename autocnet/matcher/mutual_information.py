@@ -3,9 +3,9 @@ from autocnet.transformation.roi import Roi
 import numpy as np
 
 from scipy.ndimage.measurements import center_of_mass
-from skimage.transform import AffineTransform
+import skimage.transform as tf
 
-def mutual_information(reference_arr, moving_arr, affine=AffineTransform(), **kwargs):
+def mutual_information(reference_arr, moving_arr, **kwargs):
     """
     Computes the correlation coefficient between two images using a histogram
     comparison (Mutual information for joint histograms). The corr_map coefficient
@@ -33,7 +33,7 @@ def mutual_information(reference_arr, moving_arr, affine=AffineTransform(), **kw
     numpy.histogram2d : for the kwargs that can be passed to the comparison
     """
    
-    if np.isnan(reference_arr.data).any() or np.isnan(moving_arr.data).any():
+    if np.isnan(reference_arr).any() or np.isnan(moving_arr).any():
         print('Unable to process due to NaN values in the input data')
         return
     
@@ -56,7 +56,10 @@ def mutual_information(reference_arr, moving_arr, affine=AffineTransform(), **kw
 # TODO 
 # need's to take in a ROI and not ndarray's
 # and use one clip (to pass arr later on?)
-def mutual_information_match(moving_roi, reference_roi, subpixel_size=3,
+def mutual_information_match(moving_roi,
+                             reference_roi, 
+                             affine=tf.AffineTransform(), 
+                             subpixel_size=3,
                              func=None, **kwargs):
     """
     Applys the mutual information matcher function over a search image using a
@@ -92,7 +95,7 @@ def mutual_information_match(moving_roi, reference_roi, subpixel_size=3,
                locations within the search area
     """
     reference_template = reference_roi.clip()
-    moving_image = moving_roi.clip()
+    moving_image = moving_roi.clip(affine)
 
     if func == None:
         func = mutual_information

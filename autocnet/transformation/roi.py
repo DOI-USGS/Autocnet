@@ -52,20 +52,6 @@ class Roi():
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
 
-    def roi_coords_to_image_coords(self, x, y):
-        """
-        Given coordinates in ROI pixel space, return the coordinates in
-        image coordinate space.
-        """
-        return self.affine((x, y))[0]
-
-    @property
-    def affine(self):
-        """
-        This affine sets the origin of the ROI to be (0,0).
-        """
-        return tf.AffineTransform(translation=(self.x, self.y))
-
     @property
     def x(self):
         return self._whole_x + self._remainder_x
@@ -157,7 +143,7 @@ class Roi():
     @property
     def center(self):
         ie = self.image_extent
-        return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
+        return ((ie[1] - ie[0])-1 + self.buffer*2)/2. + 0.5, ((ie[3]-ie[2])-1 + self.buffer*2)/2. + 0.5
 
     @property
     def is_valid(self):
@@ -184,7 +170,7 @@ class Roi():
         return self.clip()
 
 
-    def clip(self, affine=None, dtype=None, mode="constant"):
+    def clip(self, affine=None, dtype=None, mode="reflect"):
         """
         Compatibility function that makes a call to the array property.
         Warning: The dtype passed in via this function resets the dtype attribute of this
@@ -203,45 +189,42 @@ class Roi():
         self.dtype = dtype
 
         pixels = self.image_extent
-        
+
         if (np.asarray(pixels) - self.buffer < 0).any():
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
-        if isinstance(self.data, np.ndarray): # 33x33 buffer = 3
-            data = self.data[pixels[2]-self.buffer:pixels[3]+1+self.buffer,  #(10-3): (43 + 3) 39x39 of real data, non-interpolated 
+        if isinstance(self.data, np.ndarray):
+            data = self.data[pixels[2]-self.buffer:pixels[3]+1+self.buffer, 
                              pixels[0]-self.buffer:pixels[1]+1+self.buffer]
         else:
             # Have to reformat to [xstart, ystart, xnumberpixels, ynumberpixels]
             # TODO: I think this will result in an incorrect obj.center when the passed data is a GeoDataset
             pixels = [pixels[0]-self.buffer, 
                       pixels[2]-self.buffer, 
-                      pixels[1]-pixels[0]+1+self.buffer, 
-                      pixels[3]-pixels[2]+1+self.buffer]
+                      pixels[1]-pixels[0]+(self.buffer*2)+1, 
+                      pixels[3]-pixels[2]+(self.buffer*2)+1]
             data = self.data.read_array(pixels=pixels)
-        
+
         # Now that the whole pixel array has been read, interpolate the array to align pixel edges
         xi = np.linspace(self._remainder_x, 
-                         (self.buffer*2) + self._remainder_x + (self.size_x*2), 
+                         ((self.buffer*2) + self._remainder_x + (self.size_x*2)), 
                          (self.size_x*2+1)+(self.buffer*2)) 
         yi = np.linspace(self._remainder_y, 
-                         (self.buffer*2) + self._remainder_y + (self.size_y*2), 
+                         ((self.buffer*2) + self._remainder_y + (self.size_y*2)), 
                          (self.size_y*2+1)+(self.buffer*2))
 
         # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
         pixel_locked = ndimage.map_coordinates(data, 
                                        np.meshgrid(yi, xi, indexing='ij'),
                                        mode=mode,
-                                       cval=-10.0,
                                        order=3)
 
         if affine:
-            # if array_to_warp.shape != ((self.size_y * 2) + 1, (self.size_x * 2) + 1):
-            #     raise ValueError("Unable to enlarge Roi to apply affine transformation." +
-            #                      f" Was only able to extract {array_to_warp.shape}, when " +
-            #                      f"{((self.size_y * 2) + 1, (self.size_x * 2) + 1)} was asked for. Select, " +
-            #                      "a smaller region of interest" )
-
-            pixel_locked = tf.warp(pixel_locked, affine.inverse, order=3, mode=mode, cval=-10)
+            # The cval is being set to the mean of the array,
+            pixel_locked = tf.warp(pixel_locked, 
+                                   affine.inverse, 
+                                   order=3, 
+                                   mode=mode)
 
         if self.buffer != 0:
             return img_as_float32(pixel_locked[self.buffer:-self.buffer, 
