@@ -19,8 +19,8 @@ def test_geodata_is_valid(geodata_b):
     assert roi.is_valid == True
 
 def test_center(array_with_nodata):
-    roi = Roi(array_with_nodata, 5, 5, size_x=5, size_y=5)
-    assert roi.center == (5,5)
+    roi = Roi(array_with_nodata, 5, 5, size_x=5, size_y=5, buffer=5)
+    assert roi.center == (10.0,10.0)
 
 @pytest.mark.parametrize("x, y, axr, ayr",[
                          (10.1, 10.1, .1, .1),
@@ -30,8 +30,8 @@ def test_center(array_with_nodata):
 def test_roi_remainder(x, y, axr, ayr):
     gd = np.zeros((10,10))
     roi = Roi(gd, x, y)
-    pytest.approx(roi.axr, axr)
-    pytest.approx(roi.ayr, ayr)
+    pytest.approx(roi._remainder_x, axr)
+    pytest.approx(roi._remainder_y, ayr)
     assert roi.x == x
     assert roi.y == y
 
@@ -46,15 +46,15 @@ def test_extent_computation(x, y, size_arr, size_roi, expected):
     pixels = roi.image_extent
     assert pixels == expected
 
-@pytest.mark.parametrize("x, y, size_arr, size_roi, expected",[
-    (50, 50, (100,100), (10,10), (4040, 6060)),
-    (20, 20, (100, 100), (20, 20), (0,3030)),
-    (69, 69, (100,100), (30,30), (4545, 9999))
+@pytest.mark.parametrize("x, y, size_arr, size_roi,buffer,expected",[
+    (50, 50, (100,100), (10,10), 5, (4040, 6060)),
+    (20, 20, (100, 100), (20, 20), 0, (0,3030)),
+    (69, 69, (100,100), (30,30), 3, (4545, 9999))
 ])
-def test_array_extent_computation(x, y, size_arr, size_roi, expected):
+def test_array_extent_computation(x, y, size_arr, size_roi, buffer, expected):
     gd = np.arange(size_arr[0]*size_arr[1]).reshape(size_arr)
     
-    roi = Roi(gd, x, y, size_x=size_roi[0], size_y=size_roi[1])
+    roi = Roi(gd, x, y, size_x=size_roi[0], size_y=size_roi[1], buffer=buffer)
     array = roi.clip()
 
     assert array.dtype == np.float32
