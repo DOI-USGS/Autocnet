@@ -1701,23 +1701,6 @@ def subpixel_register_point_smart(pointid,
         cost = None
         destination_node = nodes[measure.imageid]
 
-        try:
-            affine = estimate_local_affine(source_node.geodata, 
-                                           destination_node.geodata,
-                                           source.apriorisample,
-                                           source.aprioriline,
-                                           30,
-                                           30)
-        except Exception as e:
-            print(e)
-            m = {'id': measure.id,
-                 'sample':measure.apriorisample,
-                 'line':measure.aprioriline,
-                 'status':False,
-                 'choosername':chooser}
-            updated_measures.append([None, None, m])
-            continue
-
         # Compute the baseline metrics using the smallest window
         size_x = np.inf
         size_y = np.inf
@@ -1741,12 +1724,21 @@ def subpixel_register_point_smart(pointid,
                              size_y=size_y, 
                              buffer=10)
 
-        _, baseline_corr, _ = subpixel_template(reference_roi, 
-                                                moving_roi,
-                                                affine=affine)
-        
+        try:
+            baseline_affine = estimate_local_affine(reference_roi,
+                                                    moving_roi)
+        except Exception as e:
+            print(e)
+            m = {'id': measure.id,
+                 'sample':measure.apriorisample,
+                 'line':measure.aprioriline,
+                 'status':False,
+                 'choosername':chooser}
+            updated_measures.append([None, None, m])
+            continue
+
         reference_clip = reference_roi.clip()
-        moving_clip = moving_roi.clip(affine)
+        moving_clip = moving_roi.clip(baseline_affine)
         if np.isnan(reference_clip).any() or np.isnan(moving_clip).any():
             print('Unable to process due to NaN values in the input data.')
             m = {'id': measure.id,
@@ -1763,6 +1755,10 @@ def subpixel_register_point_smart(pointid,
             updated_measures.append([None, None, m])
             continue
 
+        _, baseline_corr, _ = subpixel_template(reference_roi, 
+                                                moving_roi,
+                                                affine=baseline_affine)
+        
         baseline_mi = 0 #mutual_information_match(reference_roi, moving_roi, affine=affine)
         
         print(f'Baseline MI: {baseline_mi} | Baseline Corr: {baseline_corr}')
@@ -1782,8 +1778,18 @@ def subpixel_register_point_smart(pointid,
                                  size_x=match_kwargs['template_size'][0],
                                  size_y=match_kwargs['template_size'][1], 
                                  buffer=10)
-
-
+            
+            try:
+               affine = estimate_local_affine(reference_roi, moving_roi)
+            except Exception as e:
+                print(e)
+                m = {'id': measure.id,
+                     'sample':measure.apriorisample,
+                     'line':measure.aprioriline,
+                     'status':False,
+                     'choosername':chooser}
+                updated_measures.append([None, None, m])
+                continue
             
             updated_affine, maxcorr, temp_corrmap = subpixel_template(reference_roi,
                                                                       moving_roi,
@@ -2008,12 +2014,6 @@ def validate_candidate_measure(measure_to_register,
         line = measure_to_register['line']
 
         print(f'Validating measure: {measure_to_register_id} on image: {source_image.name}')
-        try:
-            affine = estimate_local_affine(source_node.geodata, destination_node.geodata, sample, line, 30,30)
-        except:
-            print('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
-            return [np.inf] * len(parameters)
-
 
         dists = []
         for parameter in parameters:
@@ -2031,6 +2031,12 @@ def validate_candidate_measure(measure_to_register,
                                     size_x=match_kwargs['template_size'][0],
                                     size_y=match_kwargs['template_size'][1],
                                     buffer=10)
+
+            try:
+                affine = estimate_local_affine(reference_roi, moving_roi)
+            except:
+                print('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
+                return [np.inf] * len(parameters)
 
             updated_affine, maxcorr, temp_corrmap = subpixel_template(reference_roi,
                                                                       moving_roi,

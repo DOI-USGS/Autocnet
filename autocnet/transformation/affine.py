@@ -91,11 +91,10 @@ def estimate_affine_from_sensors(reference_image,
     return affine
 
 
-def estimate_local_affine(reference_image, moving_image, center_x, center_y, size_x, size_y):
+def estimate_local_affine(reference_roi, moving_roi):
     """
-    estimate_local_affine
-
-    similar to estimate_affine_from_sensors, but for regions of interest (ROI).
+    Applies the affine transfromation calculated in estimate_affine_from_sensors to the moving region of interest (ROI).
+    
 
     Parameters
     ----------
@@ -105,16 +104,6 @@ def estimate_local_affine(reference_image, moving_image, center_x, center_y, siz
     moving_image : plio.io.io_gdal.GeoDataset
                    Image that is expected to move around during the matching process, 
                    points are projected onto this image to compute an affine  
-    center_sample : number
-                    center x (aka center sample) of the ROI in reference image pixel space
-    center_line : number
-                  center y (aka center line) of the ROI in reference image pixel space
-    size_x : number
-             distance from the center to the end of the ROI window in the x (aka sample) direction. 
-             This is in reference image pixel space, resulting roi shape is (sizey*2, sizex*2)
-    size_y : number
-             distance from the center to the end of the ROI window in the y (aka line) direction, 
-             This is in reference image pixel space, resulting roi shape is (sizey*2, sizex*2)
 
     Returns
     -------
@@ -122,15 +111,13 @@ def estimate_local_affine(reference_image, moving_image, center_x, center_y, siz
         Affine matrix to transform the moving image onto the center image
     """
     # get initial affine
-    affine_transform = estimate_affine_from_sensors(reference_image, moving_image, center_x, center_y)
-
-    ref_center = (center_x, center_y)
+    affine_transform = estimate_affine_from_sensors(reference_roi.data, moving_roi.data, reference_roi.x, reference_roi.y)
+    ref_center = (reference_roi.x, reference_roi.y)
 
     # MOVING NO AFFINE; Get the full moving image area so that an applied affine transformation that 
     # adds no data around 1+ edge does not fool the to be applied matcher.
     # The affine transformed center is a better match than the a priori sensor coords at this point.
     affine_center = affine_transform(ref_center)[0]
-    moving_roi = Roi(moving_image, *affine_center, size_x=size_x, size_y=size_y)
 
     # The above coordinate transformation to get the center of the ROI handles translation. 
     # So, we only need to rotate/shear/scale the ROI. Omitting scale, which should be 1 (?) results
