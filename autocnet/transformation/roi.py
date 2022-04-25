@@ -143,7 +143,7 @@ class Roi():
     @property
     def center(self):
         ie = self.image_extent
-        return ((ie[1] - ie[0])-1 + self.buffer*2)/2. + 0.5, ((ie[3]-ie[2])-1 + self.buffer*2)/2. + 0.5
+        return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
 
     @property
     def is_valid(self):
@@ -219,6 +219,10 @@ class Roi():
                                        mode=mode,
                                        order=3)
 
+        if self.buffer != 0:
+            pixel_locked = pixel_locked[self.buffer:-self.buffer, 
+                                       self.buffer:-self.buffer]
+
         if affine:
             # The cval is being set to the mean of the array,
             pixel_locked = tf.warp(pixel_locked, 
@@ -226,8 +230,4 @@ class Roi():
                                    order=3, 
                                    mode=mode)
 
-        if self.buffer != 0:
-            return img_as_float32(pixel_locked[self.buffer:-self.buffer, 
-                                       self.buffer:-self.buffer])
-        else:
-            return img_as_float32(pixel_locked)
+        return img_as_float32(pixel_locked)
