@@ -76,7 +76,7 @@ def test_manage_complex_messages(args, queue, complex_message, mocker, capfd, nc
     assert queue.llen(args['working_queue']) == 0
 
 
-@pytest.mark.skip(reason="Requires update outside subpixelapi branch.")
+'''@pytest.mark.skip(reason="Requires update outside subpixelapi branch.")
 def test_job_history(args, queue, complex_message, mocker, capfd, ncg):
     queue.rpush(args['processing_queue'], complex_message)
 
