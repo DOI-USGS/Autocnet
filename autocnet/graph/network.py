@@ -7,7 +7,7 @@ import os
 from shutil import copyfile
 import threading
 from time import gmtime, strftime, time
-import warnings
+import logging
 from itertools import combinations
 
 import networkx as nx
@@ -58,6 +58,8 @@ from autocnet.spatial.isis import point_info
 from autocnet.spatial.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, og2oc
 
+# set up the logging file
+log = logging.getLogger(__name__)
 #np.warnings.filterwarnings('ignore')
 
 # The total number of pixels squared that can fit into the keys number of GB of RAM for SIFT.
@@ -237,7 +239,7 @@ class CandidateGraph(nx.Graph):
             if fp and fp.IsValid():
                 valid_datasets.append(i)
             else:
-                warnings.warn(
+                log.warning(
                     'Missing or invalid geospatial data for {}'.format(i.base_name))
 
         # Grab the footprints and test for intersection
@@ -250,7 +252,7 @@ class CandidateGraph(nx.Graph):
                     adjacency_dict[i.file_name].append(j.file_name)
                     adjacency_dict[j.file_name].append(i.file_name)
             except:
-                warnings.warn(
+                log.warning(
                     'Failed to calculate intersection between {} and {}'.format(i, j))
         return cls.from_adjacency(adjacency_dict)
 
@@ -377,7 +379,7 @@ class CandidateGraph(nx.Graph):
             else:
                 image_path = image_name
             if not os.path.exists(image_path):
-                warnings.warn("Cannot find {}".format(image_path))
+                log.warning("Cannot find {}".format(image_path))
                 return
             n = self.graph["node_counter"]
             self.graph["node_counter"] += 1
@@ -395,7 +397,7 @@ class CandidateGraph(nx.Graph):
         if new_node is not None and adj is not None:
             for adj_img in adj:
                 if adj_img not in self.graph["node_name_map"].keys():
-                    warnings.warn("{} not found in the graph".format(adj_img))
+                    log.warning("{} not found in the graph".format(adj_img))
                     continue
                 new_idx = new_node["node_id"]
                 adj_idx = self.graph["node_name_map"][adj_img]
@@ -1007,7 +1009,7 @@ class CandidateGraph(nx.Graph):
         """
 
         if not self.is_connected():
-            warnings.warn(
+            log.warning(
                 'The given graph is not complete and may yield garbage.')
 
         for s, d, edge in self.edges.data('edge'):
@@ -1596,7 +1598,7 @@ class NetworkCandidateGraph(CandidateGraph):
         """
         Push messages to the redis queue for objects e.g., Nodes and Edges
         """
-
+        pipeline = self.redis_queue.pipeline()
         for job_counter, elem in enumerate(onobj.data('data')):
             if getattr(elem[-1], 'ignore', False):
                 continue
@@ -1622,7 +1624,8 @@ class NetworkCandidateGraph(CandidateGraph):
                     'param_step':1,
                     'config':self.config}
 
-            self.redis_queue.rpush(self.processing_queue, json.dumps(msg, cls=JsonEncoder))
+            pipeline.rpush(self.processing_queue, json.dumps(msg, cls=JsonEncoder))
+        pipeline.execute()
         return job_counter + 1
 
     def _push_row_messages(self, query_obj, on, function, walltime, filters, query_string, args, kwargs):
@@ -1630,7 +1633,7 @@ class NetworkCandidateGraph(CandidateGraph):
         Push messages to the redis queue for DB objects e.g., Points, Measures
         """
         if filters and query_string:
-            warnings.warn('Use of filters and query_string are mutually exclusive.')
+            log.warning('Use of filters and query_string are mutually exclusive.')
 
         with self.session_scope() as session:
             # Support either an SQL query string, or a simple dict based query
@@ -1645,25 +1648,35 @@ class NetworkCandidateGraph(CandidateGraph):
 
                 # Execute the query to get the rows to be processed
                 res = query.order_by(query_obj.id).all()
+            # Expunge so that the connection can be rapidly returned to the pool
+            session.expunge_all()
 
-            if len(res) == 0:
-                raise ValueError('Query returned zero results.')
-            for row in res:
-                msg = {'along':on,
-                        'id':row.id,
-                        'func':function,
-                        'args':args,
-                        'kwargs':kwargs,
-                        'walltime':walltime}
-                msg['config'] = self.config  # Hacky for now, just passs the whole config dict
-                self.redis_queue.rpush(self.processing_queue,
-                                    json.dumps(msg, cls=JsonEncoder))
-            assert len(res) == self.queue_length
+        if len(res) == 0:
+            raise ValueError('Query returned zero results.')
+        pipeline = self.redis_queue.pipeline()
+        for i, row in enumerate(res):
+            msg = {'along':on,
+                    'id':row.id,
+                    'func':function,
+                    'args':args,
+                    'kwargs':kwargs,
+                    'walltime':walltime}
+            msg['config'] = self.config  # Hacky for now, just passs the whole config dict
+            pipeline.rpush(self.processing_queue,
+                                json.dumps(msg, cls=JsonEncoder))
+            if i % 1000 == 0:
+                # Redis can only accept 512MB of messages at a time. This ensures that the pipe
+                # stays under the size limit.
+                pipeline.execute()
+                pipeline = self.redis_queue.pipeline()
+        pipeline.execute()
         return len(res)
 
     def _push_iterable_message(self, iterable, function, walltime, args, kwargs):
         if not iterable:  # the list is empty...
             raise ValueError('iterable is not an iterable object, e.g., a list or set')
+
+        pipeline = self.redis_queue.pipeline()
         for job_counter, item in enumerate(iterable):
             msg = {'along':item,
                     'func':function,
@@ -1671,8 +1684,9 @@ class NetworkCandidateGraph(CandidateGraph):
                     'kwargs':kwargs,
                     'walltime':walltime}
             msg['config'] = self.config
-            self.redis_queue.rpush(self.processing_queue,
+            pipeline.rpush(self.processing_queue,
                                    json.dumps(msg, cls=JsonEncoder))
+        pipeline.execute()
         return job_counter + 1
 
     def apply(self,
@@ -1691,6 +1705,7 @@ class NetworkCandidateGraph(CandidateGraph):
             queue=None,
             redis_queue='processing_queue',
             exclude=None,
+            just_stage=False,
             **kwargs):
         """
         A mirror of the apply function from the standard CandidateGraph object. This implementation
@@ -1768,6 +1783,13 @@ class NetworkCandidateGraph(CandidateGraph):
                       The redis queue to push messages to that are then pulled by the
                       cluster job this call launches. Options are: 'processing_queue' (default)
                       or 'working_queue'
+
+        just_stage : bool
+                     If True, push messages to the redis queue for processing, but do not
+                     submit a slurm/sbatch job to the cluster. This is useful when one process
+                     is being used to orchestrate queue population and another process is being
+                     used to process the messages. Default: False.
+
         Returns
         -------
         job_str : str
@@ -1846,6 +1868,10 @@ class NetworkCandidateGraph(CandidateGraph):
             job += ' --queue'  # Use queue mode where jobs run until the queue is empty
         command = f'{condasetup} && {isissetup} && srun {job}'
 
+        # The user does not want to submit the job. Only stage the messages.
+        if just_stage:
+            return command
+
         if queue == None:
             queue = self.config['cluster']['queue']
 
@@ -1856,6 +1882,8 @@ class NetworkCandidateGraph(CandidateGraph):
                      partition=queue,
                      ntasks=ntasks,
                      output=log_dir+f'/autocnet.{function}-%j')
+
+        # Submit the jobs to the cluster   
         if ntasks > 1:
             job_str = submitter.submit(exclude=exclude)
         else:
@@ -1943,7 +1971,7 @@ class NetworkCandidateGraph(CandidateGraph):
         fpaths = [self.nodes[i]['data']['image_path'] for i in ids]
         for f in self.files:
             if f not in fpaths:
-                warnings.warn(f'{f} in candidate graph but not in output network.')
+                log.warning(f'{f} in candidate graph but not in output network.')
 
         # Remap the df columns back to ISIS
         df.rename(columns={'pointtype':'pointType',
@@ -2038,7 +2066,7 @@ class NetworkCandidateGraph(CandidateGraph):
         elif os.path.exists(filelist):
             filelist = io_utils.file_to_list(filelist)
         else:
-            warnings.warn('Unable to parse the passed filelist')
+           log.warning('Unable to parse the passed filelist')
 
         if clear_db:
             self.clear_db()
@@ -2257,7 +2285,7 @@ class NetworkCandidateGraph(CandidateGraph):
                     try:
                         session.execute(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1')
                     except Exception as e:
-                        warnings.warn(f'Failed to reset primary id sequence for table {t}')
+                        log.warning(f'Failed to reset primary id sequence for table {t}')
 
     def cnet_to_db(self, cnet):
         """
@@ -2559,7 +2587,7 @@ class NetworkCandidateGraph(CandidateGraph):
                                           walltime='00:20:00',
                                           chunksize=1000,
                                           exclude=None):
-        warnings.warn('This function is not well tested. No tests currently exists \
+        log.warning('This function is not well tested. No tests currently exists \
         in the test suite for this version of the function.')
 
         # Setup the redis queue

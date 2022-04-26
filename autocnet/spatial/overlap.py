@@ -163,15 +163,17 @@ def place_points_in_overlap(overlap,
     semi_major = ncg.config['spatial']['semimajor_rad']
     semi_minor = ncg.config['spatial']['semiminor_rad']
 
+    ta = time.time()
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
     valid = compgeom.distribute_points_in_geom(geom, **distribute_points_kwargs, **kwargs)
     if not valid.any():
-        log.warning('Failed to distribute points in overlap')
+        warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
 
-    print(f'Have {len(valid)} potential points to place.')
-
+    print(f'Have {len(valid)} potential points to place in overlap {overlap.id}.')
+    tb = time.time()
+    print(f'Point distribution took {tb-ta} seconds.')
     # Setup the node objects that are covered by the geom
     nodes = []
     with ncg.session_scope() as session:
@@ -180,8 +182,10 @@ def place_points_in_overlap(overlap,
             nn = NetworkNode(node_id=id, image_path=res.path)
             nn.parent = ncg
             nodes.append(nn)
+    tc = time.time()
+    print(f'Took {tc-tb} seconds to instantiate {len(nodes)} images.')
+    
 
-    print(f'Attempting to place measures in {len(nodes)} images.')
     for v in valid:
         lon = v[0]
         lat = v[1]
@@ -197,10 +201,13 @@ def place_points_in_overlap(overlap,
             if cam_type == "isis":
                 try:
                     sample, line = isis.ground_to_image(node["image_path"], lon, lat)
-                except CalledProcessError as e:
-                    if 'Requested position does not project in camera model' in e.stderr:
-                        print(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
-                        continue
+                except:
+                    continue
+
+                #except CalledProcessError as e:
+                #    if 'Requested position does not project in camera model' in e.stderr:
+                #        print(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
+                #        continue
             if cam_type == "csm":
                 lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
                 x, y, z = reproject([lon_og, lat_og, height],
@@ -240,11 +247,12 @@ def place_points_in_overlap(overlap,
         if cam_type == "isis":
             try:
                 p = isis.point_info(node["image_path"], newsample, newline, point_type="image")
-            except CalledProcessError as e:
-                if 'Requested position does not project in camera model' in e.stderr:
-                    print(node["image_path"])
-                    print(f'interesting point ({newsample}, {newline}) does not project back to ground')
-                    continue
+            except: 
+                continue
+            #except CalledProcessError as e:
+            #    if 'Requested position does not project in camera model' in e.stderr:
+            #        print(f'interesting point ({newsample}, {newline}) in image {node["image_path"]} does not project back to ground')
+            #        continue
             try:
                 x, y, z = p["BodyFixedCoordinate"].value
             except:
@@ -305,9 +313,9 @@ def place_points_in_overlap(overlap,
                 # to find the most interesting feature.
                 try:
                     sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
-                except CalledProcessError as e:
-                    if 'Requested position does not project in camera model' in e.stderr:
-                        print(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
+                #except CalledProcessError as e:
+                except:  # CalledProcessError is not catching the ValueError that this try/except is attempting to handle.
+                    print(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
                     # If the current_index is greater than the reference_index, the change in list size does
                     # not impact the positional index of the reference. If current_index is less than the
                     # reference_index, then the reference_index needs to de-increment by one for each time
@@ -328,13 +336,18 @@ def place_points_in_overlap(overlap,
         if len(point.measures) >= 2:
             points.append(point)
     print(f'Able to place {len(points)} points.')
+    
+    if not points: return
 
     # Insert the points into the database asynchronously (via redis) or synchronously via the ncg
     if use_cache:
+        pipeline = ncg.redis_queue.pipeline()
+        msgs = [json.dumps(point.to_dict(_hide=[]), cls=JsonEncoder) for point in points]
+        pipeline.rpush(ncg.point_insert_queue, *msgs)
+        pipeline.execute()
         # Push
-        print('Using the cache')
-        ncg.redis_queue.rpush(ncg.point_insert_queue, *[json.dumps(point.to_dict(_hide=[]), cls=JsonEncoder) for point in points])
-        ncg.redis_queue.incr(ncg.point_insert_counter, amount=len(points))
+        #ncg.redis_queue.rpush(ncg.point_insert_queue, *[json.dumps(point.to_dict(_hide=[]), cls=JsonEncoder) for point in points])
+        ncg.redis_queue.incr(ncg.point_insert_counter, amount=len(msgs))
     else:
         with ncg.session_scope() as session:
             for point in points:

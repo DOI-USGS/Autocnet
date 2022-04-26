@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+import logging
 
 from autocnet.utils.serializers import JsonEncoder, object_hook
 from autocnet.graph import cluster_submit
@@ -12,6 +13,7 @@ from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
 from autocnet.io.db.model import Points, JobsHistory
 
+log = logging.getLogger(__name__)
 
 @pytest.fixture
 def args():
@@ -41,7 +43,9 @@ def complex_message():
 def test_manage_simple_messages(args, queue, simple_message, mocker, capfd, ncg):
     queue.rpush(args['processing_queue'], simple_message)
 
-    response_msg = {'success':True, 'results':'Things were good.', 'kwargs' : {'Session' : ncg.Session}}
+    response_msg = {'success':True, 
+                    'results':'Things were good.', 
+                    'kwargs' : {'Session' : ncg.Session}}
     mocker.patch('autocnet.graph.cluster_submit.process', return_value=response_msg)
     mocker.patch.dict(os.environ, {"SLURM_JOB_ID": "1000"}) 
 
@@ -49,6 +53,7 @@ def test_manage_simple_messages(args, queue, simple_message, mocker, capfd, ncg)
     
     # Check that logging to stdout is working
     out, err = capfd.readouterr()
+    print('OE', out, err)
     assert out.strip() == str(response_msg).strip() 
 
     # Check that the messages are finalizing
@@ -89,7 +94,7 @@ def test_job_history(args, queue, complex_message, mocker, capfd, ncg):
         assert resp.functionName == "autocnet.place_points"
         assert resp.jobId == 1000
         assert resp.args == {"args" : message_json["args"], "kwargs" : message_json["kwargs"]}
-        assert resp.logs.strip() == str(response_msg).strip()
+        assert resp.logs.strip() == str(response_msg).strip()'''
 
 def test_transfer_message_to_work_queue(args, queue, simple_message):
     queue.rpush(args['processing_queue'], simple_message)
@@ -103,9 +108,11 @@ def test_finalize_message_from_work_queue(args, queue, simple_message):
     cluster_submit.finalize_message_from_work_queue(queue, args['working_queue'], remove_key)
     assert queue.llen(args['working_queue']) == 0
     
-def test_no_msg(args, queue):
-    with pytest.warns(UserWarning, match='Expected to process a cluster job, but the message queue is empty.'):
-        cluster_submit.manage_messages(args, queue)
+def test_no_msg(caplog,args, queue):
+    cluster_submit.manage_messages(args, queue)
+    expected_log = 'Expected to process a cluster job, but the message queue is empty.'
+    assert expected_log in caplog.text
+    
 
 
 # Classes and funcs for testing job submission.
@@ -167,6 +174,23 @@ def test_process_row(along, func, msg_additions, mocker):
     assert msg['results'] == True
     
     cluster_submit._instantiate_row.assert_called_once()
+
+@pytest.mark.parametrize()
+def _do_something(log_level):
+    return getattr(log, log_level)(f'Logging at the {log_level}')
+
+def test_do_something(caplog):
+    log_levels = ["critical", "error", "warning", "info", "debug"]
+    
+    for level in log_levels:
+        os.environ["AUTOCNET_LOGLEVEL"] = level
+        _do_something(os.environ["AUTOCNET_LOGLEVEL"])
+
+        for record in caplog.records:
+            # casting the env var and record level to a string for comparison 
+            assert(str(os.environ["AUTOCNET_LOGLEVEL"]).upper() == str(record.levelname).upper())
+            caplog.clear()
+
 
 @pytest.mark.parametrize("along, func, msg_additions",[
                         ([1,2,3,4,5], _do_nothing, {})

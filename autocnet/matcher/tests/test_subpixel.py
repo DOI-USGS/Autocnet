@@ -4,6 +4,7 @@ from re import A
 import sys
 import unittest
 from unittest.mock import patch
+import logging
 
 from skimage import transform as tf
 from scipy.ndimage.interpolation import rotate

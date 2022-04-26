@@ -248,6 +248,8 @@ def point_info(
             )
 
         camres = pvl.loads(cp.stdout)
+        if 'campt' in camres.keys():
+            camres = camres['campt']
         for r in camres.getall("GroundPoint"):
             if r['Error'] is None:
                 # convert all pixels to PLIO pixels from ISIS

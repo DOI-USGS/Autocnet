@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 with open('README.md', 'r') as f:
     long_description = f.read()
 
-__version__ = '0.6.2'
+__version__ = '0.7.0'
 
 def setup_package():
     setup(
@@ -31,7 +31,8 @@ def setup_package():
             'Programming Language :: Python :: 3.8',
         ],
         entry_points={"console_scripts": [
-        "acn_submit = autocnet.graph.cluster_submit:main"], 
+        "acn_submit = autocnet.graph.cluster_submit:main",
+        "acn_submit_single = autocnet.graph.cluster_submit_single:main"], 
         }
     )
 

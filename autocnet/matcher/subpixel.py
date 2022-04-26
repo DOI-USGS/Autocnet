@@ -1,5 +1,6 @@
 from collections import defaultdict
 import json
+import logging
 from math import modf, floor
 import time
 import numpy as np
@@ -44,6 +45,7 @@ from autocnet.utils.utils import bytescale
 from sqlalchemy import inspect
 
 PIL.Image.MAX_IMAGE_PIXELS = sys.float_info.max
+log = logging.getLogger(__name__)
 
 def check_geom_func(func):
     # TODO: Pain. Stick with one of these and delete this function along with

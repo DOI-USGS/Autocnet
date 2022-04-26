@@ -1,4 +1,5 @@
 from math import isclose, ceil
+import random
 import warnings
 
 import pandas as pd
@@ -313,6 +314,18 @@ def xy_in_polygon(x,y, geom):
     """
     return geom.contains(Point(x, y))
 
+def generate_random(number, polygon):
+    points = []
+    minx, miny, maxx, maxy = polygon.bounds
+    i = 0
+    while len(points) < number and i < 1000:
+        pnt = Point(random.uniform(minx, maxx), random.uniform(miny, maxy))
+        if polygon.contains(pnt):
+            print(pnt.x, pnt.y)
+            points.append([pnt.x, pnt.y])
+        i += 1
+    return np.asarray(points)
+
 def distribute_points_classic(geom, nspts, ewpts, use_mrr=True, **kwargs):
     """
     This is a decision tree that attempts to perform a
@@ -378,6 +391,9 @@ def distribute_points_classic(geom, nspts, ewpts, use_mrr=True, **kwargs):
     points = np.vstack(points)
     # Perform a spatial intersection check to eject points that are not valid
     valid = [p for p in points if xy_in_polygon(p[0], p[1], original_geom)]
+    # The standard method failed. Attempt random placement within the geometry
+    if not valid:
+        valid = generate_random(ewpts * nspts, original_geom)
     return valid
 
 def distribute_points_new(geom, nspts, ewpts, Session):
