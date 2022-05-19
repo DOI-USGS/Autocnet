@@ -111,7 +111,11 @@ def estimate_local_affine(reference_roi, moving_roi):
         Affine matrix to transform the moving image onto the center image
     """
     # get initial affine
-    affine_transform = estimate_affine_from_sensors(reference_roi.data, moving_roi.data, reference_roi.x, reference_roi.y)
+    roi_buffer = reference_roi.buffer
+    size_x = reference_roi.size_x + roi_buffer
+    size_y = reference_roi.size_y + roi_buffer
+    
+    affine_transform = estimate_affine_from_sensors(reference_roi.data, moving_roi.data, reference_roi.x, reference_roi.y, size_x=size_x, size_y=size_y)
     ref_center = (reference_roi.x, reference_roi.y)
 
     # MOVING NO AFFINE; Get the full moving image area so that an applied affine transformation that 
