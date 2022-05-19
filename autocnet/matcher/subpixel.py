@@ -3,7 +3,8 @@ import json
 from math import modf, floor
 import time
 import numpy as np
-import warnings    
+import warnings
+import logging
 
 from subprocess import CalledProcessError
 
@@ -1700,6 +1701,7 @@ def subpixel_register_point_smart(pointid,
                     'status':''}
         cost = None
         destination_node = nodes[measure.imageid]
+        print(f'Registering measure {measure.id} (image: {measure.imageid})')
 
         # Compute the baseline metrics using the smallest window
         size_x = np.inf
@@ -1801,10 +1803,10 @@ def subpixel_register_point_smart(pointid,
             else:
                 mi_metric=0
                 metric = maxcorr
-                new_x, new_y = updated_affine([measure.sample, measure.line])[0]
+                new_x, new_y = updated_affine([measure.apriorisample, measure.aprioriline])[0]
                 
-                dist = np.linalg.norm([measure.line-new_x, 
-                                      measure.sample-new_y])
+                dist = np.linalg.norm([measure.aprioriline-new_x, 
+                                      measure.apriorisample-new_y])
                 cost = cost_func(dist, metric)
 
                 m = {'id': measure.id,
@@ -1957,7 +1959,12 @@ def validate_candidate_measure(measure_to_register,
     Parameters
     ----------
     measure_to_register : dict
-                          The measure to register
+                          A dictionary containing information about the measure to validate, the
+                          {keys: types} needed for this function are: 
+                          {'id': int, 
+                          'line': np.float, 
+                          'sample': np.float,
+                          'parameters_index': dict}
 
     ncg : obj
           A network candidate graph object
