@@ -1795,9 +1795,10 @@ def subpixel_register_point_smart(pointid,
                 updated_measures.append([None, None, m])
                 continue
             
+            # Updated so that the affine used is computed a single time.
             updated_affine, maxcorr, temp_corrmap = subpixel_template(reference_roi,
                                                                       moving_roi,
-                                                                      affine=affine)
+                                                                      affine=baseline_affine)
             
             if updated_affine is None:
                 print('Unable to match with this parameter set.')

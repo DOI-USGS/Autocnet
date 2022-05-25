@@ -189,7 +189,6 @@ class Roi():
         self.dtype = dtype
 
         pixels = self.image_extent
-
         if (np.asarray(pixels) - self.buffer < 0).any():
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
@@ -203,8 +202,22 @@ class Roi():
                       pixels[2]-self.buffer, 
                       pixels[1]-pixels[0]+(self.buffer*2)+1, 
                       pixels[3]-pixels[2]+(self.buffer*2)+1]
-            data = self.data.read_array(pixels=pixels)
+            data = self.data.read_array(pixels=pixels, dtype=dtype)
+        if affine:
+            # The cval is being set to the mean of the array,
+            d2 = tf.warp(data, 
+                        affine.inverse, 
+                        order=3, 
+                        mode=mode)
+            
+            if self.buffer != 0:
+                pixel_locked = d2[self.buffer:-self.buffer, 
+                                  self.buffer:-self.buffer]
 
+                return img_as_float32(pixel_locked)
+            return d2
+        else:
+            return data
         # Now that the whole pixel array has been read, interpolate the array to align pixel edges
         xi = np.linspace(self._remainder_x, 
                          ((self.buffer*2) + self._remainder_x + (self.size_x*2)), 
@@ -220,14 +233,13 @@ class Roi():
                                        order=3)
 
         if self.buffer != 0:
-            pixel_locked = pixel_locked[self.buffer:-self.buffer, 
+            pixel_locked = data[self.buffer:-self.buffer, 
                                        self.buffer:-self.buffer]
 
         if affine:
             # The cval is being set to the mean of the array,
             pixel_locked = tf.warp(pixel_locked, 
-                                   affine.inverse, 
+                                   affine,#.inverse, 
                                    order=3, 
                                    mode=mode)
-
         return img_as_float32(pixel_locked)
