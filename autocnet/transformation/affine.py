@@ -112,8 +112,8 @@ def estimate_local_affine(reference_roi, moving_roi):
     """
     # get initial affine
     roi_buffer = reference_roi.buffer
-    size_x = reference_roi.size_x + roi_buffer
-    size_y = reference_roi.size_y + roi_buffer
+    size_x = reference_roi.clip_center + roi_buffer
+    size_y = reference_roi.clip_center + roi_buffer
     
     affine_transform = estimate_affine_from_sensors(reference_roi.data, moving_roi.data, reference_roi.x, reference_roi.y, size_x=size_x, size_y=size_y)
     ref_center = (reference_roi.x, reference_roi.y)
@@ -131,7 +131,8 @@ def estimate_local_affine(reference_roi, moving_roi):
                                           scale=affine_transform.scale)
 
     # This rotates about the center of the image
-    shift_x, shift_y = moving_roi.center
+    shift_x = moving_roi.clip_center
+    shift_y = moving_roi.clip_center
     tf_shift = tf.SimilarityTransform(translation=[shift_x, shift_y])
     tf_shift_inv = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
     

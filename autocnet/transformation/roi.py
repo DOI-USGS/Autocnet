@@ -1,6 +1,6 @@
 from math import modf, floor
 import numpy as np
-
+form plio.io.io_gdal import GeoDataset
 import scipy.ndimage as ndimage
 
 from skimage import transform as tf
@@ -36,18 +36,26 @@ class Roi():
     bottom_y : int
                The bottom image coordinate in imge space
     """
-    def __init__(self, data, x, y, ndv=None, ndv_threshold=0.5, buffer=5):
+    def __init__(self, data, x, y, size_x=200, size_y=200, ndv=None, ndv_threshold=0.5, buffer=5):
+        if not isinstance(data, GeoDataset):
+            raise TypeError('Error: data object must be a plio GeoDataset')
         self.data = data
         self.x = x
         self.y = y
+        self.size_x = size_x
+        self.size_y = size_y
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
+        self.clipped_array = None
 
     @property
     def center(self):
-        ie = self.image_extent
-        return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
+        return (self.x, self.y)
+
+    @property
+    def clip_center(self):
+        return (self.size_x + 0.5, self.size_y + 0.5)
 
     @property
     def x(self):
@@ -117,12 +125,8 @@ class Roi():
         In full image space, this method computes the valid
         pixel indices that can be extracted.
         """
-        try:
-            # Geodataset object
-            raster_size = self.data.raster_size
-        except:
-            # Numpy array in y,x form
-            raster_size = self.data.shape[::-1]
+        # Geodataset object
+        raster_size = self.data.raster_size
 
         # Should this modify (+-) and then round to whole pixel?
 
@@ -137,10 +141,6 @@ class Roi():
 
         return [left_x, right_x, top_y, bottom_y]
 
-    @property
-    def center(self):
-        ie = self.image_extent
-        return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
 
     @property
     def is_valid(self):
@@ -167,7 +167,7 @@ class Roi():
         return self.clip()
 
 
-    def clip(self, size_x, size_y, affine=None, dtype=None, mode="reflect"):
+    def clip(self, size_x=None, size_y=None, affine=None, dtype=None, mode="reflect"):
         """
         Compatibility function that makes a call to the array property.
         Warning: The dtype passed in via this function resets the dtype attribute of this
@@ -189,26 +189,23 @@ class Roi():
          : ndarray
            The array attribute of this object.
         """
-        
+        if size_x:
+            self.size_x = size_x
+        if size_y:
+            self.size_y = size_y
 
+        min_x = self._whole_x - size_x - self.buffer
+        min_y = self._whole_y - size_y - self.buffer
+        x_read_length = (size_x * 2) + 1 + self.buffer
+        y_read_length = (size_y * 2) + 1 + self.buffer
 
-        pixels = self.image_extent
-        if (np.asarray(pixels) - self.buffer < 0).any():
+        pixels = [min_x, min_y, x_read_length, y_read_length]
+        if (np.asarray(pixels) < 0).any():
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
+        data = self.data.read_array(pixels=pixels, dtype=dtype)
 
-        if isinstance(self.data, np.ndarray):
-            data = self.data[pixels[2]-self.buffer:pixels[3]+1+self.buffer, 
-                             pixels[0]-self.buffer:pixels[1]+1+self.buffer]
-        else:
-            # Have to reformat to [xstart, ystart, xnumberpixels, ynumberpixels]
-            # TODO: I think this will result in an incorrect obj.center when the passed data is a GeoDataset
-            pixels = [pixels[0]-self.buffer, 
-                      pixels[2]-self.buffer, 
-                      pixels[1]-pixels[0]+(self.buffer*2)+1, 
-                      pixels[3]-pixels[2]+(self.buffer*2)+1]
-            pixels = map(floor, [self.x-size_x, self.y-size_y, size_x*2+1, size_y*2+1])
-            data = self.data.read_array(pixels=pixels, dtype=dtype)
-            return data
+        # CENTER SHIFTING?
+
         if affine:
             # The cval is being set to the mean of the array,
             af = tf.warp(data, 
@@ -224,7 +221,7 @@ class Roi():
             af = af[floor(new_center[0])-self.size_y:floor(new_center[0])+self.size_y+1,
                       floor(new_center[1])-self.size_x:floor(new_center[1])+self.size_x+1]
             
-            return af
+            self.clipped_array = ar
         """if affine:
             # The cval is being set to the mean of the array,
             d2 = tf.warp(data, 
@@ -269,4 +266,4 @@ class Roi():
                                 self.buffer:-self.buffer]
         # Ohh is buffer doing something here? Yeah, post clip, so we should be safe.
         # Buffers don't matter - wtf
-        return img_as_float32(pixel_locked)
+        self.clipped_array = img_as_float32(pixel_locked)

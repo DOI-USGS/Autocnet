@@ -281,15 +281,15 @@ def subpixel_template(reference_roi,
 
     # Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
     # All this does is adjust from the upper left of the maximum correlation to the origin of the 2d array.
-    new_affine_transformed_center_x = moving_roi.center[0] - matcher_shift_x  #Center is indices.
-    new_affine_transformed_center_y = moving_roi.center[1] - matcher_shift_y
+    new_affine_transformed_center_x = moving_roi.clip_center - matcher_shift_x  #Center is indices.
+    new_affine_transformed_center_y = moving_roi.clip_center- matcher_shift_y
 
     # Invert the affine transformation of the new center. This result is plotted in the second figure as a red dot.
     inverse_transformed_affine_center_x, inverse_transformed_affine_center_y = affine.inverse((new_affine_transformed_center_x, new_affine_transformed_center_y))[0]
 
     # Take the original x,y (moving_roi.x, moving_roi.y) and subtract the delta between the original ROI center and the newly computed center.
-    translation_x = - (moving_roi.center[0] - inverse_transformed_affine_center_x) 
-    translation_y = - (moving_roi.center[1] - inverse_transformed_affine_center_y)
+    translation_x = - (moving_roi.clip_center - inverse_transformed_affine_center_x) 
+    translation_y = - (moving_roi.clip_center - inverse_transformed_affine_center_y)
 
     new_affine = tf.AffineTransform(translation=(translation_x,
                                                  translation_y))
