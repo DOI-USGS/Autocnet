@@ -24,12 +24,6 @@ class Roi():
     y : float
         The y coordinate in image space
 
-    size_x : int
-             1/2 the total ROI width in pixels
-
-    size_y : int
-             1/2 the total ROI height in pixels
-
     left_x : int
              The left pixel coordinate in image space
 
@@ -42,15 +36,17 @@ class Roi():
     bottom_y : int
                The bottom image coordinate in imge space
     """
-    def __init__(self, data, x, y, size_x=200, size_y=200, ndv=None, ndv_threshold=0.5, buffer=5):
+    def __init__(self, data, x, y, ndv=None, ndv_threshold=0.5, buffer=5):
         self.data = data
         self.x = x
         self.y = y
-        self.size_x = size_x
-        self.size_y = size_y
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
+
+    @property
+    def center(self):
+        return (self.x, self.y)
 
     @property
     def x(self):
@@ -170,13 +166,19 @@ class Roi():
         return self.clip()
 
 
-    def clip(self, affine=None, dtype=None, mode="reflect"):
+    def clip(self, size_x, size_y, affine=None, dtype=None, mode="reflect"):
         """
         Compatibility function that makes a call to the array property.
         Warning: The dtype passed in via this function resets the dtype attribute of this
         instance.
         Parameters
         ----------
+        size_x : int
+             1/2 the total ROI width in pixels
+
+        size_y : int
+             1/2 the total ROI height in pixels
+
         dtype : str
                 The datatype to be used when reading the ROI information if the read
                 occurs through the data object using the read_array method. When using
@@ -186,27 +188,46 @@ class Roi():
          : ndarray
            The array attribute of this object.
         """
-        self.dtype = dtype
+        
 
         pixels = self.image_extent
         if (np.asarray(pixels) - self.buffer < 0).any():
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
+        
         if isinstance(self.data, np.ndarray):
             data = self.data[pixels[2]-self.buffer:pixels[3]+1+self.buffer, 
                              pixels[0]-self.buffer:pixels[1]+1+self.buffer]
         else:
             # Have to reformat to [xstart, ystart, xnumberpixels, ynumberpixels]
             # TODO: I think this will result in an incorrect obj.center when the passed data is a GeoDataset
-            pixels = [pixels[0]-self.buffer, 
+            '''pixels = [pixels[0]-self.buffer, 
                       pixels[2]-self.buffer, 
                       pixels[1]-pixels[0]+(self.buffer*2)+1, 
-                      pixels[3]-pixels[2]+(self.buffer*2)+1]
+                      pixels[3]-pixels[2]+(self.buffer*2)+1]'''
+            pixels = map(floor, [self.x-size_x, self.y-size_y, size_x*2+1, size_y*2+1])
             data = self.data.read_array(pixels=pixels, dtype=dtype)
+            return data
         if affine:
             # The cval is being set to the mean of the array,
+            af = tf.warp(data, 
+                                   affine, #.inverse, 
+                                   order=3, 
+                                   mode='constant',
+                                   cval=0.1)
+
+            array_center =  (np.array(data.shape)[::-1] - 1) / 2.0
+            rmatrix = np.linalg.inv(affine.params[0:2, 0:2])
+            new_center = np.dot(rmatrix, array_center)
+            
+            af = af[floor(new_center[0])-self.size_y:floor(new_center[0])+self.size_y+1,
+                      floor(new_center[1])-self.size_x:floor(new_center[1])+self.size_x+1]
+            
+            return af
+        """if affine:
+            # The cval is being set to the mean of the array,
             d2 = tf.warp(data, 
-                        affine.inverse, 
+                        affine,# .inverse, 
                         order=3, 
                         mode=mode)
             
@@ -217,7 +238,7 @@ class Roi():
                 return img_as_float32(pixel_locked)
             return d2
         else:
-            return data
+            return data"""
         # Now that the whole pixel array has been read, interpolate the array to align pixel edges
         xi = np.linspace(self._remainder_x, 
                          ((self.buffer*2) + self._remainder_x + (self.size_x*2)), 
@@ -227,19 +248,24 @@ class Roi():
                          (self.size_y*2+1)+(self.buffer*2))
 
         # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
+        # Maybe this operates in place?
         pixel_locked = ndimage.map_coordinates(data, 
                                        np.meshgrid(yi, xi, indexing='ij'),
                                        mode=mode,
                                        order=3)
-
-        if self.buffer != 0:
-            pixel_locked = data[self.buffer:-self.buffer, 
-                                       self.buffer:-self.buffer]
-
+   
         if affine:
             # The cval is being set to the mean of the array,
-            pixel_locked = tf.warp(pixel_locked, 
-                                   affine,#.inverse, 
+            pixel_locked = tf.warp(data, 
+                                   affine.inverse, 
                                    order=3, 
                                    mode=mode)
+
+        # UL, LR, C and then compute 
+
+        if self.buffer != 0:
+            pixel_locked = pixel_locked[self.buffer:-self.buffer, 
+                                self.buffer:-self.buffer]
+        # Ohh is buffer doing something here? Yeah, post clip, so we should be safe.
+        # Buffers don't matter - wtf
         return img_as_float32(pixel_locked)
