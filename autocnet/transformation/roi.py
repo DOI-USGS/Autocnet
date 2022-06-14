@@ -202,18 +202,19 @@ class Roi():
         pixels = [min_x, min_y, x_read_length, y_read_length]
         if (np.asarray(pixels) < 0).any():
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
+        
+        # This data is an nd array that is larger than originally requested, because it may be affine warped.
         data = self.data.read_array(pixels=pixels, dtype=dtype)
-
-        # CENTER SHIFTING?
 
         if affine:
             # The cval is being set to the mean of the array,
             af = tf.warp(data, 
-                                   affine, #.inverse, 
-                                   order=3, 
-                                   mode='constant',
-                                   cval=0.1)
+                         affine, #.inverse, 
+                         order=3, 
+                         mode='constant',
+                         cval=0.1)
 
+            # 
             array_center =  (np.array(data.shape)[::-1] - 1) / 2.0
             rmatrix = np.linalg.inv(affine.params[0:2, 0:2])
             new_center = np.dot(rmatrix, array_center)
@@ -221,7 +222,7 @@ class Roi():
             af = af[floor(new_center[0])-self.size_y:floor(new_center[0])+self.size_y+1,
                       floor(new_center[1])-self.size_x:floor(new_center[1])+self.size_x+1]
             
-            self.clipped_array = ar
+            self.clipped_array = af
         """if affine:
             # The cval is being set to the mean of the array,
             d2 = tf.warp(data, 
