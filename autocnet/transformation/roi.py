@@ -46,7 +46,8 @@ class Roi():
 
     @property
     def center(self):
-        return (self.x, self.y)
+        ie = self.image_extent
+        return ((ie[1] - ie[0])-1)/2. + 0.5, ((ie[3]-ie[2])-1)/2. + 0.5
 
     @property
     def x(self):
@@ -190,21 +191,21 @@ class Roi():
         """
         
 
+
         pixels = self.image_extent
         if (np.asarray(pixels) - self.buffer < 0).any():
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
-        
         if isinstance(self.data, np.ndarray):
             data = self.data[pixels[2]-self.buffer:pixels[3]+1+self.buffer, 
                              pixels[0]-self.buffer:pixels[1]+1+self.buffer]
         else:
             # Have to reformat to [xstart, ystart, xnumberpixels, ynumberpixels]
             # TODO: I think this will result in an incorrect obj.center when the passed data is a GeoDataset
-            '''pixels = [pixels[0]-self.buffer, 
+            pixels = [pixels[0]-self.buffer, 
                       pixels[2]-self.buffer, 
                       pixels[1]-pixels[0]+(self.buffer*2)+1, 
-                      pixels[3]-pixels[2]+(self.buffer*2)+1]'''
+                      pixels[3]-pixels[2]+(self.buffer*2)+1]
             pixels = map(floor, [self.x-size_x, self.y-size_y, size_x*2+1, size_y*2+1])
             data = self.data.read_array(pixels=pixels, dtype=dtype)
             return data

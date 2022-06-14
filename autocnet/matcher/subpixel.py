@@ -274,11 +274,13 @@ def subpixel_template(reference_roi,
     if (ref_clip is None) or (moving_clip is None):
         return None, None, None
 
+    # Just takes 2d arrays, no idea about affines
     matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
     if matcher_shift_x is None:
         return None, None, None
 
     # Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
+    # All this does is adjust from the upper left of the maximum correlation to the origin of the 2d array.
     new_affine_transformed_center_x = moving_roi.center[0] - matcher_shift_x  #Center is indices.
     new_affine_transformed_center_y = moving_roi.center[1] - matcher_shift_y
 
