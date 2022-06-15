@@ -1,6 +1,6 @@
 from math import modf, floor
 import numpy as np
-form plio.io.io_gdal import GeoDataset
+from plio.io.io_gdal import GeoDataset
 import scipy.ndimage as ndimage
 
 from skimage import transform as tf
@@ -193,11 +193,11 @@ class Roi():
             self.size_x = size_x
         if size_y:
             self.size_y = size_y
-
-        min_x = self._whole_x - size_x - self.buffer
-        min_y = self._whole_y - size_y - self.buffer
-        x_read_length = (size_x * 2) + 1 + self.buffer
-        y_read_length = (size_y * 2) + 1 + self.buffer
+        print('BUFFER: ', self.buffer)
+        min_x = self._whole_x - self.size_x - self.buffer
+        min_y = self._whole_y - self.size_y - self.buffer
+        x_read_length = (self.size_x * 2) + 1 + (self.buffer * 2)
+        y_read_length = (self.size_y * 2) + 1 + (self.buffer * 2)
 
         pixels = [min_x, min_y, x_read_length, y_read_length]
         if (np.asarray(pixels) < 0).any():
@@ -205,24 +205,45 @@ class Roi():
         
         # This data is an nd array that is larger than originally requested, because it may be affine warped.
         data = self.data.read_array(pixels=pixels, dtype=dtype)
+        print('data shape: ', data.shape)
+        # Now that the whole pixel array has been read, interpolate the array to align pixel edges
+        xi = np.linspace(self._remainder_x, 
+                         ((self.buffer*2) + self._remainder_x + (self.size_x*2)), 
+                         (self.size_x*2+1)+(self.buffer*2)) 
+        yi = np.linspace(self._remainder_y, 
+                         ((self.buffer*2) + self._remainder_y + (self.size_y*2)), 
+                         (self.size_y*2+1)+(self.buffer*2))
+        
+        # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
+        # Maybe this operates in place?
+        pixel_locked = ndimage.map_coordinates(data, 
+                                       np.meshgrid(yi, xi, indexing='ij'),
+                                       mode=mode,
+                                       order=3)
+        print('pixel locked shape', pixel_locked.shape)
+
+        #pixel_locked = data
 
         if affine:
             # The cval is being set to the mean of the array,
-            af = tf.warp(data, 
+            pixel_locked = tf.warp(pixel_locked, 
                          affine, #.inverse, 
                          order=3, 
                          mode='constant',
                          cval=0.1)
 
-            # 
-            array_center =  (np.array(data.shape)[::-1] - 1) / 2.0
-            rmatrix = np.linalg.inv(affine.params[0:2, 0:2])
-            new_center = np.dot(rmatrix, array_center)
+            array_center =  (np.array(pixel_locked.shape)[::-1] - 1) / 2.0
+            # Return order is x,y
+            new_center = affine.inverse(array_center)[0]
             
-            af = af[floor(new_center[0])-self.size_y:floor(new_center[0])+self.size_y+1,
-                      floor(new_center[1])-self.size_x:floor(new_center[1])+self.size_x+1]
+            # +1 handles non-inclusive end indexing on the nd-array; indexing order is y, x
+            pixel_locked = pixel_locked[floor(new_center[1])-self.size_y:floor(new_center[1])+self.size_y+1,
+                                        floor(new_center[0])-self.size_x:floor(new_center[0])+self.size_x+1]
             
-            self.clipped_array = af
+            print('post affine pixel locked shape', pixel_locked.shape)
+            self.clipped_array = img_as_float32(pixel_locked)
+            return
+        
         """if affine:
             # The cval is being set to the mean of the array,
             d2 = tf.warp(data, 
@@ -238,27 +259,14 @@ class Roi():
             return d2
         else:
             return data"""
-        # Now that the whole pixel array has been read, interpolate the array to align pixel edges
-        xi = np.linspace(self._remainder_x, 
-                         ((self.buffer*2) + self._remainder_x + (self.size_x*2)), 
-                         (self.size_x*2+1)+(self.buffer*2)) 
-        yi = np.linspace(self._remainder_y, 
-                         ((self.buffer*2) + self._remainder_y + (self.size_y*2)), 
-                         (self.size_y*2+1)+(self.buffer*2))
 
-        # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
-        # Maybe this operates in place?
-        pixel_locked = ndimage.map_coordinates(data, 
-                                       np.meshgrid(yi, xi, indexing='ij'),
-                                       mode=mode,
-                                       order=3)
    
-        if affine:
+        """if affine:
             # The cval is being set to the mean of the array,
             pixel_locked = tf.warp(data, 
                                    affine.inverse, 
                                    order=3, 
-                                   mode=mode)
+                                   mode=mode)"""
 
         # UL, LR, C and then compute 
 
