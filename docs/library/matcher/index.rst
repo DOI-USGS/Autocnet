@@ -25,10 +25,6 @@ Subpixel Refinement
    ciratefi
    naive_template
 
-High-Level Matchiing Examples
------------------------------
-.. toctree::
-   cross_instrument_matcher
 
 Spatial Suppression Function Examples
 -------------------------------------

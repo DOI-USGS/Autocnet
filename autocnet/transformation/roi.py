@@ -1,6 +1,6 @@
 from math import modf, floor
 import numpy as np
-form plio.io.io_gdal import GeoDataset
+from plio.io.io_gdal import GeoDataset
 import scipy.ndimage as ndimage
 
 from skimage import transform as tf
