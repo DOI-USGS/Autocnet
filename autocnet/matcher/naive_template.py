@@ -82,7 +82,7 @@ def pattern_match_autoreg(template, image, subpixel_size=3, metric=cv2.TM_CCOEFF
     
     return x, y, max_corr, result
 
-def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, error_check=False):
+def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED):
     """
     Call an arbitrary pattern matcher using a subpixel approach where the template and image
     are upsampled using a third order polynomial.
@@ -137,9 +137,6 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
            The function to be used to perform the template based matching
            Options: {cv2.TM_CCORR_NORMED, cv2.TM_CCOEFF_NORMED, cv2.TM_SQDIFF_NORMED}
            In testing the first two options perform significantly better with Apollo data.
-    error_check : bool
-                  If True, also apply a different matcher and test that the values
-                  are not too divergent.  Default, False.
     Returns
     -------
     x : float

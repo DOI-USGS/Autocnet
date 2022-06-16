@@ -259,6 +259,7 @@ def propagate_point(Session,
                         match_kwargs=match_kwargs, \
                         verbose=verbose)
             except Exception as e:
+                # TODO remove this except block?
                 raise Exception(e)
                 match_results.append(e)
                 continue

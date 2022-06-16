@@ -1,14 +1,5 @@
-import math
-import os
-from re import A
-import sys
-import unittest
-from unittest.mock import patch
-import logging
-
 from skimage import transform as tf
 from scipy.ndimage.interpolation import rotate
-from skimage.util import img_as_float   
 from skimage import color 
 from skimage import data
 
