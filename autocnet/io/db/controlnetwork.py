@@ -7,40 +7,9 @@ import shapely.wkb as swkb
 from plio.io import io_controlnetwork as cnet
 from autocnet.io.db.model import Measures
 from autocnet.spatial.isis import isis2np_types
+from ... import sql
 
-def db_to_df(engine, sql = """
-SELECT measures."pointid",
-        points."pointType",
-        points."apriori",
-        points."adjusted",
-        points."pointIgnore",
-        points."referenceIndex",
-        points."identifier",
-        measures."id",
-        measures."serialnumber",
-        measures."sample",
-        measures."line",
-        measures."measureType",
-        measures."imageid",
-        measures."measureIgnore",
-        measures."measureJigsawRejected",
-        measures."aprioriline",
-        measures."apriorisample"
-FROM measures
-INNER JOIN points ON measures."pointid" = points."id"
-WHERE
-    points."pointIgnore" = False AND
-    measures."measureIgnore" = FALSE AND
-    measures."measureJigsawRejected" = FALSE AND
-    measures."imageid" NOT IN
-        (SELECT measures."imageid"
-        FROM measures
-        INNER JOIN points ON measures."pointid" = points."id"
-        WHERE measures."measureIgnore" = False and measures."measureJigsawRejected" = False AND points."pointIgnore" = False
-        GROUP BY measures."imageid"
-        HAVING COUNT(DISTINCT measures."pointid")  < 3)
-ORDER BY measures."pointid", measures."id";
-"""):
+def db_to_df(engine, sql = sql.db_to_df_sql_string):
         """
         Given a set of points/measures in an autocnet database, generate an ISIS
         compliant control network.

@@ -10,6 +10,7 @@ import shapely
 import sqlalchemy
 from plio.io.io_gdal import GeoDataset
 
+
 from autocnet.cg import cg as compgeom
 from autocnet.graph.node import NetworkNode
 from autocnet.io.db.model import Images, Measures, Overlay, Points, JsonEncoder
@@ -20,27 +21,6 @@ from autocnet.transformation import roi
 
 from plurmy import Slurm
 import csmapi
-
-# SQL query to decompose pairwise overlaps
-compute_overlaps_sql = """
-WITH intersectiongeom AS
-(SELECT geom AS geom FROM ST_Dump((
-   SELECT ST_Polygonize(the_geom) AS the_geom FROM (
-     SELECT ST_Union(the_geom) AS the_geom FROM (
-     SELECT ST_ExteriorRing((ST_DUMP(geom)).geom) AS the_geom
-       FROM images WHERE images.geom IS NOT NULL) AS lines
-  ) AS noded_lines))),
-iid AS (
- SELECT images.id, intersectiongeom.geom AS geom
-    FROM images, intersectiongeom
-    WHERE images.geom is NOT NULL AND
-    ST_INTERSECTS(intersectiongeom.geom, images.geom) AND
-    ST_AREA(ST_INTERSECTION(intersectiongeom.geom, images.geom)) > 0.000001
-)
-INSERT INTO overlay(intersections, geom) SELECT row.intersections, row.geom FROM
-(SELECT iid.geom, array_agg(iid.id) AS intersections
-  FROM iid GROUP BY iid.geom) AS row WHERE array_length(intersections, 1) > 1;
-"""
 
 # set up the logger file
 log = logging.getLogger(__name__)
