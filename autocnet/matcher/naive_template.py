@@ -177,4 +177,4 @@ def pattern_match(template, image, upsampling=8, metric=cv2.TM_CCOEFF_NORMED, er
     shift_x = (matched_x - ((corrmap.shape[1]-1)/2)) / upsampling
     shift_y = (matched_y - ((corrmap.shape[0]-1)/2)) / upsampling
 
-    return shift_x, shift_y , max_corr, corrmap
+    return -shift_x, -shift_y , max_corr, corrmap
