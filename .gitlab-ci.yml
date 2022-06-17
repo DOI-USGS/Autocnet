@@ -1,0 +1,14 @@
+image: condaforge/mambaforge:latest
+stages:
+  - test
+unit-test-job: 
+  stage: test
+  script:
+    - apt-get --allow-releaseinfo-change update -y
+    - apt-get -y upgrade
+    - apt-get install -y libgomp1
+    - apt-get install -y libgl1-mesa-glx
+    - mamba env create -f environment.yml --prefix /autocnet
+    - /autocnet/bin/pytest .
+  rules:
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
