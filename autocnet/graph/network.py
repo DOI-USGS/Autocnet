@@ -33,6 +33,7 @@ from plio.io.io_gdal import GeoDataset
 from plio.io.isis_serial_number import generate_serial_number
 from plio.io import io_controlnetwork as cnet
 
+from .. import sql
 
 from plurmy import Slurm
 
@@ -53,7 +54,6 @@ from autocnet.matcher import subpixel
 from autocnet.matcher import cross_instrument_matcher as cim
 from autocnet.vis.graph_view import plot_graph, cluster_plot
 from autocnet.control import control
-from autocnet.spatial.overlap import compute_overlaps_sql
 from autocnet.spatial.isis import point_info
 from autocnet.spatial.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, og2oc
@@ -2080,7 +2080,7 @@ class NetworkCandidateGraph(CandidateGraph):
 
         self.from_database()
         # Execute the computation to compute overlapping geometries
-        self._execute_sql(compute_overlaps_sql)
+        self._execute_sql(sql.compute_overlaps_sql)
 
     def add_image(self, img_path):
         """
@@ -2128,7 +2128,7 @@ class NetworkCandidateGraph(CandidateGraph):
                 else:
                     continue
 
-    def add_from_remote_database(self, source_db_config, path=None,  query_string='SELECT * FROM public.images LIMIT 10'):
+    def add_from_remote_database(self, source_db_config, path=None,  query_string=sql.select_ten_pub_image):
         """
         This is a constructor that takes an existing database containing images and sensors,
         copies the selected rows into the project specified in the autocnet_config variable,
@@ -2199,9 +2199,9 @@ class NetworkCandidateGraph(CandidateGraph):
         if path:
             self.copy_images(path)
         self.from_database()
-        self._execute_sql(compute_overlaps_sql)
+        self._execute_sql(sql.compute_overlaps_sql)
 
-    def from_database(self, query_string='SELECT * FROM public.images'):
+    def from_database(self, query_string=sql.select_pub_image):
         """
         This is a constructor that takes the results from an arbitrary query string,
         uses those as a subquery into a standard polygon overlap query and
@@ -2234,11 +2234,7 @@ class NetworkCandidateGraph(CandidateGraph):
         SELECT * FROM Images WHERE (split_part(path, '/', 6) ~ 'P[0-9]+_.+') = True
         """
 
-        composite_query = '''WITH i as ({}) SELECT i1.id
-        as i1_id,i1.path as i1_path, i2.id as i2_id, i2.path as i2_path
-        FROM i  as i1, i as i2
-        WHERE ST_INTERSECTS(i1.geom, i2.geom) = TRUE
-        AND i1.id < i2.id'''.format(query_string)
+        composite_query = sql.from_database_composite.format(formatInput=sql.select_pub_image)
 
         with self.session_scope() as session:
             res = session.execute(composite_query)
