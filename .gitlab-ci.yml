@@ -24,7 +24,7 @@ unit-test-job:   # This job runs in the test stage.
     - ls -lrt
     - mamba env create -f environment.yml --prefix /autocnet 
     - conda init bash 
-    - source ~/.bashrc
+    - source /root/.bashrc
     - conda activate /autocnet
     - pytest
 
