@@ -23,6 +23,6 @@ unit-test-job:   # This job runs in the test stage.
     - echo "Running unit tests... This will take about 60 seconds."
     - ls -lrt
     # - mamba env create -f environment.yml --prefix /autocnet
-    - mamba create --prefix /autocnet python
+    - mamba create --prefix /autocnet python pytest
     - ./anaconda/bin/pytest .
 
