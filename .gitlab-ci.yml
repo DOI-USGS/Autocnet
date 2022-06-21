@@ -17,8 +17,6 @@ stages:
   - test
 unit-test-job: 
   stage: test
-  before_script:
-
   script:
     - apt-get --allow-releaseinfo-change update -y
     - apt-get -y upgrade
