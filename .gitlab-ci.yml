@@ -24,6 +24,7 @@ unit-test-job:
     - apt-get install -y libgl1-mesa-glx
     - mamba env create -f environment.yml --prefix /autocnet
     - conda init bash
+    - source /root/.bashrc
     - conda activate /autocnet
     - psql -h $POSTGRES_HOST -c 'create database template_postgis;' -U postgres -p 35432;
     - psql template_postgis -h $POSTGRES_HOST -U postgres -p 35432 -c 'create extension postgis';
