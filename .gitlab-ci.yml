@@ -22,7 +22,7 @@ unit-test-job:
     - apt-get -y upgrade
     - apt-get install -y libgomp1
     - apt-get install -y libgl1-mesa-glx
-    - mamba env create -f environment.yml --prefix /autocnet -n autocnet_env
+    - mamba env create -f environment.yml -n autocnet_env
     - conda init
     - source /root/.bashrc
     - conda activate autocnet_env
