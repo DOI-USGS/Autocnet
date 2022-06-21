@@ -184,7 +184,7 @@ def place_points_in_overlap(overlap,
                     sample, line = isis.ground_to_image(node["image_path"], lon, lat)
                 except CalledProcessError as e:
                     if 'Requested position does not project in camera model' in e.stderr:
-                        log.warning(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
+                        log.exception(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
                         continue
             if cam_type == "csm":
                 lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
@@ -227,8 +227,8 @@ def place_points_in_overlap(overlap,
                 p = isis.point_info(node["image_path"], newsample, newline, point_type="image")
             except CalledProcessError as e:
                 if 'Requested position does not project in camera model' in e.stderr:
-                    log.warning(node["image_path"])
-                    log.warning(f'interesting point ({newsample}, {newline}) does not project back to ground')
+                    log.exception(node["image_path"])
+                    log.exception(f'interesting point ({newsample}, {newline}) does not project back to ground')
                     continue
             try:
                 x, y, z = p["BodyFixedCoordinate"].value
@@ -292,7 +292,7 @@ def place_points_in_overlap(overlap,
                     sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
                 #except CalledProcessError as e:
                 except:  # CalledProcessError is not catching the ValueError that this try/except is attempting to handle.
-                    log.warning(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
+                    log.exception(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
                     # If the current_index is greater than the reference_index, the change in list size does
                     # not impact the positional index of the reference. If current_index is less than the
                     # reference_index, then the reference_index needs to de-increment by one for each time
@@ -424,7 +424,7 @@ def place_points_in_image(image,
                 sample, line = isis.ground_to_image(node["image_path"], lon, lat)
             except CalledProcessError as e:
                 if 'Requested position does not project in camera model' in e.stderr:
-                    log.warning(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
+                    log.exception(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
                     continue
         if cam_type == "csm":
             lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
@@ -457,8 +457,8 @@ def place_points_in_image(image,
                 p = isis.point_info(node["image_path"], newsample, newline, point_type="image")
             except CalledProcessError as e:
                 if 'Requested position does not project in camera model' in e.stderr:
-                    log.warning(node["image_path"])
-                    log.warning(f'interesting point ({newsample}, {newline}) does not project back to ground')
+                    log.exception(node["image_path"])
+                    log.exception(f'interesting point ({newsample}, {newline}) does not project back to ground')
                     continue
             try:
                 x, y, z = p["BodyFixedCoordinate"].value
@@ -521,7 +521,7 @@ def place_points_in_image(image,
                     sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
                 except CalledProcessError as e:
                     if 'Requested position does not project in camera model' in e.stderr:
-                        log.warning(f'interesting point ({lon},{lat}) does not project to image {node["image_path"]}')
+                        log.exception(f'interesting point ({lon},{lat}) does not project to image {node["image_path"]}')
                         insert = False
 
             point.measures.append(Measures(sample=sample,
@@ -566,7 +566,7 @@ def add_measures_to_point(pointid, cam_type='isis', ncg=None, Session=None):
                     sample, line = isis.ground_to_image(image.path, point_lon, point_lat)
                 except CalledProcessError as e:
                     if 'Requested position does not project in camera model' in e.stderr:
-                        log.warning(f'interesting point ({point_lon},{point_lat}) does not project to image {image.name}')
+                        log.exception(f'interesting point ({point_lon},{point_lat}) does not project to image {image.name}')
 
             point.measures.append(Measures(sample=sample,
                                            line=line,

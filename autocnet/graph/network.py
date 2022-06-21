@@ -1854,7 +1854,7 @@ class NetworkCandidateGraph(CandidateGraph):
         try:
             processing_queue = getattr(self, redis_queue)
         except AttributeError:
-            log.warning(f'Unable to find attribute {redis_queue} on this object. Valid queue names are: "processing_queue" and "working_queue".')
+            log.exception(f'Unable to find attribute {redis_queue} on this object. Valid queue names are: "processing_queue" and "working_queue".')
 
         env = self.config['env']
         condaenv = env['conda']

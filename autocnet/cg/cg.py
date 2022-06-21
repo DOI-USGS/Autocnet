@@ -22,7 +22,7 @@ from autocnet.cg import cg
 from shapely.ops import cascaded_union, polygonize
 
 # set up the logger file
-log = loggin.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 def two_point_extrapolate(x, xs, ys):
     """

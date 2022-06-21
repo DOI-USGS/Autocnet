@@ -69,7 +69,7 @@ def propagate_ground_point(point,
                     preprocess=preprocess,
                     verbose=verbose)
         except Exception as e:
-            log.warning(e)
+            log.exception(e)
             continue
         
         if x is None:
@@ -86,7 +86,7 @@ def propagate_ground_point(point,
             log.info(f'Found a match with correlation: {metrics}, shift distance: {dist}, and cost {current_cost} ', )
     
     if best_match is None:
-        log.info('Unable to propagate this ground point into any images.')
+        log.warning('Unable to propagate this ground point into any images.')
         return
     
     dem = ncg.dem
@@ -142,7 +142,7 @@ def propagate_ground_point(point,
                 sample, line = isis.ground_to_image(image["path"], lon_oc, lat_oc)
             except ValueError as e:
                 if 'Requested position does not project in camera model' in e.stderr:
-                    log.info(f'interesting point ({lon_oc},{lat_oc}) does not project to image {images["image_path"]}')
+                    log.exception(f'interesting point ({lon_oc},{lat_oc}) does not project to image {images["image_path"]}')
                     continue
 
         if image['id'] == best_match[7]:
@@ -293,7 +293,7 @@ def find_ground_reference(point,
                                             verbose=verbose,
                                             **geom_kwargs)
         if x == None:
-            log.info(f'Unable to match image {node["image_name"]} to {baseimage}.')
+            log.warning(f'Unable to match image {node["image_name"]} to {baseimage}.')
             continue
 
         current_cost = cost_func(dist, metrics)
@@ -306,7 +306,7 @@ def find_ground_reference(point,
         else:
             log.info(f'Cost function not met. Unable to use {node["image_name"]} as reference')
     if sample == None:
-        log.info('Unable to register this point to a ground source.')
+        log.warning('Unable to register this point to a ground source.')
         return
 
     # A reference measure has been identified. This measure matched successfully to the ground.

@@ -1097,7 +1097,7 @@ def geom_match_classic(base_cube,
             )
         except CalledProcessError as e:
             if 'Requested position does not project in camera model' in e.stderr:
-                log.info(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {input_cube.base_name}')
+                log.exception(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {input_cube.base_name}')
                 return None, None, None, None, None
 
     base_gcps = np.array([*base_corners])
@@ -1273,8 +1273,8 @@ def geom_match(destination_cube,
         center_x, center_y = spatial.isis.ground_to_image(source_cube.file_name, mlon, mlat)
     except CalledProcessError as e:
             if 'Requested position does not project in camera model' in e.stderr:
-                log.info(f'Skip geom_match; Region of interest center located at ({mlon}, {mlat}) does not project to image {source_cube.base_name}')
-                log.info('This should only appear when propagating ground points')
+                log.exception(f'Skip geom_match; Region of interest center located at ({mlon}, {mlat}) does not project to image {source_cube.base_name}')
+                log.exception('This should only appear when propagating ground points')
                 return None, None, None, None, None
 
     # Compute the mapping between the destination corners and the source_cube corners in
@@ -1288,7 +1288,7 @@ def geom_match(destination_cube,
             )
         except CalledProcessError as e:
             if 'Requested position does not project in camera model' in e.stderr:
-                log.info(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {source_cube.base_name}')
+                log.exception(f'Skip geom_match; Region of interest corner located at ({lon}, {lat}) does not project to image {source_cube.base_name}')
                 return None, None, None, None, None
 
 
@@ -1393,7 +1393,7 @@ def subpixel_register_measure(measureid,
                                                             match_func=match_func,
                                                             template_kwargs=subpixel_template_kwargs)
         except Exception as e:
-            log.warning(f'geom_match failed on measure {measureid} with exception -> {e}')
+            log.exception(f'geom_match failed on measure {measureid} with exception -> {e}')
             destination.ignore = True # geom_match failed
             currentlog['status'] = f"Failed to register measure {measureid}"
             resultlog.append(currentlog)
@@ -2046,7 +2046,7 @@ def estimate_affine_transformation(base_cube,
     passing_base_corners = []
     for x,y in base_corners:
         try:
-            log.info('Processing: ', x,y)
+            log.exception('Processing: ', x,y)
             lon, lat = spatial.isis.image_to_ground(base_cube.file_name, x, y)
             dst_corners.append(
                 spatial.isis.ground_to_image(input_cube.file_name, lon, lat)
@@ -2232,7 +2232,7 @@ def subpixel_register_point_smart(pointid,
                                                         source.apriorisample, 
                                                         source.aprioriline)
         except Exception as e:
-            log.warning(e) 
+            log.exception(e) 
             m = {'id': measure.id,
                  'sample':measure.apriorisample,
                  'line':measure.aprioriline,
@@ -2539,7 +2539,7 @@ def validate_candidate_measure(measure_to_register,
         try:
             affine = estimate_affine_transformation(source_node.geodata, destination_node.geodata, sample, line)
         except:
-            log.warning('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
+            log.exception('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
             return [np.inf] * len(parameters)
         base_arr, dst_arr = affine_warp_image(source_node.geodata, 
                                                   destination_node.geodata, 

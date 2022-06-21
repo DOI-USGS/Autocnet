@@ -111,7 +111,7 @@ def ingest_hirise(directory):
             isis.cubenorm(cube, to=output)
 
     except CalledProcessError as e:
-        log.warning(
+        log.exception(
             textwrap.dedent(
                 f"""\
                 Had a subprocess error:
