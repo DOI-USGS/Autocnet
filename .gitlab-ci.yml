@@ -25,7 +25,7 @@ unit-test-job:
     - mamba env create -f environment.yml -n autocnet_env
     - conda init
     - source /root/.bashrc
-    - conda activate autocnet_env
+    - source activate autocnet_env
     - psql -h $POSTGRES_HOST -c 'create database template_postgis;' -U postgres -p 35432;
     - psql template_postgis -h $POSTGRES_HOST -U postgres -p 35432 -c 'create extension postgis';
     - psql template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p 35432 -c 'create extension postgis_topology';
