@@ -10,7 +10,7 @@ variables:
     POSTGRES_HOST: postgres
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: NotTheDefault
-    POSTGRES_PORT: 35432
+    POSTGRES_PORT: 5432
     POSTGRES_HOST_AUTH_METHOD: trust
 
 stages:
@@ -26,10 +26,10 @@ unit-test-job:
     - conda init
     - source /root/.bashrc
     - source activate autocnet_env
-    - psql -h $POSTGRES_HOST -c 'create database template_postgis;' -U postgres -p 35432;
-    - psql template_postgis -h $POSTGRES_HOST -U postgres -p 35432 -c 'create extension postgis';
-    - psql template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p 35432 -c 'create extension postgis_topology';
-    - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p 35432 -c 'GRANT ALL ON geometry_columns TO PUBLIC;';
-    - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p 35432 -c 'GRANT ALL ON geography_columns TO PUBLIC;';
-    - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p 35432 -c 'GRANT ALL ON spatial_ref_sys TO PUBLIC;';
+    - psql -h $POSTGRES_HOST -c 'create database template_postgis;' -U postgres -p $POSTGRES_PORT;
+    - psql template_postgis -h $POSTGRES_HOST -U postgres -p $POSTGRES_PORT -c 'create extension postgis';
+    - psql template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p $POSTGRES_PORT -c 'create extension postgis_topology';
+    - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p $POSTGRES_PORT -c 'GRANT ALL ON geometry_columns TO PUBLIC;';
+    - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p $POSTGRES_PORT -c 'GRANT ALL ON geography_columns TO PUBLIC;';
+    - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -p $POSTGRES_PORT -c 'GRANT ALL ON spatial_ref_sys TO PUBLIC;';
     - /autocnet/bin/pytest .
