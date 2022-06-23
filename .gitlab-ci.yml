@@ -1,4 +1,4 @@
-image: condaforge/mambaforge:latest
+image: code.usgs.gov:5001/astrogeology/autocnet/mambaforge
 
 services:
     - name: code.usgs.gov:5001/astrogeology/autocnet/postgis
@@ -14,7 +14,7 @@ variables:
 
 stages:
   - test
-unit-test-job: 
+unit-test-job:
   stage: test
   script:
     - mamba env create -f environment.yml -n autocnet_env
@@ -27,5 +27,4 @@ unit-test-job:
     - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -c 'GRANT ALL ON geometry_columns TO PUBLIC;';
     - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -c 'GRANT ALL ON geography_columns TO PUBLIC;';
     - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -c 'GRANT ALL ON spatial_ref_sys TO PUBLIC;';
-    - ls /usr/lib/x86_64-linux-gnu/libGL.so.1
     - pytest .
