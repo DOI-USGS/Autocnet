@@ -2,7 +2,6 @@ import socket
 
 import sqlalchemy
 from sqlalchemy import create_engine, pool, orm
-from sqlalchemy.orm import create_session, scoped_session, sessionmaker
 
 import os
 import socket

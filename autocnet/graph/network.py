@@ -50,7 +50,7 @@ from autocnet.io.db.model import (Images, Keypoints, Matches, Cameras, Points,
                                   JsonEncoder, try_db_creation)
 from autocnet.io.db.connection import new_connection, Parent
 from autocnet.matcher import subpixel
-from autocnet.matcher import cross_instrument_matcher as cim
+from autocnet.matcher import ground 
 from autocnet.vis.graph_view import plot_graph, cluster_plot
 from autocnet.control import control
 from autocnet.spatial.overlap import compute_overlaps_sql
@@ -2718,13 +2718,13 @@ class NetworkCandidateGraph(CandidateGraph):
         subpixel.subpixel_register_measure(self.Session, measureid, **kwargs)
 
     def propagate_control_network(self, control_net, **kwargs):
-        cim.propagate_control_network(self.Session,
+        ground.propagate_control_network(self.Session,
                                       self.config,
                                       self.dem,
                                       control_net)
 
     def generate_ground_points(self, ground_mosaic, **kwargs):
-        cim.generate_ground_points(self.Session, ground_mosaic, **kwargs)
+        ground.generate_ground_points(self.Session, ground_mosaic, **kwargs)
 
     def place_points_in_overlaps(self, nodes, **kwargs):
         overlap.place_points_in_overlaps(self.Session,

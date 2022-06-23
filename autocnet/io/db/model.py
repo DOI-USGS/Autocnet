@@ -4,8 +4,7 @@ import json
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import (Column, String, Integer, Float, \
-                        ForeignKey, Boolean, LargeBinary, \
-                        UniqueConstraint, event, DateTime
+                        ForeignKey, Boolean, event, DateTime
                         )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import relationship, backref

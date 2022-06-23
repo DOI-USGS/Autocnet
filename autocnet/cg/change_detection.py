@@ -8,7 +8,7 @@ from sklearn.cluster import  OPTICS
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors import NearestNeighbors
 
-from skimage.feature import blob_log, blob_doh
+from skimage.feature import blob_log
 from math import sqrt, atan2, pi
 from hoggorm.mat_corr_coeff import RVcoeff
 import math

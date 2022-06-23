@@ -1,7 +1,7 @@
 from collections import defaultdict
 import json
 import logging
-from math import modf, floor
+from math import floor
 import time
 import numpy as np
 import warnings
@@ -220,7 +220,6 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
 def subpixel_template(reference_roi, 
                       moving_roi, 
                       affine=tf.AffineTransform(), 
-                      mode='constant',
                       func=pattern_match,
                       **kwargs):
     """
@@ -236,9 +235,6 @@ def subpixel_template(reference_roi,
     
     affine : skimage.transform.AffineTransform
              scikit-image Affine transformation, used as a seed transform that 
-
-    mode : str
-           Mode passed into warp used to determine how to pad null pixels from affine transform. See skimage.transform.warp 
 
     func : callable 
            Some subpixel template matching function 

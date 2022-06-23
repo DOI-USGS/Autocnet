@@ -1,5 +1,5 @@
 from pathlib import PosixPath
-from psycopg2.extensions import register_adapter, AsIs, adapt
+from psycopg2.extensions import register_adapter, adapt
 
 # Adaptors as defined by https://www.psycopg.org/docs/advanced.html#adapting-new-python-types-to-sql-syntax
 
