@@ -17,10 +17,6 @@ stages:
 unit-test-job: 
   stage: test
   script:
-    - apt-get --allow-releaseinfo-change update -y
-    - apt-get -y upgrade
-    - apt-get install -y libgomp1
-    - apt-get install -y libgl1-mesa-glx
     - mamba env create -f environment.yml -n autocnet_env
     - conda init
     - source /root/.bashrc
