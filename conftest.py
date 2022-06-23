@@ -77,7 +77,7 @@ def default_configuration():
                   'password': 'NotTheDefault',
                   'host': 'postgres',
                   'port': 5432,
-                  'pgbouncer_port': 35432,
+                  'pgbouncer_port': 5432,
                   'name': 'travis_ci_test',
                   'timeout': 500},
               'pfeffernusse': {'url': ''},
