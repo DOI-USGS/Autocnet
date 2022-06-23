@@ -1854,7 +1854,7 @@ class NetworkCandidateGraph(CandidateGraph):
         try:
             processing_queue = getattr(self, redis_queue)
         except AttributeError:
-            print(f'Unable to find attribute {redis_queue} on this object. Valid queue names are: "processing_queue" and "working_queue".')
+            log.exception(f'Unable to find attribute {redis_queue} on this object. Valid queue names are: "processing_queue" and "working_queue".')
 
         env = self.config['env']
         condaenv = env['conda']
@@ -2075,7 +2075,7 @@ class NetworkCandidateGraph(CandidateGraph):
         for cnt, f in enumerate(filelist):
             # Create the nodes in the graph. Really, this is creating the
             # images in the DB
-            print('loading {} of {}'.format(cnt+1, total))
+            log.info('loading {} of {}'.format(cnt+1, total))
             self.add_image(f)
 
         self.from_database()
@@ -2560,7 +2560,7 @@ class NetworkCandidateGraph(CandidateGraph):
 
             # TO DO: RETURN ALL EDGES
             if len(df) == 0:
-                print(f'Overlap {oid} is empty')
+                log.info(f'Overlap {oid} is empty')
                 return []
 
             # create graph edges
@@ -2572,7 +2572,7 @@ class NetworkCandidateGraph(CandidateGraph):
             fully_connected_number_of_edges = scipy.special.comb(graph.number_of_nodes(),2)
             all_edges = list(combinations(graph.nodes, 2))
             if graph.number_of_edges() == fully_connected_number_of_edges:
-                print(f'Overlap {oid} is fully connected')
+                log.info(f'Overlap {oid} is fully connected')
                 return []
 
             # return missing image id pairs

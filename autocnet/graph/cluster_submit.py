@@ -7,7 +7,7 @@ import json
 import sys
 import logging
 
-from io import StringIO 
+from io import StringIO
 from contextlib import redirect_stdout
 
 from redis import StrictRedis
@@ -171,50 +171,38 @@ def manage_messages(args, queue):
 
     """
     processing = True
-    
+
     while processing:
         # Pop the message from the left queue and push to the right queue; atomic operation
         msg = transfer_message_to_work_queue(queue,
                                             args['processing_queue'],
                                             args['working_queue'])
-        
+
         if msg is None:
             if args['queue'] == False:
                 log.warning('Expected to process a cluster job, but the message queue is empty.')
                 return
             elif args['queue'] == True:
-                print(f'Completed processing from queue: {queue}.')
+                log.info(f'Completed processing from queue: {queue}.')
                 return
 
         # The key to remove from the working queue is the message. Essentially, find this element
         # in the list where the element is the JSON representation of the message. Maybe swap to a hash?
         remove_key = msg
-        
+
         #Convert the message from binary into a dict
         msgdict = json.loads(msg, object_hook=object_hook)
 
-        
-        # should replace this with some logging logic later
-        # rather than redirecting std out
-        stdout = StringIO()
-        with redirect_stdout(stdout):
-            # Apply the algorithm
-            response = process(msgdict)
-            # Should go to a logger someday! (today is that day!)
-            print(response)
-            
-        out = stdout.getvalue()
-        # print to get everything on the logs in the directory
-        print(out)
-        sys.stdout.flush()
-        stdout.flush()
+        # Apply the algorithm
+        response = process(msgdict)
+        log.info(response)
 
         #serializedDict = json.loads(msg)
         #results  = msgdict['results'] if msgdict['results'] else [{"status" : "success"}]
         #success = True if "success" in results[0]["status"].split(" ")[0].lower() else False
 
         #jh = JobsHistory(jobId=int(os.environ["SLURM_JOB_ID"]), functionName=msgdict["func"], args={"args" : serializedDict["args"], "kwargs": serializedDict["kwargs"]}, results=msgdict["results"], logs=out, success=success)
-        
+
         #with response['kwargs']['Session']() as session:
             #session.add(jh)
             #session.commit()
@@ -224,7 +212,7 @@ def manage_messages(args, queue):
         # Process only a single job, else draw the next message off the queue if available.
         if args['queue'] == False:
             processing = False
-        
+
 
 def main():  # pragma: no cover
     args = vars(parse_args())
@@ -233,6 +221,6 @@ def main():  # pragma: no cover
     # Get the message
     queue = StrictRedis(host=args['host'], port=args['port'], db=0)
     manage_messages(args, queue)
-    
+
 if __name__ == '__main__':
     main()

@@ -19,6 +19,10 @@ from scipy.spatial import Delaunay
 from shapely import geometry
 from shapely.geometry import MultiPoint
 from shapely.ops import cascaded_union, polygonize
+import logging
+
+# set up logging file
+log = logging.getLogger(__name__)
 
 
 class FailedImport():
@@ -742,7 +746,7 @@ def rasterize_polygon(shape, vertices, dtype=bool):
     for k in range(vertices.shape[0]):
         fill = np.all([fill, check(vertices[k-1], vertices[k], base_array)], axis=0)
     
-    print(fill.any())
+    log.info(fill.any())
     # Set all values inside polygon to one
     base_array[fill] = 1
     return base_array

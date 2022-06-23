@@ -73,16 +73,16 @@ def generate_ground_points(Session, ground_mosaic, nspts_func=lambda x: int(roun
     newsamples = []
 
     # throw out points not intersecting the ground reference images
-    print('points to lay down: ', len(coords))
+    log.info('points to lay down: ', len(coords))
     for i, coord in enumerate(coords):
         # res = ground_session.execute(formated_sql)
         p = Point(*coord)
-        print(f'point {i}'),
+        log.info(f'point {i}'),
 
 
         linessamples = isis.point_info(ground_mosaic.file_name, p.x, p.y, 'ground')
         if linessamples is None:
-            print('unable to find point in ground image')
+            log.warning('unable to find point in ground image')
             continue
         line = linessamples.get('Line')
         sample = linessamples.get('Sample')
@@ -108,7 +108,7 @@ def generate_ground_points(Session, ground_mosaic, nspts_func=lambda x: int(roun
                   newpoint.get('PlanetocentricLatitude'))
 
         if not (xy_in_polygon(p.x, p.y, fp_poly)):
-                print('Interesting point not in mosaic area, ignore')
+                log.warning('Interesting point not in mosaic area, ignore')
                 continue
 
         old_coord_list.append(op)
@@ -251,9 +251,9 @@ def propagate_point(Session,
                 continue
 
             try:
-                print(f'prop point: base_image: {base_image}')
-                print(f'prop point: dest_image: {dest_image}')
-                print(f'prop point: (sx, sy): ({sx}, {sy})')
+                log.info(f'prop point: base_image: {base_image}')
+                log.info(f'prop point: dest_image: {dest_image}')
+                log.info(f'prop point: (sx, sy): ({sx}, {sy})')
                 x,y, dist, metrics, corrmap = geom_match_simple(base_image, dest_image, sx, sy, 16, 16, \
                         match_func = match_func, \
                         match_kwargs=match_kwargs, \
@@ -280,14 +280,14 @@ def propagate_point(Session,
         return new_measures
 
     if verbose:
-        print("match_results final length: ", len(match_results))
-        print("best_results length: ", len(best_results))
-        print("Full results: ", best_results)
-        print("Winning CORRs: ", best_results[:,3], "Themis Pixel shifts: ", best_results[:,4])
-        print("Themis Images: ", best_results[:,6], "CTX images:", best_results[:,7])
-        print("Themis Sample: ", sx, "CTX Samples: ", best_results[:,1])
-        print("Themis Line: ", sy, "CTX Lines: ", best_results[:,2])
-        print('\n')
+        log.info("match_results final length: ", len(match_results))
+        log.info("best_results length: ", len(best_results))
+        log.info("Full results: ", best_results)
+        log.info("Winning CORRs: ", best_results[:,3], "Themis Pixel shifts: ", best_results[:,4])
+        log.info("Themis Images: ", best_results[:,6], "CTX images:", best_results[:,7])
+        log.info("Themis Sample: ", sx, "CTX Samples: ", best_results[:,1])
+        log.info("Themis Line: ", sy, "CTX Lines: ", best_results[:,2])
+        log.info('\n')
 
     # if the single best results metric (returned by geom_matcher) is None
     if len(best_results[:,3])==1 and best_results[:,3][0] is None:
