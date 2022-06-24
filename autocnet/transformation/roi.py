@@ -40,8 +40,12 @@ class Roi():
                   on instantiation, set to (). When clip is called and the clipped_array
                   variable is set, the clip_center is set to the center of the, potentially
                   affine transformed, cliped_array.
+    
+    affine : object
+             a scikit image affine transformation object that is applied when clipping. The default,
+             identity matrix results in no transformation.
     """
-    def __init__(self, data, x, y, size_x=200, size_y=200, ndv=None, ndv_threshold=0.5, buffer=5):
+    def __init__(self, data, x, y, size_x=200, size_y=200, ndv=None, ndv_threshold=0.5, buffer=5, affine=tf.AffineTransform()):
         if not isinstance(data, GeoDataset):
             raise TypeError('Error: data object must be a plio GeoDataset')
         self.data = data
@@ -54,10 +58,19 @@ class Roi():
         self.buffer = buffer
         self.clipped_array = None
         self.clip_center = ()
+        self.affine = affine
 
     @property
     def center(self):
         return (self.x, self.y)
+
+    @property
+    def affine(self):
+        return self._affine
+
+    @affine.setter
+    def affine(self, affine=tf.AffineTransform()):
+        self._affine = affine
 
     @property
     def x(self):
@@ -167,6 +180,37 @@ class Roi():
         """
         return self.clip()
 
+    def clip_coordinate_to_image_coordinate(self, x, y):
+        """
+        Take a passed coordinate in a clipped array from an ROI and return the coordinate
+        in the full image.
+
+        Parameters
+        ----------
+        x : float
+            The x coordinate in the clipped array to be transformed into full image coordinates
+
+        y : float
+            The y coordinate in the clipped array to be transformed into full image coordinates
+
+        Returns
+        -------
+        x_in_image_space : float
+                           The transformed x in image coordinate space
+
+        y_in_imag_space : float
+                          The transformed y in image coordinate space
+        """
+        x_in_affine_space = x + self._clip_start_x
+        y_in_affine_space = y + self._clip_start_y
+
+        x_in_clip_space, y_in_clip_space = self.affine((x_in_affine_space,
+                                                                y_in_affine_space))[0]
+
+        x_in_image_space = x_in_clip_space + self._roi_x_to_clip_center
+        y_in_image_space = y_in_clip_space + self._roi_y_to_clip_center
+
+        return x_in_image_space, y_in_image_space
 
     def clip(self, size_x=None, size_y=None, affine=None, dtype=None, mode="reflect"):
         """
@@ -194,7 +238,7 @@ class Roi():
             self.size_x = size_x
         if size_y:
             self.size_y = size_y
-        
+
         min_x = self._whole_x - self.size_x - self.buffer
         min_y = self._whole_y - self.size_y - self.buffer
         x_read_length = (self.size_x * 2) + 1 + (self.buffer * 2)
@@ -207,41 +251,63 @@ class Roi():
         # This data is an nd-array that is larger than originally requested, because it may be affine warped.
         data = self.data.read_array(pixels=pixels, dtype=dtype)
 
-        # Now that the whole pixel array has been read, interpolate the array to align pixel edges
-        xi = np.linspace(self._remainder_x, 
-                         ((self.buffer*2) + self._remainder_x + (self.size_x*2)), 
-                         (self.size_x*2+1)+(self.buffer*2)) 
-        yi = np.linspace(self._remainder_y, 
-                         ((self.buffer*2) + self._remainder_y + (self.size_y*2)), 
-                         (self.size_y*2+1)+(self.buffer*2))
-        
-        # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
-        pixel_locked = ndimage.map_coordinates(data, 
-                                       np.meshgrid(yi, xi, indexing='ij'),
-                                       mode=mode,
-                                       order=3)
+        data_center = np.array(data.shape[::-1]) / 2.  # Location within a pixel
+        # 12 - 5.5; 12 - 5.5, self.x, self.y = coordinates in the full image and data center are 1/2 the total size of the read array
+        self._roi_x_to_clip_center = self.x - data_center[0]
+        self._roi_y_to_clip_center = self.y - data_center[1]
 
         if affine:
+            self.affine = affine
             # The cval is being set to the mean of the array,
-            pixel_locked = tf.warp(pixel_locked, 
-                         affine, #.inverse, 
+            warped_data = tf.warp(data, 
+                         self.affine, #.inverse, 
                          order=3, 
                          mode='reflect')
 
-            self.original_array_center =  (np.array(pixel_locked.shape)[::-1] - 1) / 2.0
-            # Return order is x,y
-            self.clip_center = affine.inverse(self.original_array_center)[0]
+            # Confirm inverse! 
+            self.warped_array_center = self.affine.inverse(data_center)[0]
             
-            # +1 handles non-inclusive end indexing on the nd-array; indexing order is y, x
-            pixel_locked = pixel_locked[floor(self.clip_center[1])-self.size_y:ceil(self.clip_center[1])+self.size_y,
-                                        floor(self.clip_center[0])-self.size_x:ceil(self.clip_center[0])+self.size_x]
+            # Warped center coordinate - offset from pixel center to pixel edge - desired size
+            self._clip_start_x = self.warped_array_center[0] - 0.5 - self.size_x
+            self._clip_start_y = self.warped_array_center[1] - 0.5 - self.size_y
+
+            # Now that the whole pixel array has been warped, interpolate the array to align pixel edges
+            xi = np.linspace(self._clip_start_x, 
+                             self._clip_start_x + (self.size_x * 2) + 1, 
+                             (self.size_x * 2) + 1) 
+            yi = np.linspace(self._clip_start_y, 
+                             self._clip_start_y + (self.size_y * 2) + 1, 
+                             (self.size_y * 2) + 1) 
             
+            # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
+            pixel_locked = ndimage.map_coordinates(warped_data, 
+                                        np.meshgrid(yi, xi, indexing='ij'),
+                                        mode=mode,
+                                        order=3)
+
+            self.clip_center = (np.array(pixel_locked.shape)[::-1]) / 2.0
+
             self.clipped_array = img_as_float32(pixel_locked)
-            return
         else:
+
+            # Now that the whole pixel array has been read, interpolate the array to align pixel edges
+            xi = np.linspace(self._remainder_x, 
+                            ((self.buffer*2) + self._remainder_x + (self.size_x*2)), 
+                            (self.size_x*2+1)+(self.buffer*2)) 
+            yi = np.linspace(self._remainder_y, 
+                            ((self.buffer*2) + self._remainder_y + (self.size_y*2)), 
+                            (self.size_y*2+1)+(self.buffer*2))
+            
+            # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
+            pixel_locked = ndimage.map_coordinates(data, 
+                                        np.meshgrid(yi, xi, indexing='ij'),
+                                        mode=mode,
+                                        order=3)
+
             if self.buffer != 0:
                 pixel_locked = pixel_locked[self.buffer:-self.buffer, 
                                             self.buffer:-self.buffer]
             self.clip_center = tuple(np.array(pixel_locked.shape)[::-1] / 2.)
-            self.original_array_center = self.clip_center
+            self.warped_array_center = self.clip_center
             self.clipped_array = img_as_float32(pixel_locked)
+

@@ -78,16 +78,13 @@ def estimate_affine_from_sensors(reference_image,
         if xs[i] is not None and ys[i] is not None:
             dst_gcps.append((xs[i], ys[i]))
             base_gcps.append((base_x, base_y))
-
-    log.debug(f'base_gcps: {base_gcps}')
-    log.debug(f'dst_gcps: {dst_gcps}')
-
+            
     if len(dst_gcps) < 3:
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_corners)} points, but need at least 3.')
 
     affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
     t2 = time.time()
-    log.debug(f'Estimation of the transformation took {t2-t1} seconds.')
+    log.debug(f'Estimation of local affine took {t2-t1} seconds.')
     return affine
 
 
@@ -112,27 +109,22 @@ def estimate_local_affine(reference_roi, moving_roi):
     """
     # get initial affine
     roi_buffer = reference_roi.buffer
-    size_x = reference_roi.clip_center + roi_buffer
-    size_y = reference_roi.clip_center + roi_buffer
+    size_x = 60# reference_roi.size_x + roi_buffer
+    size_y = 60# reference_roi.size_y + roi_buffer
     
     affine_transform = estimate_affine_from_sensors(reference_roi.data, moving_roi.data, reference_roi.x, reference_roi.y, size_x=size_x, size_y=size_y)
-    ref_center = (reference_roi.x, reference_roi.y)
 
-    # MOVING NO AFFINE; Get the full moving image area so that an applied affine transformation that 
-    # adds no data around 1+ edge does not fool the to be applied matcher.
-    # The affine transformed center is a better match than the a priori sensor coords at this point.
-    affine_center = affine_transform(ref_center)[0]
 
     # The above coordinate transformation to get the center of the ROI handles translation. 
     # So, we only need to rotate/shear/scale the ROI. Omitting scale, which should be 1 (?) results
     # in an affine transoformation that does not match the full image affine
     tf_rotate = tf.AffineTransform(rotation=affine_transform.rotation, 
-                                          shear=affine_transform.shear,
-                                          scale=affine_transform.scale)
+                                   shear=affine_transform.shear,
+                                   scale=affine_transform.scale)
 
     # This rotates about the center of the image
-    shift_x = moving_roi.clip_center
-    shift_y = moving_roi.clip_center
+    shift_x, shift_y = (30.5, 30.5) #moving_roi.center
+        
     tf_shift = tf.SimilarityTransform(translation=[shift_x, shift_y])
     tf_shift_inv = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
     
@@ -140,5 +132,4 @@ def estimate_local_affine(reference_roi, moving_roi):
     # this is 'shift to the center', apply the rotation, shift back
     # to the origin.
     trans = tf_shift_inv + tf_rotate + tf_shift
-
     return trans

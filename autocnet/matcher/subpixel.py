@@ -18,7 +18,6 @@ import cv2
 from skimage import transform as tf
 from skimage import registration
 from skimage import filters
-from skimage.util import img_as_float32
 from scipy import fftpack
 from sqlalchemy.sql.expression import bindparam
 
@@ -31,10 +30,9 @@ import pvl
 import PIL
 from PIL import Image
 
-from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg
+from autocnet.matcher.naive_template import pattern_match
 from autocnet.matcher.mutual_information import mutual_information_match
 from autocnet.matcher import ciratefi
-from autocnet.matcher.mutual_information import mutual_information
 from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
@@ -42,6 +40,7 @@ from autocnet.transformation import roi
 from autocnet.transformation.affine import estimate_local_affine
 from autocnet import spatial
 from autocnet.utils.utils import bytescale
+from autocnet.utils.serializers import JsonEncoder
 
 from sqlalchemy import inspect
 
@@ -263,10 +262,23 @@ def subpixel_template(reference_roi,
     autocnet.matcher.naive_template.pattern_match_autoreg : for the jwargs that can be passed to the autoreg style matcher
     """
 
-    # In ISIS, the reference image is the search and moving image is the pattern.
-    ref_clip = reference_roi.clip()
-    moving_clip = moving_roi.clip(affine)
+    try:
+        s_image_dtype = isis.isis2np_types[pvl.load(reference_roi.data.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    except:
+        s_image_dtype = None
 
+    try:
+        d_template_dtype = isis.isis2np_types[pvl.load(moving_roi.data.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    except:
+        d_template_dtype = None
+    
+    
+    # In ISIS, the reference image is the search and moving image is the pattern.
+    reference_roi.clip(dtype = s_image_dtype)
+    ref_clip = reference_roi.clipped_array
+    moving_roi.clip(affine=affine, dtype=d_template_dtype)
+    moving_clip = moving_roi.clipped_array
+    
     if moving_clip.var() == 0:
         warnings.warn('Input ROI has no variance.')
         return [None] * 3
@@ -274,26 +286,20 @@ def subpixel_template(reference_roi,
     if (ref_clip is None) or (moving_clip is None):
         return None, None, None
 
-    # Just takes 2d arrays, no idea about affines
-    matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
+    matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, upsampling=16, **kwargs)
     if matcher_shift_x is None:
         return None, None, None
 
-    # Apply the shift to the center of the moving roi to the center of the reference ROI in index space. One pixel == one index (unitless).
-    # All this does is adjust from the upper left of the maximum correlation to the origin of the 2d array.
-    new_affine_transformed_center_x = moving_roi.clip_center - matcher_shift_x  #Center is indices.
-    new_affine_transformed_center_y = moving_roi.clip_center- matcher_shift_y
-
-    # Invert the affine transformation of the new center. This result is plotted in the second figure as a red dot.
-    inverse_transformed_affine_center_x, inverse_transformed_affine_center_y = affine.inverse((new_affine_transformed_center_x, new_affine_transformed_center_y))[0]
-
-    # Take the original x,y (moving_roi.x, moving_roi.y) and subtract the delta between the original ROI center and the newly computed center.
-    translation_x = - (moving_roi.clip_center - inverse_transformed_affine_center_x) 
-    translation_y = - (moving_roi.clip_center - inverse_transformed_affine_center_y)
-
-    new_affine = tf.AffineTransform(translation=(translation_x,
-                                                 translation_y))
-
+    # shift_x, shift_y are in the affine transformed space. They are relative to center of the affine transformed ROI.
+    # Apply the shift to the center of the moving roi to the center of the reference ROI in index space.
+    new_center_x = moving_roi.clip_center[0] + matcher_shift_x
+    new_center_y = moving_roi.clip_center[1] + matcher_shift_y
+    
+    new_x, new_y = moving_roi.clip_coordinate_to_image_coordinate(new_center_x, new_center_y)
+    
+    new_affine = tf.AffineTransform(translation=(-(moving_roi.x - new_x),
+                                                 -(moving_roi.y - new_y)))
+    
     return new_affine, metrics, corrmap
     
 
@@ -1078,13 +1084,11 @@ def subpixel_register_point(pointid,
     if isinstance(pointid, Points):
         pointid = pointid.id
 
-    t1 = time.time()
     with ncg.session_scope() as session:
         measures = session.query(Measures).filter(Measures.pointid == pointid).order_by(Measures.id).all()
         point = session.query(Points).filter(Points.id == pointid).one()
         reference_index = point.reference_index
-        t2 = time.time()
-        print(f'Query took {t2-t1} seconds to find the measures and reference measure.')
+
         # Get the reference measure. Previously this was index 0, but now it is a database tracked attribute
         source = measures[reference_index]
 
@@ -1100,8 +1104,7 @@ def subpixel_register_point(pointid,
         sourceres = session.query(Images).filter(Images.id == sourceid).one()
         source_node = NetworkNode(node_id=sourceid, image_path=sourceres.path)
         source_node.parent = ncg
-        t3 = time.time()
-        print(f'Query for the image to use as source took {t3-t2} seconds.')
+
         print(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
         nodes = {}
         for measure in measures:
@@ -1195,21 +1198,15 @@ def subpixel_register_point(pointid,
     updated_measures.append(source)
 
     if use_cache:
-        t4 = time.time()
         ncg.redis_queue.rpush(ncg.measure_update_queue,
                               *[json.dumps(measure.to_dict(_hide=[]), cls=JsonEncoder) for measure in updated_measures])
         ncg.redis_queue.incr(ncg.measure_update_counter, amount=len(updated_measures))
-        t5 = time.time()
-        print(f'Cache load took {t5-t4} seconds')
     else:
-        t4 = time.time()
         # Commit the updates back into the DB
         with ncg.session_scope() as session:
             for m in updated_measures:
                 ins = inspect(m)
                 session.add(m)
-        t5 = time.time()
-        print(f'Database update took {t5-t4} seconds.')
     return resultlog
 
 def subpixel_register_points(subpixel_template_kwargs={'image_size':(251,251)},
@@ -1628,6 +1625,7 @@ def subpixel_register_point_smart(pointid,
 
     Parameters
     ----------
+    
     pointid : int or obj
               The identifier of the point in the DB or a Points object
 
@@ -1722,13 +1720,13 @@ def subpixel_register_point_smart(pointid,
                                 source.aprioriline, 
                                 size_x=size_x, 
                                 size_y=size_y, 
-                                buffer=10)
+                                buffer=0)
         moving_roi = roi.Roi(destination_node.geodata, 
                              measure.apriorisample, 
                              measure.aprioriline, 
                              size_x=size_x, 
                              size_y=size_y, 
-                             buffer=10)
+                             buffer=20)
 
         try:
             baseline_affine = estimate_local_affine(reference_roi,
@@ -1743,8 +1741,12 @@ def subpixel_register_point_smart(pointid,
             updated_measures.append([None, None, m])
             continue
 
-        reference_clip = reference_roi.clip()
-        moving_clip = moving_roi.clip(baseline_affine)
+        reference_roi.clip()
+        reference_clip = reference_roi.clipped_array
+
+        moving_roi.clip(affine=baseline_affine)
+        moving_clip = moving_roi.clipped_array
+
         if np.isnan(reference_clip).any() or np.isnan(moving_clip).any():
             print('Unable to process due to NaN values in the input data.')
             m = {'id': measure.id,
@@ -1761,11 +1763,14 @@ def subpixel_register_point_smart(pointid,
             updated_measures.append([None, None, m])
             continue
 
+        # Compute the a priori template and MI correlations with no shifts allowed. 
         _, baseline_corr, _ = subpixel_template(reference_roi, 
                                                 moving_roi,
                                                 affine=baseline_affine)
         
-        baseline_mi = 0 #mutual_information_match(reference_roi, moving_roi, affine=affine)
+        baseline_mi = 0 #mutual_information_match(reference_roi, 
+                        #                         moving_roi, 
+                        #                         affine=baseline_affine)
         
         print(f'Baseline MI: {baseline_mi} | Baseline Corr: {baseline_corr}')
         
@@ -1777,15 +1782,15 @@ def subpixel_register_point_smart(pointid,
                                     source.aprioriline,
                                     size_x=match_kwargs['image_size'][0],
                                     size_y=match_kwargs['image_size'][1], 
-                                    buffer=10)
+                                    buffer=0)
             moving_roi = roi.Roi(destination_node.geodata,
                                  measure.apriorisample,
                                  measure.aprioriline,
                                  size_x=match_kwargs['template_size'][0],
                                  size_y=match_kwargs['template_size'][1], 
-                                 buffer=10)
+                                 buffer=20)
             
-            try:
+            """try:
                affine = estimate_local_affine(reference_roi, moving_roi)
             except Exception as e:
                 print(e)
@@ -1795,12 +1800,13 @@ def subpixel_register_point_smart(pointid,
                      'status':False,
                      'choosername':chooser}
                 updated_measures.append([None, None, m])
-                continue
+                continue"""
             
             # Updated so that the affine used is computed a single time.
-            updated_affine, maxcorr, temp_corrmap = subpixel_template(reference_roi,
-                                                                      moving_roi,
-                                                                      affine=baseline_affine)
+            # Has not scale or shear or rotation.
+            updated_affine, maxcorr, _ = subpixel_template(reference_roi,
+                                                           moving_roi,
+                                                           affine=baseline_affine)
             
             if updated_affine is None:
                 print('Unable to match with this parameter set.')
@@ -2025,7 +2031,7 @@ def validate_candidate_measure(measure_to_register,
         sample = measure_to_register['sample']
         line = measure_to_register['line']
 
-        print(f'Validating measure: {measure_to_register_id} on image: {source_image.name}')
+        print(f'Validating measure: {measure_to_register_id} on image: {source_imageid}')
 
         dists = []
         for parameter in parameters:
@@ -2050,9 +2056,9 @@ def validate_candidate_measure(measure_to_register,
                 print('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
                 return [np.inf] * len(parameters)
 
-            updated_affine, maxcorr, temp_corrmap = subpixel_template(reference_roi,
-                                                                      moving_roi,
-                                                                      affine=affine)
+            updated_affine, maxcorr, _ = subpixel_template(reference_roi,
+                                                           moving_roi,
+                                                           affine=affine)
             if updated_affine is None:
                 continue
             
@@ -2100,8 +2106,9 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Ses
 
     Parameters
     ----------
-    pointid : int
-              The id of the point to register
+    pointid : int or object
+              The id of the point to register or a point object from which the
+              id is accessed.
 
     parameters : list
                  A list of dict subpixel registration kwargs, {template_size: (x,x), image_size: (y,y)}
@@ -2125,17 +2132,18 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Ses
                             building approach
 
     """
+    if isinstance(pointid, Points):
+        pointid = pointid.id
     measure_results = subpixel_register_point_smart(pointid, ncg=ncg, parameters=parameters, **shared_kwargs)
     measures_to_update, measures_to_set_false = decider(measure_results)
 
     #print()
-    #print(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
+    print(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
     # Validate that the new position has consensus
     for measure in measures_to_update:
         #print()
         reprojection_distances = validate_candidate_measure(measure, parameters=parameters, ncg=ncg, **shared_kwargs)
         if np.sum(np.array(reprojection_distances) < 1) < 2:
-        #if reprojection_distance > 1:
             print(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")
             measures_to_set_false.append(measure['id'])
 
@@ -2167,4 +2175,7 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, ncg=None, Ses
             resp = conn.execute(
                 stmt, measures_to_set_false
             )
+    print(f'Updated measures: {json.dumps(measures_to_update, indent=2, cls=JsonEncoder)}')
+    print(f'Ignoring measures: {measures_to_set_false}')
+
     return measures_to_update, measures_to_set_false
