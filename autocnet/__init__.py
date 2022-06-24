@@ -34,11 +34,6 @@ import autocnet.transformation
 import autocnet.utils
 import autocnet.spatial
 
-def get_data(filename):
-    packagdir = autocnet.__path__[0]
-    dirname = os.path.join(os.path.dirname(packagdir), 'data')
-    fullname = os.path.join(dirname, filename)
-    return fullname
 
 def cuda(enable=False, gpu=0):
     # Classes/Methods that can vary if GPU is available

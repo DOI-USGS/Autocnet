@@ -693,61 +693,6 @@ def compute_depression(input_dem, scale_factor=1, curvature_percentile=75):
     return dem, dmask
 
 
-def rasterize_polygon(shape, vertices, dtype=bool):
-    """
-    Simple tool to convert poly into a boolean numpy array.
-    
-    source: https://stackoverflow.com/questions/37117878/generating-a-filled-polygon-inside-a-numpy-array
-    
-    Parameters
-    ----------
-    
-    shape : tuple 
-            size of the array in (y,x) format
-    
-    vertices : np.array, list
-               array of vertices in [[x0, y0], [x1, y1]...] format
-    
-    dtype : type
-            datatype of output mask
-    
-    Returns
-    -------
-    
-    mask : np.array
-           mask with filled polygon set to true
-    
-    """
-    def check(p1, p2, base_array):
-        idxs = np.indices(base_array.shape) # Create 3D array of indices
-
-        p1 = p1.astype(float)
-        p2 = p2.astype(float)
-
-        # Calculate max column idx for each row idx based on interpolated line between two points
-        if p1[0] == p2[0]:
-            max_col_idx = (idxs[0] - p1[0]) * idxs.shape[1]
-            sign = np.sign(p2[1] - p1[1])
-        else:
-            max_col_idx = (idxs[0] - p1[0]) / (p2[0] - p1[0]) * (p2[1] - p1[1]) + p1[1]
-            sign = np.sign(p2[0] - p1[0])
-            
-        return idxs[1] * sign <= max_col_idx * sign
-
-    base_array = np.zeros(shape, dtype=dtype)  # Initialize your array of zeros
-
-    fill = np.ones(base_array.shape) * True  # Initialize boolean array defining shape fill
-
-    # Create check array for each edge segment, combine into fill array
-    for k in range(vertices.shape[0]):
-        fill = np.all([fill, check(vertices[k-1], vertices[k], base_array)], axis=0)
-    
-    print(fill.any())
-    # Set all values inside polygon to one
-    base_array[fill] = 1
-    return base_array
-
-
 def generate_dem(alpha=1.0, size=800, scales=[160,80,32,16,8,4,2,1], scale_factor=5):
     """
     Produces a random DEM

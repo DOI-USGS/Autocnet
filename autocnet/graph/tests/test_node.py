@@ -1,16 +1,11 @@
 import os
 import sys
 
-import unittest
 from unittest.mock import Mock, MagicMock, patch, PropertyMock
-import warnings
-
 
 import numpy as np
 import pandas as pd
 import pytest
-from shapely.geometry import LinearRing
-
 
 from autocnet.examples import get_path
 from plio.io.io_gdal import GeoDataset

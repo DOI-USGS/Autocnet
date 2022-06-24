@@ -314,6 +314,7 @@ def xy_in_polygon(x,y, geom):
     """
     return geom.contains(Point(x, y))
 
+
 def generate_random(number, polygon):
     points = []
     minx, miny, maxx, maxy = polygon.bounds
@@ -325,6 +326,7 @@ def generate_random(number, polygon):
             points.append([pnt.x, pnt.y])
         i += 1
     return np.asarray(points)
+
 
 def distribute_points_classic(geom, nspts, ewpts, use_mrr=True, **kwargs):
     """
@@ -395,6 +397,7 @@ def distribute_points_classic(geom, nspts, ewpts, use_mrr=True, **kwargs):
     if not valid:
         valid = generate_random(ewpts * nspts, original_geom)
     return valid
+
 
 def distribute_points_new(geom, nspts, ewpts, Session):
     """
@@ -471,7 +474,7 @@ def distribute_points_in_geom(geom, method="classic",
     sides of the geometry.
 
     This algorithm does not know anything about the units being used
-    so the caller is responsible for acocunting for units (if appropriate)
+    so the caller is responsible for accounting for units (if appropriate)
     in the passed funcs.
 
     Parameters

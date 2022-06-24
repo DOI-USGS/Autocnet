@@ -4,7 +4,7 @@ import pandas as pd
 from scipy import optimize
 from autocnet.camera import camera
 from autocnet.camera import utils as camera_utils
-from autocnet.utils.utils import make_homogeneous, normalize_vector
+from autocnet.utils.utils import make_homogeneous
 
 # set up the logger file
 log = logging.getLogger(__name__)

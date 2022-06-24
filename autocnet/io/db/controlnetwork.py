@@ -97,7 +97,7 @@ ORDER BY measures."pointid", measures."id";
 
         return df
 
-def copy_from_method(table, conn, keys, data_iter, pre_truncate=False, fatal_failure=False):
+def copy_from_method(table, conn, keys, data_iter):
     """
     Custom method for pandas.DataFrame.to_sql that will use COPY FROM
     From: https://stackoverflow.com/questions/24084710/to-sql-sqlalchemy-copy-from-postgresql-engine

@@ -366,7 +366,7 @@ def place_points_in_image(image,
                           **kwargs):
     """
     Place points into an image and then attempt to place measures
-    into all overlapping images. This function is funcitonally identical
+    into all overlapping images. This function is functionally identical
     to place_point_in_overlap except it works on individual images.
 
     Parameters
