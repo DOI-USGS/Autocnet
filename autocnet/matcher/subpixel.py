@@ -456,6 +456,7 @@ def subpixel_template_classic(sx, sy, dx, dy,
     """
     Uses a pattern-matcher on subsets of two images determined from the passed-in keypoints and optional sizes to
     compute an x and y offset from the search keypoint to the template keypoint and an associated strength.
+
     Parameters
     ----------
     sx : Numeric
@@ -485,6 +486,7 @@ def subpixel_template_classic(sx, sy, dx, dy,
               Shift in the y-dimension
     strength : float
                Strength of the correspondence in the range [-1, 1]
+
     See Also
     --------
     autocnet.matcher.naive_template.pattern_match : for the kwargs that can be passed to the matcher
@@ -816,43 +818,45 @@ def geom_match_simple(base_cube,
 
     Parameters
     ----------
-    base_cube:  plio.io.io_gdal.GeoDataset
+    base_cube : plio.io.io_gdal.GeoDataset
                 source image
-    input_cube: plio.io.io_gdal.GeoDataset
-                destination image; gets matched to the source image
-    bcenter_x:  int
+    input_cube : plio.io.io_gdal.GeoDataset
+                 destination image; gets matched to the source image
+    bcenter_x : int
                 sample location of source measure in base_cube
-    bcenter_y:  int
+    bcenter_y : int
                 line location of source measure in base_cube
-    size_x:     int
-                half-height of the subimage used in the affine transformation
-    size_y:     int
-                half-width of the subimage used in affine transformation
-    template_kwargs: dict
-                     contains keywords necessary for autocnet.matcher.subpixel.subpixel_template
-    phase_kwargs:    dict
-                     contains kwargs for autocnet.matcher.subpixel.subpixel_phase
-    verbose:    boolean
-                indicates level of print out desired. If True, two subplots are output; the first subplot contains
-                the source subimage and projected destination subimage, the second subplot contains the registered
-                measure's location in the base subimage and the unprojected destination subimage with the corresponding
-                template metric correlation map.
+    size_x : int
+             half-height of the subimage used in the affine transformation
+    size_y : int
+             half-width of the subimage used in affine transformation
+    template_kwargs : dict
+                      contains keywords necessary for autocnet.matcher.subpixel.subpixel_template
+    phase_kwargs : dict
+                   contains kwargs for autocnet.matcher.subpixel.subpixel_phase
+    verbose : boolean
+              indicates level of print out desired. If True, two subplots are output; the first subplot contains
+              the source subimage and projected destination subimage, the second subplot contains the registered
+              measure's location in the base subimage and the unprojected destination subimage with the corresponding
+              template metric correlation map.
+
     Returns
     -------
-    sample: int
-            sample of new measure in destination image space
-    line:   int
-            line of new measures in destination image space
-    dist:   np.float or tuple of np.float
-            distance matching algorithm moved measure
-            if template matcher only (default): returns dist_template
-            if template and phase matcher:      returns (dist_template, dist_phase)
-    metric: np.float or tuple of np.float
-            matching metric output by the matcher
-            if template matcher only (default): returns maxcorr
-            if template and phase matcher:      returns (maxcorr, perror, pdiff)
-    temp_corrmap: np.ndarray
-            correlation map of the naive template matcher
+    sample : int
+             sample of new measure in destination image space
+    line : int
+           line of new measures in destination image space
+    dist : np.float or tuple of np.float
+           distance matching algorithm moved measure
+           if template matcher only (default): returns dist_template
+           if template and phase matcher:      returns (dist_template, dist_phase)
+    metric : np.float or tuple of np.float
+             matching metric output by the matcher
+             if template matcher only (default): returns maxcorr
+             if template and phase matcher:      returns (maxcorr, perror, pdiff)
+    temp_corrmap : np.ndarray
+                   correlation map of the naive template matcher
+
     See Also
     --------
     autocnet.matcher.subpixel.subpixel_template: for list of kwargs that can be passed to the matcher
@@ -1011,6 +1015,7 @@ def geom_match_classic(base_cube,
     destination image. The created measure is then matched to the source measure using a quick projection
     of the destination image into source image space (using an affine transformation) and a naive
     template match with optional phase template match.
+
     Parameters
     ----------
     base_cube:  plio.io.io_gdal.GeoDataset
@@ -1027,13 +1032,14 @@ def geom_match_classic(base_cube,
                 half-width of the subimage used in affine transformation
     template_kwargs: dict
                      contains keywords necessary for autocnet.matcher.subpixel.subpixel_template
-    phase_kwargs:    dict
-                     contains kwargs for autocnet.matcher.subpixel.subpixel_phase
-    verbose:    boolean
-                indicates level of print out desired. If True, two subplots are output; the first subplot contains
-                the source subimage and projected destination subimage, the second subplot contains the registered
-                measure's location in the base subimage and the unprojected destination subimage with the corresponding
-                template metric correlation map.
+    phase_kwargs: dict
+                  contains kwargs for autocnet.matcher.subpixel.subpixel_phase
+    verbose: boolean
+             indicates level of print out desired. If True, two subplots are output; the first subplot contains
+             the source subimage and projected destination subimage, the second subplot contains the registered
+             measure's location in the base subimage and the unprojected destination subimage with the corresponding
+             template metric correlation map.
+
     Returns
     -------
     sample: int
@@ -1050,6 +1056,7 @@ def geom_match_classic(base_cube,
             if template and phase matcher:      returns (maxcorr, perror, pdiff)
     temp_corrmap: np.ndarray
             correlation map of the naive template matcher
+
     See Also
     --------
     autocnet.matcher.subpixel.subpixel_template: for list of kwargs that can be passed to the matcher
@@ -2368,6 +2375,7 @@ def check_for_shift_consensus(shifts, tol=0.1):
           points less than or equal to the tolerance are inliers. In pixel space.
 
     Returns
+    -------
      : ndarray
        (n,1) boolean array where the nth element corresponds to the nth measure
        in the shifts input array. True values indicate that the measure has shift

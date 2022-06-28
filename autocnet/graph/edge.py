@@ -275,7 +275,9 @@ class Edge(dict, MutableMapping):
         pass
 
     def overlap_check(self):
-        """Creates a mask for matches on the overlap"""
+        """
+        Creates a mask for matches on the overlap
+        """
         if not (self["source_mbr"] and self["destin_mbr"]):
             log.warning(
                 "Cannot use overlap constraint, minimum bounding rectangles"

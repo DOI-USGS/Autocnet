@@ -57,7 +57,7 @@ def identify_potential_overlaps(cg, cn, overlap=True):
     Parameters
     ----------
     overlap : boolean
-              If True, apply aprint(g)n additional point in polygon check, where
+              If True, apply an additional point in polygon check, where
               the polygon is the footprint intersection between images and
               the point is a keypoint projected into lat/lon space.  Note
               that the projection can be inaccurate if the method used

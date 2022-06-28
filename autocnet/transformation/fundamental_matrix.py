@@ -80,9 +80,6 @@ def compute_reprojection_error(F, x, x1, index=None):
     compute distance between match points and the associated
     epipolar lines.
 
-    The distance between a point and the associated epipolar
-    line is computed as: $d = \frac{\lvert ax_{0} + by_{0} + c \rvert}{\sqrt{a^{2} + b^{2}}}$.
-
     Parameters
     ----------
     F : ndarray
@@ -99,6 +96,15 @@ def compute_reprojection_error(F, x, x1, index=None):
     -------
     F_error : ndarray
               n,1 vector of reprojection errors
+
+    Notes
+    -----
+
+    The distance between a point and the associated epipolar
+    line is computed as:
+
+    .. math:: d=\\frac{\\lvert ax_{0} + by_{0} + c \\rvert}{\\sqrt{a^{2} + b^{2}}}
+
     """
 
     if isinstance(x, (pd.Series, pd.DataFrame)):
@@ -131,9 +137,9 @@ def compute_fundamental_error(F, x, x1):
     """
     Compute the fundamental error using the idealized error metric.
 
-    Ideal error is defined by $x^{\intercal}Fx = 0$,
-    where $x$ are all matchpoints in a given image and
-    $x^{\intercal}F$ defines the standard form of the
+    Ideal error is defined by :math:`x^{\\intercal}Fx = 0`,
+    where :math:`x` are all matchpoints in a given image and
+    :math:`x^{\intercal}F` defines the standard form of the
     epipolar line in the second image.
 
     This method assumes that x and x1 are ordered such that x[0]

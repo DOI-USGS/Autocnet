@@ -118,7 +118,7 @@ source_db_config = {'username':'jay',
 
 # Subset the data store using a spatial query.
 geom = 'LINESTRING(145 10, 145 10.25, 145.25 10.25, 145.25 10, 145 10)'
-srid = 949900
+srid = 104971
 outpath = '/scratch/some/path/for/data'
 query = f"SELECT * FROM ctx WHERE ST_INTERSECTS(geom, ST_Polygon(ST_GeomFromText('{geom}'), {srid})) = TRUE"
 ncg.add_from_remote_database(source_db_config, outpath, query_string=query)
@@ -136,7 +136,7 @@ the quert string be valid SQL. `geom = 'LINESTRING(145 10, 145 10.25, 145.25
 
 The PostGIS query requires a valid SRID for the input geometry, so we
 explicitly define that here. This is the SRID that the footprints are being
-stored in inside of the data store. `srid = 949900` The srid here is a custom
+stored in inside of the data store. `srid = 104971` The srid here is a custom
 srid that has been added to the data store spatial reference table; the id can
 be any arbitrary number as long as it exists in the spatial reference table.
 

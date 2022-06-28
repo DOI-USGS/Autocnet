@@ -2,11 +2,9 @@ import numpy as np
 
 def check_pidx_duplicates(pidx):
     """
-    Given a ring match generted set of indices, 
-    apply outlier detection to ensure no duplicates
-    exist in either the reference column or the
-    source column. If duplicates do exist, remove the 
-    rows; the solution is ambiguous.
+    Given a ring match generted set of indices, apply outlier detection to
+    ensure no duplicates exist in either the reference column or the source
+    column. If duplicates do exist, remove all rows because the solution is ambiguous.
     """
     # Check for duplicates
     l = pidx[:,1].tolist()
@@ -326,6 +324,7 @@ def dynamically_grow_array(array, m, dtype=None):
             A numpy data type that is used for the new entries. A 
             dynamically grown array will upcast to the most complex
             data type.
+
     Returns
     -------
     array : ndarray
@@ -562,6 +561,10 @@ def add_correspondences(in_feats, ref_feats, tar_feats, ref_desc, tar_desc,  xex
 
     target_points : int
                     The desired number of points to identify a correspondence
+
+    See Also
+    --------
+    autocnet.matcher.cpu_ring_matcher: for options associated with kwargs parameter
     """
     x_edges = np.linspace(xextent[0], xextent[1], n_x_cells)
     y_edges = np.linspace(yextent[0], yextent[1], n_y_cells)

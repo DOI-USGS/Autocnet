@@ -491,7 +491,7 @@ class Node(dict, MutableMapping):
                       (n, 2) array of latlon coordinates
 
         Returns
-        ----------
+        -------
         : object
           A shapely polygon object made using the reprojected coordinates
         """

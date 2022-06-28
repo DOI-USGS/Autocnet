@@ -15,7 +15,7 @@ def normalize(a):
     """
     Normalize a set of coordinates such that the origin is
     translated to the center and then scaled isotropically such
-    that the average distance from the origin is $\sqrt{2}$.
+    that the average distance from the origin is :math:`\\sqrt{2}`.
 
     Parameters
     ----------

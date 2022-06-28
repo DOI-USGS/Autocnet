@@ -200,8 +200,7 @@ def okubogar_detector(image1, image2, nbins=50, extractor_method="orb", image_fu
 
      See Also
      --------
-
-     feature extractor: autocnet.matcher.cpu_extractor.extract_features
+     autocnet.matcher.cpu_extractor.extract_features : for description of information associated with the feature extractor
 
      """
      if isinstance(image1, GeoDataset):

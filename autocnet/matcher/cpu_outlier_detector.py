@@ -15,6 +15,12 @@ def distance_ratio(edge, matches, ratio=0.8, single=False):
 
     Parameters
     ----------
+    matches : dataframe
+              the matches dataframe stored along the edge of the graph
+              containing matched points with columns containing:
+              matched image name, query index, train index, and
+              descriptor distance
+
     ratio : float
             the ratio between the first and second-best match distances
             for each keypoint to use as a bound for marking the first keypoint
@@ -184,6 +190,7 @@ def self_neighbors(matches):
               containing matched points with columns containing:
               matched image name, query index, train index, and
               descriptor distance
+
     Returns
     -------
     : dataseries
