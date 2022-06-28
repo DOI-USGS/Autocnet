@@ -17,10 +17,6 @@ def from_hdf(in_path, index=None, keypoints=True, descriptors=True):
     in_path : str
               handle to the file
 
-    key : str
-          An optional path into the HDF5.  For example key='image_name', will
-          search /image_name/descriptors for the descriptors.
-
     index : iterable
             an h5py accepted indexer to pull only a subset of the keypoints
             off disk. Default is None to pull all keypoints.
@@ -94,14 +90,14 @@ def to_hdf(out_path, keypoints=None, descriptors=None, key=None):
 
     Parameters
     ----------
+    out_path : str
+               to the HDF5 file
+
     keypoints : DataFrame
                 Pandas dataframe of keypoints
 
     descriptors : ndarray
                   of feature descriptors
-
-    out_path : str
-               to the HDF5 file
 
     key : str
           path within the HDF5 file.  If given, the keypoints and descriptors

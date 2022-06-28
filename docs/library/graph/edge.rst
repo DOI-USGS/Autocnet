@@ -1,5 +1,5 @@
-:mod:`graph.edge` --- Network Edge
-==================================
+:mod:`graph.edge` --- Edge and Network Edge Objects
+===================================================
 
 The :mod:`graph.edge` module contains the Edge class that extends NetworkX edges.
 

@@ -1,3 +1,6 @@
+Community Page
+--------------
+
 .. toctree::
    :maxdepth: 1
 

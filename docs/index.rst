@@ -15,12 +15,12 @@ AutoCNet supports the following:
 - Support for images of arbitrary size using downsampling or tiling for feature extraction
 - A reference implementation (the CandidateGraph) to demonstrate use of the API
 
-Tutorials
----------
+Getting Started
+---------------
 An example is worth 1000 pages of documentation.  Checkout our tutorials (jupyter notebooks).
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    users/index
 

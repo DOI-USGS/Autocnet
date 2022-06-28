@@ -159,11 +159,8 @@ def propagate_point(Session,
 
     config : dict
              configuration file associated with database you want to propagate to
-             In the form: {'username':'somename',
-                           'password':'somepassword',
-                           'host':'somehost',
-                           'pgbouncer_port':6543,
-                           'name':'somename'}
+             In the form: {'username':'somename', 'password':'somepassword',
+             'host':'somehost', 'pgbouncer_port':6543, 'name':'somename'}
 
     dem : surface
           surface model of target body
@@ -344,11 +341,8 @@ def propagate_control_network(Session,
 
     config : dict
              configuation file associated with database containing the images you want to propagate to
-             In the form: {'username':'somename',
-                          'password':'somepassword',
-                          'host':'somehost',
-                          'pgbouncer_port':6543,
-                          'name':'somename'}
+             In the form: {'username':'somename', 'password':'somepassword',
+             'host':'somehost', 'pgbouncer_port':6543, 'name':'somename'}
 
     dem : surface
           surface model of target body
@@ -373,9 +367,9 @@ def propagate_control_network(Session,
 
     Returns
     -------
-    ground   : pd.DataFrame
-               Dataframe containing pointid, imageid, image serial number, line, sample, and ground location (both latlon
-               and cartesian) of successfully propagated points
+    ground : pd.DataFrame
+             Dataframe containing pointid, imageid, image serial number, line, sample, and ground location (both latlon
+             and cartesian) of successfully propagated points
 
     """
     log.warning('This function is not well tested. No tests currently exist \

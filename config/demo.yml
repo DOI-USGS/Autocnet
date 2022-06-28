@@ -69,7 +69,7 @@ spatial:
     # the spatial information.
     #
     # The spatial reference identifier for latitudinal geometries in the database.
-    latitudinal_srid: 949900
+    latitudinal_srid: 104971
     # The spatial reference identifier for rectangular geometries in the database.
     rectangular_srid: 949980
     # The radii of the body. If the body is a sphere, these values should match.

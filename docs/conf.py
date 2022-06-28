@@ -41,11 +41,12 @@ nbsphinx_execute = 'never'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 
-              'sphinx.ext.viewcode', 
-              'sphinx.ext.napoleon', 
-              'nbsphinx', 
-              'sphinx.ext.mathjax', 
+extensions = ['sphinx.ext.autodoc',
+              'numpydoc',
+              'sphinx.ext.mathjax',
+              'sphinx.ext.viewcode',
+              'sphinx.ext.napoleon',
+              'nbsphinx',
               'sphinx_markdown_tables']
 
 # NumpyDoc Options
@@ -89,7 +90,7 @@ release = autocnet.__version__
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ['_build', '**/*test*']
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -144,7 +145,7 @@ html_short_title = "AutoCNet"
 
 # The name of an image file (relative to this directory) to place at the
 # top of the sidebar.
-html_logo = "favicon.png"
+html_logo = "_static/favicon.png"
 
 # The name of an image file (within the static path) to use as favicon
 # of the docs.  This file should be a Windows icon file (.ico) being

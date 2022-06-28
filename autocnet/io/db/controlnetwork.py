@@ -47,18 +47,12 @@ ORDER BY measures."pointid", measures."id";
 
         Parameters
         ----------
-        path : str
-               The full path to the output network.
+        engine : Object
+                 sqlalchemy engine object to read from
 
-        flistpath : str
-                    (Optional) the path to the output filelist. By default
-                    the outout filelist path is genrated programatically
-                    as the provided path with the extension replaced with .lis.
-                    For example, out.net would have an associated out.lis file.
         sql : str
               The sql query to execute in the database.
         """
-        
         df = pd.read_sql(sql, engine)
 
         # measures.id DB column was read in to ensure the proper ordering of DF
@@ -102,8 +96,8 @@ def copy_from_method(table, conn, keys, data_iter, pre_truncate=False, fatal_fai
     """
     Custom method for pandas.DataFrame.to_sql that will use COPY FROM
     From: https://stackoverflow.com/questions/24084710/to-sql-sqlalchemy-copy-from-postgresql-engine
-        
-    This is follows the API specified by pandas.
+
+    This follows the API specified by pandas.
     """
 
     dbapi_conn = conn.connection
@@ -132,9 +126,6 @@ def update_from_jigsaw(cnet, measures, engine, pointid_func=None):
 
     In order to be efficient, this func creates an in-memory control network
     and then writes to the database using a string buffer and a COPY FROM call.
-    
-    Note: If using this func and looking at the updates table in pgadmin, it
-    is necessary to refresh the pgadmin table of contents for the schema.
 
     Parameters
     ----------
@@ -145,7 +136,7 @@ def update_from_jigsaw(cnet, measures, engine, pointid_func=None):
                of measures from a database table. 
     
     engine : object
-                 An SQLAlchemy DB engine object
+             An SQLAlchemy DB engine object
 
     poitid_func : callable
                   A callable function that is used to split the id string in
@@ -153,6 +144,12 @@ def update_from_jigsaw(cnet, measures, engine, pointid_func=None):
                   will have a user specified identifier with the numeric pointid as 
                   the final element, e.g., autocnet_1. This func needs to get the
                   numeric ID back. This callable is used to unmunge the id.
+
+    Notes
+    -----
+
+    If using this func and looking at the updates table in pgadmin, it
+    is necessary to refresh the pgadmin table of contents for the schema.
     """
 
 
