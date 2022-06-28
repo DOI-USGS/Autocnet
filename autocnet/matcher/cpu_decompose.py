@@ -9,7 +9,7 @@ from autocnet.transformation.decompose import coupled_decomposition
 def decompose_and_match(self, k=2, maxiteration=3, size=18, buf_dist=3, **kwargs):
     """
     Similar to match, this method first decomposed the image into
-    $4^{maxiteration}$ subimages and applies matching between each sub-image.
+    :math:`4^{maxiteration}` subimages and applies matching between each sub-image.
 
     This method is potential slower than the standard match due to the
     overhead in matching, but can be significantly more accurate.  The
@@ -20,10 +20,6 @@ def decompose_and_match(self, k=2, maxiteration=3, size=18, buf_dist=3, **kwargs
     ----------
     k : int
         The number of neighbors to find
-
-    method : {'coupled', 'whole'}
-             whether to utilize coupled decomposition
-             or match the whole image
 
     maxiteration : int
                    When using coupled decomposition, the number of recursive
@@ -49,6 +45,10 @@ def decompose_and_match(self, k=2, maxiteration=3, size=18, buf_dist=3, **kwargs
                the (sub)image a point must be in order to be used as a
                partioning point.  The smaller the distance, the more likely
                percision errors can results in erroneous partitions.
+
+    See Also
+    --------
+    autocnet.transformation.decompose.coupled_decomposition
 
     """
     def func(group):

@@ -115,7 +115,7 @@ def projection_error(p1, p, pt, pt1):
     the gold standard method for fundamental matrix estimation.
 
     Parameters
-    -----------
+    ----------
     p1 : ndarray
          (3,4) camera matrix
 

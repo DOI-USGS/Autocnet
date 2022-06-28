@@ -1,5 +1,8 @@
+
+Getting Started
+===============
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    installation
    tutorials/index

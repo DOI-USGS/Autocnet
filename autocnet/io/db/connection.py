@@ -20,6 +20,12 @@ def new_connection(dbconfig):
     """
     Using the user supplied config create a NullPool database connection.
 
+    Parameters
+    ----------
+    dbconfig : dict
+               Dictionary defining necessary parameters for the database
+               connection
+
     Returns
     -------
     Session : object

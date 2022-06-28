@@ -1,5 +1,5 @@
-:mod:`graph.node` --- Network Node Object
-=========================================
+:mod:`graph.node` --- Node and Network Node Objects
+===================================================
 
 The :mod:`graph.node` module contains the Node class.  This is an extension to the NetworkX Node.
 
@@ -8,3 +8,4 @@ The :mod:`graph.node` module contains the Node class.  This is an extension to t
 .. automodule:: autocnet.graph.node
    :synopsis:
    :members:
+   :noindex:

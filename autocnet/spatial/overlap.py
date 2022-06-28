@@ -142,13 +142,11 @@ def place_points_in_overlap(overlap,
     --------
     autocnet.io.db.model.Overlay: for associated properties of the Overlay object
 
-    autocnet.cg.cg.distribute_points_in_geom: for the possible arguments to pass through using
-    disribute_points_kwargs.
+    autocnet.cg.cg.distribute_points_in_geom: for the possible arguments to pass through using disribute_points_kwargs.
 
     autocnet.model.io.db.PointType: for the point type options.
 
-    autocnet.graph.network.NetworkCandidateGraph: for associated properties and functionalities of the
-    NetworkCandidateGraph class
+    autocnet.graph.network.NetworkCandidateGraph: for associated properties and functionalities of the NetworkCandidateGraph class
     """
     t1 = time.time()
     if not ncg.Session:
@@ -395,11 +393,8 @@ def place_points_in_image(image,
 
     See Also
     --------
-    autocnet.cg.cg.distribute_points_in_geom: for the possible arguments to pass through using
-    disribute_points_kwargs.
-
-    autocnet.graph.network.NetworkCandidateGraph: for associated properties and functionalities of the
-    NetworkCandidateGraph class
+    autocnet.cg.cg.distribute_points_in_geom: for the possible arguments to pass through using disribute_points_kwargs.
+    autocnet.graph.network.NetworkCandidateGraph: for associated properties and functionalities of the NetworkCandidateGraph class
     """
     # Arg checking
     if not ncg.Session:
@@ -423,7 +418,7 @@ def place_points_in_image(image,
     for v in valid:
         lon = v[0]
         lat = v[1]
-        point_geometry = f'SRID=949900;POINT({v[0]} {v[1]})'
+        point_geometry = f'SRID=104971;POINT({v[0]} {v[1]})'
 
         # Calculate the height, the distance (in meters) above or
         # below the aeroid (meters above or below the BCBF spheroid).
@@ -605,4 +600,3 @@ def add_measures_to_point(pointid, cam_type='isis', ncg=None, Session=None):
                     i += 1
             if i >= 2:
                 point.ignore = False
-

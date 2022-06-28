@@ -18,6 +18,8 @@ def compute_error(H, x, x1):
 
     Parameters
     ----------
+    H : ndarray
+        (3,3) homography
 
     x : ndarray
         n,2 array of x,y coordinates
