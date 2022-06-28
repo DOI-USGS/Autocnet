@@ -111,6 +111,7 @@ def compare_dicts(d, o):
 def crossform(a):
     """
     Return the cross form, e.g. a in the cross product of a b.
+
     Parameters
     ----------
     a : ndarray
@@ -295,8 +296,7 @@ def find_nested_in_dict(data, key_list):
 
 def make_homogeneous(points):
     """
-    Convert a set of points (n x dim array) to
-        homogeneous coordinates.
+    Convert a set of points (n x dim array) to homogeneous coordinates.
 
     Parameters
     ----------
@@ -380,18 +380,22 @@ def cartesian(arrays, out=None):
 
     """
     Generate a cartesian product of input arrays.
+
     Parameters
     ----------
     arrays : list of array-like
         1-D arrays to form the cartesian product of.
     out : ndarray
         Array to place the cartesian product in.
+
     Returns
     -------
     out : ndarray
         2-D array of shape (M, len(arrays)) containing cartesian products
         formed of input arrays.
 
+    Notes
+    -----
     from scikit-learn
     https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/utils/extmath.py
     """
@@ -414,6 +418,7 @@ def cartesian(arrays, out=None):
 def array_to_poly(array):
     """
     Generate a geojson geom
+
     Parameters
     ----------
     array : array-like
@@ -447,9 +452,9 @@ def methodispatch(func):
         Function object to be dispatched
 
     Returns
+    -------
     wrapper : Object
         Wrapped function call chosen by the dispatcher
-    ----------
 
     """
     dispatcher = singledispatch(func)
@@ -523,6 +528,7 @@ def bytescale(data, cmin=None, cmax=None, high=255, low=0):
     the range to ``(low, high)`` (default 0-255).
     If the input image already has dtype uint8, no scaling is done.
     This function is only available if Python Imaging Library (PIL) is installed.
+
     Parameters
     ----------
     data : ndarray
@@ -535,10 +541,12 @@ def bytescale(data, cmin=None, cmax=None, high=255, low=0):
         Scale max value to `high`.  Default is 255.
     low : scalar, optional
         Scale min value to `low`.  Default is 0.
+
     Returns
     -------
     img_array : uint8 ndarray
         The byte-scaled array.
+
     Examples
     --------
     >>> from scipy.misc import bytescale
@@ -894,5 +902,3 @@ def hillshade(img, azi=255, min_slope=20, max_slope=100, min_bright=0, grayscale
     arrfotout = bytescale(arrforout)
     arrforout.shape
     return arrforout
-
-

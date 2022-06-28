@@ -89,7 +89,7 @@ class CandidateGraph(nx.Graph):
 
     cn : object
          A control network object instantiated by calling generate_cnet.
-    ----------
+
     """
 
     node_factory = Node
@@ -286,6 +286,15 @@ class CandidateGraph(nx.Graph):
 
     @classmethod
     def from_save(cls, input_file):
+        """
+        Loads a saved autocnet control network from a given input file
+
+        Parameters
+        ----------
+
+        input_file : str
+                     The saved off autocnet control network to be loaded
+        """
         return io_network.load(input_file)
 
     def _update_date(self):
@@ -319,10 +328,10 @@ class CandidateGraph(nx.Graph):
         Parameters
         ----------
         image_name : str
-                     That is matched using a simple 'in' check to 
+                     That is matched using a simple 'in' check to
                      node['image_name']
-        
-        Returns  
+
+        Returns
         -------
         i : int
             The node index
@@ -333,6 +342,26 @@ class CandidateGraph(nx.Graph):
                 return i
 
     def get_matches(self, clean_keys=[]):
+        """
+        Returns all matched features on all edges within the CandidateGraph
+
+        Parameters
+        ----------
+        clean_keys : list
+                     A list of keys which reference masks previous attached to 
+                     the edge by outlier detection methods
+
+        Returns
+        -------
+        matches : list
+                  All matches from each edge in the graph as a dictionary
+
+        See Also
+        --------
+        autocnet.spatial.fundamental_matrix.update_fundamental_mask: example of a function which returns an outlier mask
+        autocnet.spatial.fundamental_matrix.compute_fundamental_matrix: example of a function which returns an outlier mask
+        autocnet.spatial.homography.compute_homography: example of a function which returns an outlier mask
+        """
         matches = []
         for s, d, e in self.edges_iter(data=True):
             match, _ = e.clean(clean_keys=clean_keys)
@@ -461,7 +490,11 @@ class CandidateGraph(nx.Graph):
 
     def extract_features_with_tiling(self, *args, **kwargs): #pragma: no cover
         """
+        Extract interest points from a tiled array.
 
+        See Also
+        --------
+        autocnet.graph.node.Node.extract_features_with_tiling
         """
         self.apply(Node.extract_features_with_tiling, args=args, **kwargs)
 
@@ -504,7 +537,7 @@ class CandidateGraph(nx.Graph):
         For all connected edges in the graph, apply feature matching
 
         See Also
-        ----------
+        --------
         autocnet.graph.edge.Edge.match
         """
         self.apply_func_to_edges('match', *args, **kwargs)
@@ -527,9 +560,9 @@ class CandidateGraph(nx.Graph):
 
         See Also
         --------
-        autocnet.graoh.edge.Edge.compute_mbr
+        autocnet.graph.edge.Edge.compute_overlap
         """
-        self.apply_func_to_edges('estimate_mbr', *args, **kwargs)
+        self.apply_func_to_edges('compute_overlap', *args, **kwargs)
 
     def compute_clusters(self, func=markov_cluster.mcl, *args, **kwargs):
         """
@@ -553,8 +586,8 @@ class CandidateGraph(nx.Graph):
     def compute_triangular_cycles(self):
         """
         Find all cycles of length 3.  This is similar
-         to cycle_basis (networkX), but returns all cycles.
-         As opposed to all basis cycles.
+        to cycle_basis (networkX), but returns all cycles.
+        As opposed to all basis cycles.
 
         Returns
         -------
@@ -590,7 +623,7 @@ class CandidateGraph(nx.Graph):
         mst = nx.minimum_spanning_tree(self)
         return self.create_edge_subgraph(mst.edges())
 
-    def apply_func_to_edges(self, function, nodes=[], *args, **kwargs):
+    def apply_func_to_edges(self, function, *args, **kwargs):
         """
         Iterates over edges using an optional mask and and applies the given function.
         If func is not an attribute of Edge, raises AttributeError
@@ -600,8 +633,11 @@ class CandidateGraph(nx.Graph):
         function : obj
                    function to be called on every edge
 
-        graph_mask_keys : list
-                          of keys in graph_masks
+        args : iterable
+               Some iterable of positional arguments for function.
+
+        kwargs : dict
+                 keyword args to pass into function.
         """
         return_lis = []
         if callable(function):
@@ -683,32 +719,67 @@ class CandidateGraph(nx.Graph):
         '''
         Apply a ratio check to all edges in the graph
 
+        Parameters
+        ----------
+
+        args : iterable
+               Some iterable of positional arguments for the
+               ratio_check function.
+
+        kwargs : dict
+                 keyword args to pass into the ratio_check function.
+
         See Also
         --------
-        autocnet.matcher.cpu_outlier_detector.DistanceRatio.compute
+        autocnet.matcher.cpu_outlier_detector.distance_ratio
         '''
         self.apply_func_to_edges('ratio_check', *args, **kwargs)
 
     def compute_overlaps(self, *args, **kwargs):
         '''
         Computes overlap MBRs for all edges
+
+
+        Parameters
+        ----------
+
+        args : iterable
+               Some iterable of positional arguments for the
+               compute_overlap function.
+
+        kwargs : dict
+                 keyword args to pass into the compute_overlap function.
+
+        See Also
+        --------
+        autocnet.graph.edge.Edge.compute_overlap
         '''
         self.apply_func_to_edges('compute_overlap', *args, **kwargs)
 
-    def overlap_checks(self, *args, **kwargs):
+    def overlap_checks(self):
         '''
         Apply overlap check to all edges in the graph
         '''
-        self.apply_func_to_edges('overlap_check', *args, **kwargs)
+        self.apply_func_to_edges('overlap_check')
 
     def compute_homographies(self, *args, **kwargs):
         '''
         Compute homographies for all edges using identical parameters
 
+        Parameters
+        ----------
+
+        args : iterable
+               Some iterable of positional arguments for the
+               compute_homography function.
+
+        kwargs : dict
+                 keyword args to pass into the compute_homography function.
+
         See Also
         --------
         autocnet.graph.edge.Edge.compute_homography
-        autocnet.matcher.cpu_outlier_detector.compute_homography
+        autocnet.transformation.homography.compute_homography
         '''
         self.apply_func_to_edges('compute_homography', *args, **kwargs)
 
@@ -716,15 +787,36 @@ class CandidateGraph(nx.Graph):
         '''
         Compute fundmental matrices for all edges using identical parameters
 
+        Parameters
+        ----------
+
+        args : iterable
+               Some iterable of positional arguments for the
+               compute_fundamental_matrix function.
+
+        kwargs : dict
+                 keyword args to pass into the compute_fundamental_matrix function.
+
         See Also
         --------
-        autocnet.matcher.cpu_outlier_detector.compute_fundamental_matrix
+        autocnet.graph.edge.Edge.compute_fundamental_matrix
+        autocnet.transformation.fundamental_matrix.compute_fundamental_matrix
         '''
         self.apply_func_to_edges('compute_fundamental_matrix', *args, **kwargs)
 
     def subpixel_register(self, *args, **kwargs):
         '''
         Compute subpixel offsets for all edges using identical parameters
+
+        Parameters
+        ----------
+
+        args : iterable
+               Some iterable of positional arguments for the
+               subpixel_register function.
+
+        kwargs : dict
+                 keyword args to pass into the subpixel_register function.
 
         See Also
         --------
@@ -736,9 +828,18 @@ class CandidateGraph(nx.Graph):
         '''
         Apply a metric of point suppression to the graph
 
+        Parameters
+        ----------
+
+        args : iterable
+               Some iterable of positional arguments for the suppress function.
+
+        kwargs : dict
+                 keyword args to pass into the suppress function.
+
         See Also
         --------
-        autocnet.matcher.cpu_outlier_detector.SpatialSuppression
+        autocnet.matcher.cpu_outlier_detector.spatial_suppression
         '''
         self.apply_func_to_edges('suppress', *args, **kwargs)
 
@@ -748,7 +849,7 @@ class CandidateGraph(nx.Graph):
 
         See Also
         --------
-        autocnet.cg.cg.two_image_overlap
+        autocnet.cg.cg.two_poly_overlap
         '''
         self.apply_func_to_edges('overlap')
 
@@ -962,7 +1063,8 @@ class CandidateGraph(nx.Graph):
 
         Parameters
         ----------
-        func : function which returns bool used to filter out edges
+        func : function
+               A function which returns bool used to filter out edges
 
         Returns
         -------
@@ -984,7 +1086,7 @@ class CandidateGraph(nx.Graph):
         Parameters
         ----------
         node_id : int
-                       Integer value for a given node
+                  Integer value for a given node
 
         Returns
         -------
@@ -1004,7 +1106,7 @@ class CandidateGraph(nx.Graph):
         Parameters
         ----------
         kwargs : dict
-                      keyword arguments that get passed to compute_voronoi
+                 keyword arguments that get passed to compute_voronoi
 
         clean_keys : list
                      Strings used to apply masks to omit correspondences
@@ -1166,6 +1268,16 @@ class CandidateGraph(nx.Graph):
         return True
 
     def footprints(self):
+        """
+        Gets the geodata footprint polygons of ever node in the graph and
+        returns them in a GeoDataFrame
+
+        Returns
+        -------
+        : GeoDataFrame
+          GeoDataFrame containing all footprint polygons from each node in the
+          graph
+        """
         geoms = []
         names = []
         for i, node in self.nodes.data('data'):
@@ -1175,11 +1287,34 @@ class CandidateGraph(nx.Graph):
         return gpd.GeoDataFrame(names, geometry=geoms)
 
     def identify_potential_overlaps(self, **kwargs):
+        """
+        Identify those points that could have additional measures
+
+        See Also
+        --------
+        autocnet.control.control.identify_potential_overlaps
+        """
         cc = control.identify_potential_overlaps(
             self, self.controlnetwork, **kwargs)
         return cc
 
     def nodes_iter(self, data=False):
+        """
+        Iterates over all nodes in the CandidateGraph
+
+        Parameters
+        ----------
+        data : bool
+               Whether to include the data from the node or just the index
+
+        Yields
+        ------
+        i : int
+            Index of the Node
+
+        n : Node
+            Node object
+        """
         for i, n in self.nodes.data('data'):
             if data:
                 yield i, n
@@ -1187,6 +1322,25 @@ class CandidateGraph(nx.Graph):
                 yield i
 
     def edges_iter(self, data=False):
+        """
+        Iterates over all edges in the CandidateGraph
+
+        Parameters
+        ----------
+        data : bool
+               Whether to include the data from the edge or just the indices
+
+        Yields
+        ------
+        s : int
+            Index of source Node
+
+        d : int
+            Index of source Node
+
+        e : Edge
+            Edge object
+        """
         for s, d, e in self.edges.data('data'):
             if data:
                 yield s, d, e
@@ -1264,6 +1418,14 @@ class CandidateGraph(nx.Graph):
         self.controlnetwork.index.name = 'measure_id'
 
     def remove_measure(self, idx):
+        """
+        Removes a measure from the CandidateGraph based on a given index
+
+        Parameters
+        ----------
+        idx : int
+              Index of the measure to remove
+        """
         self.controlnetwork = self.controlnetwork.drop(
             self.controlnetwork.index[idx])
         for r in idx:
@@ -1532,11 +1694,11 @@ class NetworkCandidateGraph(CandidateGraph):
         self.measure_update_counter = conf['basename'] + ':measure_update_counter'
 
         self.queue_names = [self.processing_queue, self.completed_queue, self.working_queue,
-                           self.point_insert_queue, self.point_insert_counter, 
+                           self.point_insert_queue, self.point_insert_counter,
                            self.measure_update_queue, self.measure_update_counter]
-         
+
     def _setup_asynchronous_workers(self):
-        
+
         # Default the counters to zero, unless they are already set from a run
         # where the NCG did not exit cleanly
         if self.redis_queue.get(self.point_insert_counter) is None:
@@ -1548,10 +1710,10 @@ class NetworkCandidateGraph(CandidateGraph):
 
         # Start the insert watching thread
         self.point_inserter_stop_event = threading.Event()
-        self.point_inserter = threading.Thread(target=watch_insert_queue, 
+        self.point_inserter = threading.Thread(target=watch_insert_queue,
                                                args=(self.redis_queue,
-                                                     self.point_insert_queue, 
-                                                     self.point_insert_counter, 
+                                                     self.point_insert_queue,
+                                                     self.point_insert_counter,
                                                      self.engine,
                                                      self.point_inserter_stop_event))
         self.point_inserter.setDaemon(True)
@@ -1559,14 +1721,14 @@ class NetworkCandidateGraph(CandidateGraph):
 
         # Start the update watching thread
         self.measure_updater_stop_event = threading.Event()
-        self.measure_updater = threading.Thread(target=watch_update_queue, 
+        self.measure_updater = threading.Thread(target=watch_update_queue,
                                                args=(self.redis_queue,
-                                                     self.measure_update_queue, 
-                                                     self.measure_update_counter, 
+                                                     self.measure_update_queue,
+                                                     self.measure_update_counter,
                                                      self.engine,
                                                      self.measure_updater_stop_event))
         self.measure_updater.setDaemon(True)
-        self.measure_updater.start()        
+        self.measure_updater.start()
 
     def clear_queues(self):
         """
@@ -1579,10 +1741,10 @@ class NetworkCandidateGraph(CandidateGraph):
         if self.async_watchers:
             self.point_inserter_stop_event.set()
             self.measure_updater_stop_event.set()
-        
+
         for q in self.queue_names:
             self.redis_queue.delete(q)
-        
+
         self._setup_queues()
         if self.async_watchers:
             self._setup_asynchronous_workers()
@@ -1759,7 +1921,7 @@ class NetworkCandidateGraph(CandidateGraph):
         ntasks : int
                  The number of tasks, distributed across the cluster on some set of nodes to be run.
                  When running apply with ntasks, set ntasks to some integer greater then 1. arraychunk and
-                 chunksize arguments will then be ignored. In this mode, a number of non-communicating 
+                 chunksize arguments will then be ignored. In this mode, a number of non-communicating
                  CPUs equal to ntasks are allocated and these CPUs run jobs. Changing from arrays to ntasks
                  also likely requires increasing the walltime of the job significantly since less jobs
                  will need to run for a longer duration.
@@ -1813,7 +1975,7 @@ class NetworkCandidateGraph(CandidateGraph):
 
         >>> query_string = 'SELECT overlay.id FROM overlay LEFT JOIN\
             points ON ST_INTERSECTS(overlay.geom, points.geom) WHERE\
-                points.id IS NULL AND ST_AREA(overlay.geom) >= 0.0001;'
+                pointGT_AREA(overlay.geom) >= 0.0001;'
         >>> njobs = ncg.apply('spatial.overlap.place_points_in_overlap', on='overlaps', query_string=query_string)
 
         Apply a function to the overlay table and pass keyword arguments (kwargs) to the function.
@@ -1894,7 +2056,7 @@ class NetworkCandidateGraph(CandidateGraph):
                      ntasks=ntasks,
                      output=log_dir+f'/autocnet.{function}-%j')
 
-        # Submit the jobs to the cluster   
+        # Submit the jobs to the cluster
         if ntasks > 1:
             job_str = submitter.submit(exclude=exclude)
         else:
@@ -2042,7 +2204,7 @@ class NetworkCandidateGraph(CandidateGraph):
         ncg : object
               A network candidate graph object
 
-        See Also:
+        See Also
         --------
         config_from_dict: config documentation
         """
@@ -2171,8 +2333,8 @@ class NetworkCandidateGraph(CandidateGraph):
                        An optional string to select a subset of the images in the
                        database specified in the config.
 
-        Example
-        -------
+        Examples
+        --------
         >>> ncg = NetworkCandidateGraph()
         >>> ncg.config_from_dict(new_config)
         >>> source_db_config = {'username':'jay',
@@ -2181,7 +2343,7 @@ class NetworkCandidateGraph(CandidateGraph):
         'pgbouncer_port':5432,
         'name':'mars'}
         >>> geom = 'LINESTRING(145 10, 145 10.25, 145.25 10.25, 145.25 10, 145 10)'
-        >>> srid = 949900
+        >>> srid = 104971
         >>> outpath = '/scratch/jlaura/fromdb'
         >>> query = f"SELECT * FROM ctx WHERE ST_INTERSECTS(geom, ST_Polygon(ST_GeomFromText('{geom}'), {srid})) = TRUE"
         >>> ncg.add_from_remote_database(source_db_config, outpath, query_string=query)
@@ -2192,7 +2354,7 @@ class NetworkCandidateGraph(CandidateGraph):
 
         sourceimages = sourcesession.execute(query_string).fetchall()
         # Change for SQLAlchemy >= 1.4, results are now row objects
-        
+
         sourceimages = [sourceimage._asdict() for sourceimage in sourceimages]
         with self.session_scope() as destinationsession:
             destinationsession.execute(Images.__table__.insert(), sourceimages)
@@ -2224,28 +2386,25 @@ class NetworkCandidateGraph(CandidateGraph):
         query_string : str
                        A valid SQL select statement that targets the Images table
 
-        Usage
-        -----
+        Examples
+        --------
         Here, we provide usage examples for a few, potentially common use cases.
 
-        Spatial Query
-        =============
+        Spatial Query:
         This example selects those images that intersect a given bounding polygon.  The polygon is
         specified as a Well Known Text LINESTRING with the first and last points being the same.
         The query says, select the geom (the bounding polygons in the database) that
         intersect the user provided polygon (the LINESTRING) in the given spatial reference system
-        (SRID), 949900. ::
+        (SRID), 104971, for Mars. ::
 
-            SELECT * FROM Images WHERE ST_INTERSECTS(geom, ST_Polygon(ST_GeomFromText('LINESTRING(159 10, 159 11, 160 11, 160 10, 159 10)'),949900)) = TRUE
+            SELECT * FROM Images WHERE ST_INTERSECTS(geom, ST_Polygon(ST_GeomFromText('LINESTRING(159 10, 159 11, 160 11, 160 10, 159 10)'),104971)) = TRUE
 
-        Select from a specific orbit
-        ============================
+        Select from a specific orbit:
         This example selects those images that are from a particular orbit. In this case,
         the regex string pulls all P##_* orbits and creates a graph from them. This method
         does not guarantee that the graph is fully connected. ::
 
           SELECT * FROM Images WHERE (split_part(path, '/', 6) ~ 'P[0-9]+_.+') = True
-
         """
 
         composite_query = '''WITH i as ({}) SELECT i1.id
@@ -2324,9 +2483,9 @@ class NetworkCandidateGraph(CandidateGraph):
 
         if isinstance(cnet, str):
             cnet = from_isis(cnet)
-        cnet = cnet.rename(columns={'id':'identifier', 
+        cnet = cnet.rename(columns={'id':'identifier',
                                     'measureChoosername': 'ChooserName',
-                                    'sampleResidual':'sampler', 
+                                    'sampleResidual':'sampler',
                                     'lineResidual': 'liner'})
 
         points = cnet.copy(deep=True) # this prevents Pandas value being set on copy of slice warnings
@@ -2334,14 +2493,14 @@ class NetworkCandidateGraph(CandidateGraph):
         points.insert(0, 'id', list(range(1,len(points)+1)))
         points[['overlapid','residuals', 'maxResidual']] = None
         points[['cam_type']] = 'isis'
-        
+
         points['apriori'] = [geoalchemy2.shape.from_shape(shapely.geometry.Point(x,y,z)) for x,y,z in zip(points['aprioriX'].values, points['aprioriY'].values, points['aprioriZ'].values)]
         if (points['adjustedX'] == 0).all():
             points['adjusted'] = points['apriori']
             xyz_data = [points['aprioriX'].values, points['aprioriY'].values, points['aprioriZ'].values]
         else:
             points[['adjusted']] = [geoalchemy2.shape.from_shape(shapely.geometry.Point(x,y,z)) for x,y,z in zip(points['adjustedX'].values, points['adjustedY'].values, points['adjustedZ'].values)]
-            xyz_data = [points['adjustedX'].values, points['adjustedY'].values, points['adjustedZ'].values]      
+            xyz_data = [points['adjustedX'].values, points['adjustedY'].values, points['adjustedZ'].values]
 
         og = reproject(xyz_data, semi_major, semi_minor, 'geocent', 'latlon')
         oc = og2oc(og[0], og[1], semi_major, semi_minor)
@@ -2352,10 +2511,10 @@ class NetworkCandidateGraph(CandidateGraph):
         cnet['pointid']  = cnet.apply(lambda row: pid_map[row['identifier']], axis=1)
 
         with self.session_scope() as session:
-            imgs = session.query(Images.serial, Images.id).all()  
+            imgs = session.query(Images.serial, Images.id).all()
         iid_map = {ii[0]: ii[1] for ii in imgs}
         cnet['imageid'] = cnet.apply(lambda row: iid_map[row['serialnumber']], axis=1)
- 
+
         def GoodnessOfFit_value_extract(row):
             mlog = row['measureLog']
             if mlog:
@@ -2368,7 +2527,7 @@ class NetworkCandidateGraph(CandidateGraph):
         cnet['templateShift'] = cnet.apply(lambda row: np.sqrt((row['line']-row['aprioriline'])**2 + (row['sample']-row['apriorisample'])**2) if row['ChooserName'] != row['pointChoosername'] else 0, axis=1)
         cnet['residual'] = np.sqrt(cnet['liner']**2+cnet['sampler']**2)
         cnet['rms'] = np.sqrt(np.mean([cnet['liner']**2, cnet['sampler']**2], axis=0))
-       
+
         cnet[['phaseError','phaseDiff','phaseShift']] = None
         cnet['weight'] = None
 
@@ -2389,8 +2548,8 @@ class NetworkCandidateGraph(CandidateGraph):
               The ISIS control network or path to the ISIS control network to be loaded.
 
         clear_tables: boolean
-                  Clears enteries out of the points and measures database tables if True. 
-                  Appends the control network points and measures onto the current points 
+                  Clears enteries out of the points and measures database tables if True.
+                  Appends the control network points and measures onto the current points
                   and measures database tables if False.
         """
 
@@ -2402,12 +2561,12 @@ class NetworkCandidateGraph(CandidateGraph):
         engine = self.engine
         with engine.connect() as connection:
             # Execute an SQL COPY from a CSV buffer into the DB
-            
+
             if engine.dialect.has_table(engine.connect(), 'points', schema='public') and clear_tables:
                 connection.execute('DROP TABLE measures, points;')
                 Points.__table__.create(bind=engine, checkfirst=True)
                 Measures.__table__.create(bind=engine, checkfirst=True)
-            
+
             points.to_sql('points', connection, schema='public', if_exists='append', index=False, method=io_controlnetwork.copy_from_method)
             measures.to_sql('measures', connection, schema='public', if_exists='append', index=False, method=io_controlnetwork.copy_from_method)
 
@@ -2437,7 +2596,7 @@ class NetworkCandidateGraph(CandidateGraph):
              The NetworkCandidateGraph populated with the points and measures
              from the control network and the images from the filelist.
 
-        See Also:
+        See Also
         --------
         config_from_dict: config documentation
         """
@@ -2652,7 +2811,7 @@ class NetworkCandidateGraph(CandidateGraph):
         distirbute_points_kwargs : dict
                                    Of arguments that are passed on the the
                                    distribute_points_in_geom argument in autocnet.cg.cg
-        
+
         Returns
         -------
         valid : np.ndarray
@@ -2750,4 +2909,3 @@ class NetworkCandidateGraph(CandidateGraph):
                                          self.dem,
                                          nodes,
                                          **kwargs)
-

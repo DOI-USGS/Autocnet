@@ -9,7 +9,11 @@ except:
 
 def extract_features(array, nfeatures=None, **kwargs):
     """
-    A custom docstring.
+    Use cudasift to extract features from an image
+
+    See Also
+    --------
+    cudasift
     """
     if not nfeatures:
         nfeatures = int(max(array.shape) / 1.25)
