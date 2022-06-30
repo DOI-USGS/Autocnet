@@ -12,6 +12,7 @@ from skimage.feature import blob_log, blob_doh
 from math import sqrt, atan2, pi
 from hoggorm.mat_corr_coeff import RVcoeff
 import math
+import logging
 
 import scipy
 from scipy.spatial import cKDTree
@@ -36,6 +37,9 @@ except Exception as exception:
 from autocnet.utils.utils import bytescale
 from autocnet.matcher.cpu_extractor import extract_features
 from autocnet import cg
+
+# set up the logger file
+log = logging.getLogger(__name__)
 
 def image_diff(arr1, arr2):
     """
@@ -578,7 +582,7 @@ def rv_detector(im1, im2, search_size, pattern_size=None, threshold=.999):
         pattern_size = search_size
 
     if search_size < pattern_size:
-        print("Pattern size must be <= search size.  Setting pattern_size=search_size")
+        log.warning("Pattern size must be <= search size.  Setting pattern_size=search_size")
         search_size = pattern_size
 
     rv = np.empty(im1.shape)

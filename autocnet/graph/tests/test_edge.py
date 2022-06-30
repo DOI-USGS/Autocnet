@@ -347,3 +347,11 @@ class TestEdge(unittest.TestCase):
 
             e = edge.Edge(s, d)
             e.matches = ['a', 'b', 'c']
+
+    @pytest.mark.parametrize("nmatches, nstrengths", [(10,1), (10,2)])
+    def test_prep_subpixel(self, nmatches, nstrengths):
+        e = edge.Edge()
+        arrs = e._prep_subpixel(nmatches, nstrengths=nstrengths)
+        assert len(arrs) == 5
+        assert arrs[2].shape == (nmatches, nstrengths)
+        assert arrs[0][0] == 0

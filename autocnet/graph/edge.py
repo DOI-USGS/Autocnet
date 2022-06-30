@@ -425,6 +425,46 @@ class Edge(dict, MutableMapping):
         mask[mask] = hmask.ravel()
         self.masks['homography'] = mask
 
+    def _prep_subpixel(self, nmatches, nstrengths=2):
+        """
+        Setup the data strutures to return for subpixel matching.
+
+        Parameters
+        ----------
+        nmatches : int
+                    The number of pixels to be subpixel matches
+
+        nstrengths : int
+                        The number of 'strength' values to be returned
+                        by the subpixel matching method.
+
+        Returns
+        -------
+        shifts_x : ndarray
+                (nmatches, 1) to store the x_shift parameter
+
+        shifts_y : ndarray
+                (nmatches, 1) to store the y_shift parameter
+
+        strengths : ndarray
+                    (nmatches, nstrengths) to store the strengths for each point
+
+        new_x : ndarray
+                (nmatches, 1) to store the updated x coordinates
+
+        new_y : ndarray
+                (nmatches, 1) to store the updated y coordinates
+        """
+        # Setup to store output to append to dataframes
+        shifts_x = np.zeros(nmatches)
+        shifts_y = np.zeros(nmatches)
+        strengths = np.zeros((nmatches, nstrengths))
+
+        new_x = np.empty(nmatches)
+        new_y = np.empty(nmatches)
+
+        return shifts_x, shifts_y, strengths, new_x, new_y
+
     def subpixel_register(self, method='phase', clean_keys=[],
                           template_size=251, search_size=251, **kwargs):
         """
@@ -469,7 +509,7 @@ class Edge(dict, MutableMapping):
         elif method == 'template':
             func = sp.subpixel_template
             nstrengths = 1
-        shifts_x, shifts_y, strengths, new_x, new_y = sp._prep_subpixel(len(matches), nstrengths)
+        shifts_x, shifts_y, strengths, new_x, new_y = self._prep_subpixel(len(matches), nstrengths)
 
         # for each edge, calculate this for each keypoint pair
         for i, (idx, row) in enumerate(matches.iterrows()):
