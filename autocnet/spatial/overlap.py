@@ -167,6 +167,7 @@ def place_points_in_overlap(overlap,
 
     log.info(f'Attempting to place measures in {len(nodes)} images.')
     for v in valid:
+        log.debug(f'Valid point: {v}')
         lon = v[0]
         lat = v[1]
 
@@ -176,6 +177,7 @@ def place_points_in_overlap(overlap,
 
         # Need to get the first node and then convert from lat/lon to image space
         for reference_index, node in enumerate(nodes):
+            log.debug(f'Starting with reference_index: {reference_index}')
             # reference_index is the index into the list of measures for the image that is not shifted and is set at the
             # reference against which all other images are registered.
             if cam_type == "isis":
@@ -200,14 +202,13 @@ def place_points_in_overlap(overlap,
             if image_roi.variance == 0:
                 log.warning(f'Failed to find interesting features in image {node.image_name}.')
                 continue
-            image = image_roi.clip()
-
             # Extract the most interesting feature in the search window
-            interesting = extract_most_interesting(image)
+            image_roi.clip()
+            interesting = extract_most_interesting(image_roi.clipped_array)
             if interesting is not None:
                 # We have found an interesting feature and have identified the reference point.
                 break
-
+        log.debug(f'Current reference index: {reference_index}.')
         if interesting is None:
             log.warning('Unable to find an interesting point, falling back to the a priori pointing')
             newsample = sample
@@ -268,6 +269,7 @@ def place_points_in_overlap(overlap,
             updated_lon, updated_lat = og2oc(updated_lon_og, updated_lat_og, semi_major, semi_minor)
 
         point_geom = shapely.geometry.Point(x, y, z)
+        log.debug(f'Creating point with reference_index: {reference_index}')
         point = Points(identifier=identifier,
                        overlapid=overlap.id,
                        apriori=point_geom,
@@ -298,6 +300,7 @@ def place_points_in_overlap(overlap,
                     # a measure fails to be placed.
                     if current_index < reference_index:
                         reference_index -= 1
+                    log.debug('Reference de-incremented.')
                     continue
 
             point.measures.append(Measures(sample=sample,
@@ -308,7 +311,8 @@ def place_points_in_overlap(overlap,
                                            serial=node.isis_serial,
                                            measuretype=3,
                                            choosername='place_points_in_overlap'))
-
+        log.debug(f'Current reference index in code: {reference_index}.')
+        log.debug(f'Current reference index on point: {point.reference_index}')
         if len(point.measures) >= 2:
             points.append(point)
     log.info(f'Able to place {len(points)} points.')
@@ -436,7 +440,7 @@ def place_points_in_image(image,
         image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
         image = image_roi.clip()
         try:
-            interesting = extract_most_interesting(image)
+            interesting = extract_most_interesting(image.clipped_array)
         except:
             continue
 
@@ -508,7 +512,6 @@ def place_points_in_image(image,
                        cam_type=cam_type)
 
         for node in nodes:
-            insert = True
             if cam_type == "csm":
                 image_coord = node.camera.groundToImage(gnd)
                 sample, line = image_coord.samp, image_coord.line
@@ -518,7 +521,6 @@ def place_points_in_image(image,
                 except CalledProcessError as e:
                     if 'Requested position does not project in camera model' in e.stderr:
                         log.exception(f'interesting point ({lon},{lat}) does not project to image {node["image_path"]}')
-                        insert = False
 
             point.measures.append(Measures(sample=sample,
                                            line=line,

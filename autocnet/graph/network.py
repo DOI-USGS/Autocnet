@@ -2122,6 +2122,9 @@ class NetworkCandidateGraph(CandidateGraph):
         df : pd.DataFrame
              The pandas dataframe that is passed to plio to generate the control network.
 
+        fpaths : list
+                 of paths to the images being included in the control network
+
         """
         # Read the cnet from the db
         df = io_controlnetwork.db_to_df(self.engine, **db_kwargs)
@@ -2152,7 +2155,7 @@ class NetworkCandidateGraph(CandidateGraph):
 
         # Even though this method writes, having a non-None return
         # let's a user work with the data that is passed to plio
-        return df
+        return df, fpaths
 
     def update_from_jigsaw(self, path, pointid_func=lambda x: int(x.split('_')[-1])):
         """
