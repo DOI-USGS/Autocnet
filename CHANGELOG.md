@@ -34,11 +34,19 @@ release.
 -->
 ## [Unreleased]
 
-## [0.7.1]()
+### Added
+- [`pool_pre_ping`](https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic) to the sqlalchemy engine connection to handle instances where hundreds of connections are simultaneously connecting to the database.
+- verbose option to the smart subpixel matcher that will visualize the reference and moving ROIs in order to better support single point visualization.
+
+### Changed
+- Estimation of the affine transformation no longer needs to use points completely within the destination (moving) image. Negative values are still valid for affine estimation and the sensor model is not constrained to within the image.
 
 ### Fixed
 - Fixed connection issues where too many connections to AWS RDW were causing connetions failures by adding an exponential sleep over five retries.
 - Fixed missing import in place points in overlap that was causing a failure when attempting to throw a warning.
+
+### Removed
+- Ciratefi matcher from subpixel.py as the matcher is seldom used and better alternatives for scale and rotation invariance exist in the library.
 
 ## [0.7.0]()
 

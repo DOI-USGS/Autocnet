@@ -19,6 +19,7 @@ from autocnet.examples import get_path
 from .. import network
 from .. import edge
 from .. import node
+import warnings
 
 sys.path.insert(0, os.path.abspath('..'))
 
@@ -184,7 +185,7 @@ def test_add_edge():
 def test_add_edge_missing_img(reduced_geo, caplog):
     c = 'AS15-M-0299_crop.cub'
     basepath = get_path('Apollo15')
-        # Test when "image_name" not found
+    # Test when "image_name" not found
     with caplog.at_level(logging.WARNING):
         reduced_geo.add_node(image_name=c, basepath=basepath, adjacency=["nonexistent.jpg"])
         assert 'nonexistent.jpg not found in the graph' in caplog.text

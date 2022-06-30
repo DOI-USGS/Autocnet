@@ -33,6 +33,7 @@ from plio.io.io_gdal import GeoDataset
 from plio.io.isis_serial_number import generate_serial_number
 from plio.io import io_controlnetwork as cnet
 
+from .. import sql
 
 from plurmy import Slurm
 
@@ -53,7 +54,6 @@ from autocnet.matcher import subpixel
 from autocnet.matcher import cross_instrument_matcher as cim
 from autocnet.vis.graph_view import plot_graph, cluster_plot
 from autocnet.control import control
-from autocnet.spatial.overlap import compute_overlaps_sql
 from autocnet.spatial.isis import point_info
 from autocnet.spatial.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, og2oc
@@ -380,7 +380,7 @@ class CandidateGraph(nx.Graph):
 
         return matches
 
-    def add_node(self, n=None, **attr):
+    def add_node(self, n=None, image_name="", adjacency=[], basepath="", **attr):
         """
         Adds an image node to the graph.
 
@@ -395,16 +395,13 @@ class CandidateGraph(nx.Graph):
         basepath : str
                     The base path to the node image file
         """
-
-        image_name = attr.pop("image_name", None)
-        adj = attr.pop("adjacency", None)
         new_node = None
 
         # If image name is provided, build the node from the image before
         # calling nx.add_node()
-        if image_name is not None:
-            if "basepath" in attr.keys():
-                image_path = os.path.join(attr.pop("basepath"), image_name)
+        if len(image_name) is not 0:
+            if len(basepath) is not 0:
+                image_path = os.path.join(basepath, image_name)
             else:
                 image_path = image_name
             if not os.path.exists(image_path):
@@ -423,8 +420,8 @@ class CandidateGraph(nx.Graph):
         super(CandidateGraph, self).add_node(n, **attr)
 
         # Populate adjacency, if provided
-        if new_node is not None and adj is not None:
-            for adj_img in adj:
+        if new_node is not None and adjacency is not None:
+            for adj_img in adjacency:
                 if adj_img not in self.graph["node_name_map"].keys():
                     log.warning("{} not found in the graph".format(adj_img))
                     continue
@@ -2027,7 +2024,7 @@ class NetworkCandidateGraph(CandidateGraph):
         try:
             processing_queue = getattr(self, redis_queue)
         except AttributeError:
-            print(f'Unable to find attribute {redis_queue} on this object. Valid queue names are: "processing_queue" and "working_queue".')
+            log.exception(f'Unable to find attribute {redis_queue} on this object. Valid queue names are: "processing_queue" and "working_queue".')
 
         env = self.config['env']
         condaenv = env['conda']
@@ -2248,12 +2245,12 @@ class NetworkCandidateGraph(CandidateGraph):
         for cnt, f in enumerate(filelist):
             # Create the nodes in the graph. Really, this is creating the
             # images in the DB
-            print('loading {} of {}'.format(cnt+1, total))
+            log.info('loading {} of {}'.format(cnt+1, total))
             self.add_image(f)
 
         self.from_database()
         # Execute the computation to compute overlapping geometries
-        self._execute_sql(compute_overlaps_sql)
+        self._execute_sql(sql.compute_overlaps_sql)
 
     def add_image(self, img_path):
         """
@@ -2301,7 +2298,7 @@ class NetworkCandidateGraph(CandidateGraph):
                 else:
                     continue
 
-    def add_from_remote_database(self, source_db_config, path=None,  query_string='SELECT * FROM public.images LIMIT 10'):
+    def add_from_remote_database(self, source_db_config, path=None,  query_string=sql.select_ten_pub_image):
         """
         This is a constructor that takes an existing database containing images and sensors,
         copies the selected rows into the project specified in the autocnet_config variable,
@@ -2372,9 +2369,9 @@ class NetworkCandidateGraph(CandidateGraph):
         if path:
             self.copy_images(path)
         self.from_database()
-        self._execute_sql(compute_overlaps_sql)
+        self._execute_sql(sql.compute_overlaps_sql)
 
-    def from_database(self, query_string='SELECT * FROM public.images'):
+    def from_database(self, query_string=sql.select_pub_image):
         """
         This is a constructor that takes the results from an arbitrary query string,
         uses those as a subquery into a standard polygon overlap query and
@@ -2407,11 +2404,7 @@ class NetworkCandidateGraph(CandidateGraph):
           SELECT * FROM Images WHERE (split_part(path, '/', 6) ~ 'P[0-9]+_.+') = True
         """
 
-        composite_query = '''WITH i as ({}) SELECT i1.id
-        as i1_id,i1.path as i1_path, i2.id as i2_id, i2.path as i2_path
-        FROM i  as i1, i as i2
-        WHERE ST_INTERSECTS(i1.geom, i2.geom) = TRUE
-        AND i1.id < i2.id'''.format(query_string)
+        composite_query = sql.from_database_composite.format(formatInput=sql.select_pub_image)
 
         with self.session_scope() as session:
             res = session.execute(composite_query)
@@ -2737,7 +2730,7 @@ class NetworkCandidateGraph(CandidateGraph):
 
             # TO DO: RETURN ALL EDGES
             if len(df) == 0:
-                print(f'Overlap {oid} is empty')
+                log.info(f'Overlap {oid} is empty')
                 return []
 
             # create graph edges
@@ -2749,7 +2742,7 @@ class NetworkCandidateGraph(CandidateGraph):
             fully_connected_number_of_edges = scipy.special.comb(graph.number_of_nodes(),2)
             all_edges = list(combinations(graph.nodes, 2))
             if graph.number_of_edges() == fully_connected_number_of_edges:
-                print(f'Overlap {oid} is fully connected')
+                log.info(f'Overlap {oid} is fully connected')
                 return []
 
             # return missing image id pairs

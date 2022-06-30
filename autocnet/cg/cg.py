@@ -7,6 +7,7 @@ import numpy as np
 import networkx as nx
 import geopandas as gpd
 import ogr
+import logging
 
 from skimage import transform as tf
 from scipy.spatial import Voronoi, Delaunay, ConvexHull
@@ -20,6 +21,8 @@ from autocnet.cg import cg
 
 from shapely.ops import cascaded_union, polygonize
 
+# set up the logger file
+log = logging.getLogger(__name__)
 
 def two_point_extrapolate(x, xs, ys):
     """
@@ -321,7 +324,6 @@ def generate_random(number, polygon):
     while len(points) < number and i < 1000:
         pnt = Point(random.uniform(minx, maxx), random.uniform(miny, maxy))
         if polygon.contains(pnt):
-            print(pnt.x, pnt.y)
             points.append([pnt.x, pnt.y])
         i += 1
     return np.asarray(points)
@@ -553,7 +555,7 @@ def distribute_points_in_geom(geom, method="classic",
         else:
             valid = point_distribution_func(geom, nspts, ewpts, Session=Session, **kwargs)
     else:
-        print('WTF Willy')
+        log.warning('WTF Willy')
     return np.array(valid)
 
 
@@ -652,7 +654,7 @@ def rasterize_polygon(shape, vertices, dtype=bool):
     for k in range(vertices.shape[0]):
         fill = np.all([fill, check(vertices[k-1], vertices[k], base_array)], axis=0)
 
-    print(fill.any())
+    log.info(fill.any())
     # Set all values inside polygon to one
     base_array[fill] = 1
     return base_array
