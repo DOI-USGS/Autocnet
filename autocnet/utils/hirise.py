@@ -16,7 +16,10 @@ from plio.io.io_gdal import GeoDataset
 from shapely import wkt
 import numpy as np
 import pvl
+import logging
 
+# setup logging file
+log = logging.getLogger(__name__)
 
 def segment_hirise(directory, offset=300):
     images = glob(os.path.join(directory, "*RED*.stitched.norm.cub"))
@@ -25,7 +28,7 @@ def segment_hirise(directory, offset=300):
 
         dims = label["IsisCube"]["Core"]["Dimensions"]
         nlines, nsamples = dims["Lines"], dims["Samples"]
-        print("Lines, Samples: ", nlines, nsamples)
+        log.info("Lines, Samples: ", nlines, nsamples)
 
         starts = np.arange(1, nlines, nsamples)
         stops = np.append(np.arange(starts[1], nlines, nsamples), [nlines])
@@ -38,7 +41,7 @@ def segment_hirise(directory, offset=300):
         for i, seg in enumerate(segments):
             start, stop = seg
             output = os.path.splitext(image)[0] + f".{start}_{stop}" + ".cub"
-            print("Writing:", output)
+            log.info(f"Writing: {output}")
             isis.crop(
                 image,
                 to=output,
@@ -69,35 +72,35 @@ def ingest_hirise(directory):
     l = glob(os.path.join(directory, "*RED*.IMG")) + \
         glob(os.path.join(directory, "*RED*.img"))
     l = [os.path.splitext(i)[0] for i in l]
-    print(l)
+    log.info(l)
     cube_name = "_".join(os.path.splitext(os.path.basename(l[0]))[0].split("_")[:-2])
 
-    print("Cube Name:", cube_name)
+    log.info("Cube Name:", cube_name)
 
     try:
-        print(f"Running hi2isis on {l}")
+        log.info(f"Running hi2isis on {l}")
         for i,cube in enumerate(l):
-            print(f"{i+1}/{len(l)}")
+            log.info(f"{i+1}/{len(l)}")
             isis.hi2isis(f'{cube}.IMG', to=f"{cube}.cub")
-            print(f"finished {cube}")
+            log.info(f"finished {cube}")
 
-        print(f"running spiceinit on {l}")
+        log.info(f"running spiceinit on {l}")
         for i,cube in enumerate(l):
-            print(f"{i+1}/{len(l)}")
+            log.info(f"{i+1}/{len(l)}")
             isis.spiceinit(f'{cube}.cub')
 
-        print(f"running hical on {l}")
+        log.info(f"running hical on {l}")
         for i,cube in enumerate(l):
-            print(f"{i}/{len(l)}")
+            log.info(f"{i}/{len(l)}")
             isis.hical(f'{cube}.cub', to=f'{cube}.cal.cub')
 
         cal_list_0 = sorted(glob(os.path.join(directory, "*0.cal*")))
         cal_list_1 = sorted(glob(os.path.join(directory, "*1.cal*")))
-        print(f"Channel 0 images: {cal_list_0}")
-        print(f"Channel 1 images: {cal_list_1}")
+        log.info(f"Channel 0 images: {cal_list_0}")
+        log.info(f"Channel 1 images: {cal_list_1}")
 
         for i,cubes in enumerate(zip(cal_list_0, cal_list_1)):
-            print(f"{i+1}/{len(cal_list_0)}")
+            log.info(f"{i+1}/{len(cal_list_0)}")
             c0, c1 = cubes
             output ="_".join(c0.split("_")[:-1])
             isis.histitch(from1=c0, from2=c1, to=f"{output}.stitched.cub")
@@ -108,7 +111,7 @@ def ingest_hirise(directory):
             isis.cubenorm(cube, to=output)
 
     except CalledProcessError as e:
-        print(
+        log.exception(
             textwrap.dedent(
                 f"""\
                 Had a subprocess error:
