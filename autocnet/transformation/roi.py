@@ -188,7 +188,9 @@ class Roi():
         """
         The clipped array associated with this ROI.
         """
-        return self.clip()
+        if not self.clipped_array:
+            self.clip()
+        return self.clipped_array
 
     def clip_coordinate_to_image_coordinate(self, x, y):
         """
