@@ -37,9 +37,11 @@ release.
 ### Added
 - [`pool_pre_ping`](https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic) to the sqlalchemy engine connection to handle instances where hundreds of connections are simultaneously connecting to the database.
 - verbose option to the smart subpixel matcher that will visualize the reference and moving ROIs in order to better support single point visualization.
+- Debug logging to place_points_in_overlap
 
 ### Changed
 - Estimation of the affine transformation no longer needs to use points completely within the destination (moving) image. Negative values are still valid for affine estimation and the sensor model is not constrained to within the image.
+- to_isis method on the network candidate graph returns both the dataframe (existing functionality) and the filelist (new functionality).
 
 ### Fixed
 - Fixed connection issues where too many connections to AWS RDW were causing connetions failures by adding an exponential sleep over five retries.
