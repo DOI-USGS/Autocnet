@@ -43,6 +43,7 @@ def new_connection(dbconfig):
     engine = sqlalchemy.create_engine(db_uri,
                 poolclass=sqlalchemy.pool.NullPool,
                 connect_args={"application_name":f"AutoCNet_{hostname}"},
-                isolation_level="AUTOCOMMIT")
+                isolation_level="AUTOCOMMIT",
+                pool_pre_ping=True)
     Session = orm.sessionmaker(bind=engine, autocommit=False)
     return Session, engine

@@ -40,12 +40,6 @@ def apollo_subsets():
     arr2 = imread(get_path('AS15-M-0295_SML(2).png'))[235:336, 95:196]
     return arr1, arr2
 
-@pytest.mark.parametrize("nmatches, nstrengths", [(10,1), (10,2)])
-def test_prep_subpixel(nmatches, nstrengths):
-    arrs = sp._prep_subpixel(nmatches, nstrengths=nstrengths)
-    assert len(arrs) == 5
-    assert arrs[2].shape == (nmatches, nstrengths)
-    assert arrs[0][0] == 0
 
 @pytest.mark.parametrize("center_x, center_y, size, expected", [(4, 4, 9, 404),
                                                           (55.4, 63.1, 27, 6355)])

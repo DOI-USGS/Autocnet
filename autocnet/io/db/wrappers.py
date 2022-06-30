@@ -39,7 +39,6 @@ class DbDataFrame(pd.DataFrame):
     def __setattr__(self, name, value):
         
         super(DbDataFrame, self).__setattr__(name, value)
-        #print(name, type(self), self)
         if name == '_data':            
             setattr(self.parent, self.name, self)
 

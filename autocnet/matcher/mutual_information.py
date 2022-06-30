@@ -1,8 +1,12 @@
 from math import floor
+import logging
 
 import numpy as np
 
 from scipy.ndimage.measurements import center_of_mass
+
+# setup logging file
+log = logging.getLogger(__name__)
 
 def mutual_information(t1, t2, **kwargs):
     """
@@ -32,11 +36,11 @@ def mutual_information(t1, t2, **kwargs):
     """
 
     if np.isnan(t1).any() or np.isnan(t2).any():
-        print('Unable to process due to NaN values in the input data')
+        log.warning('Unable to process due to NaN values in the input data')
         return
     
     if t1.shape != t2.shape:
-        print('Unable compute MI. Image sizes are not identical.')
+        log.warning('Unable compute MI. Image sizes are not identical.')
         return
 
     hgram, x_edges, y_edges = np.histogram2d(t1.ravel(),t2.ravel(), **kwargs)
@@ -125,7 +129,7 @@ def mutual_information_match(d_template, s_image, subpixel_size=3,
     cmass  = center_of_mass(area)
 
     if area.shape != (subpixel_size+2, subpixel_size+2):
-        print("Max correlation is too close to the boundary.")
+        log.warning("Max correlation is too close to the boundary.")
         return None, None, 0, None
 
     subpixel_y_shift = subpixel_size - 1 - cmass[0]

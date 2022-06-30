@@ -32,7 +32,7 @@ def propagate_ground_point(point,
                            ncg=None,
                            preprocess=None,
                            Session=None):
-    print(f'Attempting to propagate point {point.id}.')
+    log.info(f'Attempting to propagate point {point.id}.')
 
     match_func = check_match_func(match_func)
 
@@ -60,33 +60,33 @@ def propagate_ground_point(point,
         #if os.path.basename(m['path']) == os.path.basename(image['path']):
         #    continue
         try:
-            print(f'prop point: base_image: {base_image}')
-            print(f'prop point: dest_image: {dest_image}')
-            print(f'prop point: (sx, sy): ({sx}, {sy})')
+            log.info(f'prop point: base_image: {base_image}')
+            log.info(f'prop point: dest_image: {dest_image}')
+            log.info(f'prop point: (sx, sy): ({sx}, {sy})')
             x,y, dist, metrics, corrmap = geom_match_simple(base_image, dest_image, sx, sy, 25, 25, \
                     match_func = match_func, \
                     match_kwargs=match_kwargs, \
                     preprocess=preprocess,
                     verbose=verbose)
         except Exception as e:
-            print(e)
+            log.exception(e)
             continue
         
         if x is None:
-            print(f'Match returned None. Unable to match the ground point into image {image["path"]}.')
+            log.warning(f'Match returned None. Unable to match the ground point into image {image["path"]}.')
             continue
         
         current_cost = cost(dist, metrics)
         if current_cost > best_correlation and current_cost >= threshold:
-            print(f'Found a match with correlation: {metrics}, shift distance: {dist}, and cost {current_cost} ', )
+            log.info(f'Found a match with correlation: {metrics}, shift distance: {dist}, and cost {current_cost} ', )
             best_correlation = current_cost
             best_match = [x, y, metrics, dist, corrmap, path, image['path'], image['id'], image['serial']]
         else:
-            print(f'Found a match, but that match is either less than the threshold or worse than the current best.')
-            print(f'Found a match with correlation: {metrics}, shift distance: {dist}, and cost {current_cost} ', )
+            log.info(f'Found a match, but that match is either less than the threshold or worse than the current best.')
+            log.info(f'Found a match with correlation: {metrics}, shift distance: {dist}, and cost {current_cost} ', )
     
     if best_match is None:
-        print('Unable to propagate this ground point into any images.')
+        log.warning('Unable to propagate this ground point into any images.')
         return
     
     dem = ncg.dem
@@ -142,7 +142,7 @@ def propagate_ground_point(point,
                 sample, line = isis.ground_to_image(image["path"], lon_oc, lat_oc)
             except ValueError as e:
                 if 'Requested position does not project in camera model' in e.stderr:
-                    print(f'interesting point ({lon_oc},{lat_oc}) does not project to image {images["image_path"]}')
+                    log.exception(f'interesting point ({lon_oc},{lat_oc}) does not project to image {images["image_path"]}')
                     continue
 
         if image['id'] == best_match[7]:
@@ -156,10 +156,10 @@ def propagate_ground_point(point,
                                         serial=image['serial'],
                                         measuretype=3,
                                         choosername='propagate_ground_point'))
-    print(f'Adding {len(point.measures)} measures.')
+    log.info(f'Adding {len(point.measures)} measures.')
     with ncg.session_scope() as session:
         session.add(point)
-    print('Done adding points')
+    log.info('Done adding points')
 
 def find_most_interesting_ground(apriori_lon_lat,
                                  ground_mosaic,
@@ -293,26 +293,26 @@ def find_ground_reference(point,
                                             verbose=verbose,
                                             **geom_kwargs)
         if x == None:
-            print(f'Unable to match image {node["image_name"]} to {baseimage}.')
+            log.warning(f'Unable to match image {node["image_name"]} to {baseimage}.')
             continue
 
         current_cost = cost_func(dist, metrics)
-        print(f'Results returned: {current_cost}.')
+        log.info(f'Results returned: {current_cost}.')
         if current_cost >= cost and current_cost >= threshold:
             cost = current_cost
             sample = x
             line = y
             best_node = node
         else:
-            print(f'Cost function not met. Unable to use {node["image_name"]} as reference')
+            log.info(f'Cost function not met. Unable to use {node["image_name"]} as reference')
     if sample == None:
-        print('Unable to register this point to a ground source.')
+        log.warning('Unable to register this point to a ground source.')
         return
 
     # A reference measure has been identified. This measure matched successfully to the ground.
     # Get the lat/lon from the sample/line
     reference_node = best_node
-    print('Success...')
+    log.info('Success...')
     # Setup the measures
 
     m = Measures(sample=sample,
@@ -330,4 +330,4 @@ def find_ground_reference(point,
         point.measures.append(m)
         point.reference_index = len(point.measures) - 1  # The measure that was just appended is the new reference
 
-    print('successfully added a reference measure to the database.')
+    log.info('successfully added a reference measure to the database.')
