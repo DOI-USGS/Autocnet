@@ -1,4 +1,4 @@
-from math import floor, ceil
+from math import floor
 import numpy as np
 from plio.io.io_gdal import GeoDataset
 import scipy.ndimage as ndimage
