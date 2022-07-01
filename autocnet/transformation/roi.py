@@ -66,8 +66,14 @@ class Roi():
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
+        self.clip_center = ()
         self.affine = affine
+        self._clipped_array = None
 
+    @property 
+    def clipped_array(self):
+      return self._clipped_array
+    
     @property
     def center(self):
         return (self.x, self.y)
@@ -174,11 +180,13 @@ class Roi():
         """
         if self.ndv == None:
             return True
+        if len(self._clipped_array) == 0:
+            return False
         # Check if we have any ndv values this will return an inverted array
         # where all no data values are true, we need to then invert the array
         # and return the all result. This ensures that a valid array will return
         # True
-        return np.invert(np.isclose(self.ndv, self.clipped_array)).all()
+        return np.invert(np.isclose(self.ndv, self._clipped_array)).all()
 
 
     @property

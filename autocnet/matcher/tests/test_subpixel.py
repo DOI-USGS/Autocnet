@@ -2,8 +2,9 @@ import math
 import os
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 import logging
+
 
 from skimage import transform as tf
 from skimage.util import img_as_float   
@@ -15,8 +16,11 @@ import pytest
 import numpy as np
 from imageio import imread
 
+from plio.io.io_gdal import GeoDataset
+
 from autocnet.examples import get_path
 import autocnet.matcher.subpixel as sp
+from autocnet.transformation import roi
 
 @pytest.fixture
 def iris_pair(): 
@@ -267,15 +271,17 @@ def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
     assert dy == expected[1]
 
 
-def test_mutual_information():
+def test_mutual_information(): 
     d_template = np.array([[i for i in range(50, 100)] for j in range(50)])
     s_image = np.ones((100, 100))
-
     s_image[25:75, 25:75] = d_template
+    
+    template = Mock(spec=roi.Roi, clipped_array = d_template)
+    image = Mock(spec=roi.Roi, clipped_array = s_image)
 
-    x_offset, y_offset, max_corr, corr_map = sp.mutual_information_match(d_template, s_image, bins=20)
-    assert x_offset == 0.01711861257171421
-    assert y_offset == 0.0
+    affine, max_corr, corr_map = sp.mutual_information_match(image, template, bins=20)
+    assert affine.params[0][2] == -0.5171186125717124
+    assert affine.params[1][2] == -0.5
     assert max_corr == 2.9755967600033015
     assert corr_map.shape == (51, 51)
     assert np.min(corr_map) >= 0.0
