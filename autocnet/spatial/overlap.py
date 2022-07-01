@@ -438,7 +438,7 @@ def place_points_in_image(image,
 
         # Extract ORB features in a sub-image around the desired point
         image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
-        image = image_roi.clip()
+        image_roi.clip()
         try:
             interesting = extract_most_interesting(image.clipped_array)
         except:
