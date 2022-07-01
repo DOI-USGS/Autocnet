@@ -66,9 +66,7 @@ class Roi():
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
-        self.clip_center = ()
         self.affine = affine
-        self._clipped_array = None
 
     @property
     def center(self):
@@ -79,6 +77,16 @@ class Roi():
         if not getattr(self, '_clip_center', None):
             self.clip()
         return self._clip_center
+
+    @property
+    def clipped_array(self):
+        """
+        The clipped array associated with this ROI.
+        """
+        if not hasattr(self, "_clipped_array"):
+            self.clip()
+        return self._clipped_array
+
 
     @property
     def affine(self):
@@ -175,9 +183,7 @@ class Roi():
         present.
         """
         if self.ndv == None:
-            return 
-        if len(self._clipped_array) == 0:
-            return False
+            return True
         # Check if we have any ndv values this will return an inverted array
         # where all no data values are true, we need to then invert the array
         # and return the all result. This ensures that a valid array will return
@@ -338,5 +344,5 @@ class Roi():
                 pixel_locked = pixel_locked[self.buffer:-self.buffer,
                                             self.buffer:-self.buffer]
             self._clip_center = tuple(np.array(pixel_locked.shape)[::-1] / 2.)
-            self.warped_array_center = self.clip_center
+            self.warped_array_center = self._clip_center
             self._clipped_array = img_as_float32(pixel_locked)
