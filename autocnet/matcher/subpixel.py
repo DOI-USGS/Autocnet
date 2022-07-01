@@ -1440,8 +1440,11 @@ def mutual_information_match(moving_roi,
                Map of corrilation coefficients when comparing the template to
                locations within the search area
     """
-    reference_template = reference_roi.clip()
-    moving_image = moving_roi.clip(affine)
+    reference_roi.clip()
+    moving_roi.clip(affine)
+
+    moving_image = moving_roi.clipped_array()
+    reference_template = reference_roi.clipped_array()
 
     if func == None:
         func = mutual_information
