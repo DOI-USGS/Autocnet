@@ -5,6 +5,11 @@ import numpy as np
 from scipy.ndimage.measurements import center_of_mass
 import skimage.transform as tf
 
+import logging 
+# setup logging file
+log = logging.getLogger(__name__)
+
+
 def mutual_information(reference_arr, moving_arr, **kwargs):
     """
     Computes the correlation coefficient between two images using a histogram
@@ -32,13 +37,13 @@ def mutual_information(reference_arr, moving_arr, **kwargs):
     --------
     numpy.histogram2d : for the kwargs that can be passed to the comparison
     """
-   
+    
     if np.isnan(reference_arr).any() or np.isnan(moving_arr).any():
-        print('Unable to process due to NaN values in the input data')
+        log.warning('Unable compute MI. Image sizes are not identical.')        
         return
     
     if reference_arr.shape != moving_arr.shape:
-        print('Unable compute MI. Image sizes are not identical.')
+        log.warning('Unable compute MI. Image sizes are not identical.')
         return
 
     hgram, x_edges, y_edges = np.histogram2d(reference_arr.ravel(),moving_arr.ravel(), **kwargs)
