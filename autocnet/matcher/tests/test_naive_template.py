@@ -55,32 +55,32 @@ class TestNaiveTemplate(unittest.TestCase):
 
         # Should yield (-3, 3) offset from image center
         self._t_shape = np.array(((1, 1, 1),
-                               (0, 1, 0),
-                               (0, 1, 0)), dtype=np.uint8)
+                                  (0, 1, 0),
+                                  (0, 1, 0)), dtype=np.uint8)
 
         # Should be (3, -4)
         self._rect_shape = np.array(((1, 1, 1),
-                                  (1, 0, 1),
-                                  (1, 0, 1),
-                                  (1, 0, 1),
-                                  (1, 1, 1)), dtype=np.uint8)
+                                     (1, 0, 1),
+                                     (1, 0, 1),
+                                     (1, 0, 1),
+                                     (1, 1, 1)), dtype=np.uint8)
 
         # Should be (-2, -4)
         self._square_shape = np.array(((1, 1, 1),
-                                    (1, 0, 1),
-                                    (1, 1, 1)), dtype=np.uint8)
+                                       (1, 0, 1),
+                                       (1, 1, 1)), dtype=np.uint8)
 
         # Should be (3, 5)
         self._vertical_line = np.array(((0, 1, 0),
-                                     (0, 1, 0),
-                                     (0, 1, 0)), dtype=np.uint8)
+                                        (0, 1, 0),
+                                        (0, 1, 0)), dtype=np.uint8)
 
     def test_t_shape(self):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._t_shape,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, -3)
-        self.assertEqual(result_y, -3)
+        self.assertEqual(result_x, 3)
+        self.assertEqual(result_y, 3)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
 
@@ -88,8 +88,8 @@ class TestNaiveTemplate(unittest.TestCase):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._rect_shape,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, 3)
-        self.assertEqual(result_y, 4)
+        self.assertEqual(result_x, -3)
+        self.assertEqual(result_y, -4)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
 
@@ -97,8 +97,8 @@ class TestNaiveTemplate(unittest.TestCase):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._square_shape,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, -2)
-        self.assertEqual(result_y, 4)
+        self.assertEqual(result_x, 2)
+        self.assertEqual(result_y, -4)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
 
@@ -106,11 +106,10 @@ class TestNaiveTemplate(unittest.TestCase):
         result_x, result_y, result_strength, _ = naive_template.pattern_match(self._vertical_line,
                                                                            self._test_image, upsampling=1)
         # Test offsets
-        self.assertEqual(result_x, 3)
-        self.assertEqual(result_y, -5)
+        self.assertEqual(result_x, -3)
+        self.assertEqual(result_y, 5)
         # Test Correlation Strength: At least 0.8
         self.assertGreaterEqual(result_strength, 0.8, "Returned Correlation Strength of %d" % result_strength)
-    
+
     def tearDown(self):
         pass
-
