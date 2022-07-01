@@ -28,7 +28,7 @@ import PIL
 from PIL import Image
 
 from autocnet.matcher.naive_template import pattern_match
-from autocnet.matcher.mutual_information import mutual_information_match
+from autocnet.matcher.mutual_information import mutual_information
 from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
@@ -1400,3 +1400,87 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, valid_reproje
     log.info(f'Ignoring measures: {measures_to_set_false}')
 
     return measures_to_update, measures_to_set_false
+
+
+def mutual_information_match(moving_roi,
+                             reference_roi, 
+                             affine=tf.AffineTransform(), 
+                             subpixel_size=3,
+                             func=None, **kwargs):
+    """
+    Applies the mutual information matcher function over a search image using a
+    defined template
+
+
+    Parameters
+    ----------
+    moving_roi : roi 
+                 The input search template used to 'query' the destination
+                 image
+
+    reference_roi : roi
+              The image or sub-image to be searched
+
+    subpixel_size : int
+                    Subpixel area size to search for the center of mass
+                    calculation
+
+    func : function
+           Function object to be used to compute the histogram comparison
+
+    Returns
+    -------
+    new_affine :AffineTransform
+                The affine transformation
+
+    max_corr : float
+               The strength of the correlation in the range [0, 4].
+
+    corr_map : ndarray
+               Map of corrilation coefficients when comparing the template to
+               locations within the search area
+    """
+    reference_template = reference_roi.clip()
+    moving_image = moving_roi.clip(affine)
+
+    if func == None:
+        func = mutual_information
+
+    image_size = moving_image.shape
+    template_size = reference_template.shape
+
+    y_diff = image_size[0] - template_size[0]
+    x_diff = image_size[1] - template_size[1]
+
+    max_corr = -np.inf
+    corr_map = np.zeros((y_diff+1, x_diff+1))
+    for i in range(y_diff+1):
+        for j in range(x_diff+1):
+            sub_image = moving_image[i:i+template_size[1],  # y
+                                j:j+template_size[0]]  # x
+            corr = func(sub_image, reference_template, **kwargs)
+            if corr > max_corr:
+                max_corr = corr
+            corr_map[i, j] = corr
+
+    y, x = np.unravel_index(np.argmax(corr_map, axis=None), corr_map.shape)
+
+    upper = int(2 + floor(subpixel_size / 2))
+    lower = upper - 1
+    area = corr_map[y-lower:y+upper,
+                    x-lower:x+upper]
+
+    # Compute the y, x shift (subpixel) using scipys center_of_mass function
+    cmass  = center_of_mass(area)
+    if area.shape != (subpixel_size + 2, subpixel_size + 2):
+        return  None, 0, None
+        
+
+    subpixel_y_shift = subpixel_size - 1 - cmass[0]
+    subpixel_x_shift = subpixel_size - 1 - cmass[1]
+    y = abs(y - (corr_map.shape[1])/2)
+    x = abs(x - (corr_map.shape[0])/2)
+    y += subpixel_y_shift
+    x += subpixel_x_shift
+    new_affine = AffineTransform(translation=(-x, -y))
+    return new_affine, np.max(max_corr), corr_map
