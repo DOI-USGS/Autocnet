@@ -10,6 +10,7 @@ import logging
 
 import numpy as np
 
+from scipy.ndimage.measurements import center_of_mass
 from skimage import transform as tf
 from skimage import registration
 from skimage import filters
@@ -1441,10 +1442,10 @@ def mutual_information_match(moving_roi,
                locations within the search area
     """
     reference_roi.clip()
-    moving_roi.clip(affine)
+    moving_roi.clip(affine=affine)
 
-    moving_image = moving_roi.clipped_array()
-    reference_template = reference_roi.clipped_array()
+    moving_image = moving_roi.clipped_array
+    reference_template = reference_roi.clipped_array
 
     if func == None:
         func = mutual_information
@@ -1485,5 +1486,5 @@ def mutual_information_match(moving_roi,
     x = abs(x - (corr_map.shape[0])/2)
     y += subpixel_y_shift
     x += subpixel_x_shift
-    new_affine = AffineTransform(translation=(-x, -y))
+    new_affine = tf.AffineTransform(translation=(-x, -y))
     return new_affine, np.max(max_corr), corr_map
