@@ -1,4 +1,4 @@
-from math import floor, ceil
+from math import floor
 import numpy as np
 from plio.io.io_gdal import GeoDataset
 import scipy.ndimage as ndimage
@@ -66,7 +66,9 @@ class Roi():
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
+        self.clip_center = ()
         self.affine = affine
+        self._clipped_array = None
 
     @property
     def center(self):
@@ -173,7 +175,9 @@ class Roi():
         present.
         """
         if self.ndv == None:
-            return True
+            return 
+        if len(self._clipped_array) == 0:
+            return False
         # Check if we have any ndv values this will return an inverted array
         # where all no data values are true, we need to then invert the array
         # and return the all result. This ensures that a valid array will return

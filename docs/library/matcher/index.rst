@@ -22,7 +22,6 @@ Subpixel Refinement
 -------------------
 .. toctree::
    subpixel
-   ciratefi
    naive_template
 
 High-Level Matchiing Examples
