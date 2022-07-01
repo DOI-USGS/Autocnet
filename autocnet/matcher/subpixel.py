@@ -97,9 +97,11 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
     : tuple
       With the RMSE error and absolute difference in phase
     """
-    reference_image = reference_roi.clip()
-    walking_template = moving_roi.clip(affine)
-    
+    reference_roi.clip()
+    reference_image = reference_roi.clipped_array
+    moving_roi.clip(affine=affine)
+    walking_template = moving_roi.clipped_array
+
     if reference_image.shape != walking_template.shape:
         reference_size = reference_image.shape
         walking_size = walking_template.shape
@@ -199,7 +201,7 @@ def subpixel_template(reference_roi,
     if (ref_clip is None) or (moving_clip is None):
         return None, None, None
 
-    matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, upsampling=16, **kwargs)
+    matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
     if matcher_shift_x is None:
         return None, None, None
 
