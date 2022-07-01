@@ -17,8 +17,8 @@ stages:
 unit-test-job:
   stage: test
   script:
-    - wget "https://asc-isisdata.s3.us-west-2.amazonaws.com/autocnet_test_data/B08_012650_1780_XN_02S046W.l1.cal.destriped.crop.cub" -P tests/test_subpixel_match/B08_012650_1780_XN_02S046W.l1.cal.destriped.crop.cub
-    - wget "https://asc-isisdata.s3.us-west-2.amazonaws.com/autocnet_test_data/D16_033458_1785_XN_01S046W.l1.cal.destriped.crop.cub" -P tests/test_subpixel_match/D16_033458_1785_XN_01S046W.l1.cal.destriped.crop.cub
+    - wget "https://asc-isisdata.s3.us-west-2.amazonaws.com/autocnet_test_data/B08_012650_1780_XN_02S046W.l1.cal.destriped.crop.cub" -P tests/test_subpixel_match/
+    - wget "https://asc-isisdata.s3.us-west-2.amazonaws.com/autocnet_test_data/D16_033458_1785_XN_01S046W.l1.cal.destriped.crop.cub" -P tests/test_subpixel_match/
     - mamba env create -f environment.yml -n autocnet_env
     - conda init
     - source /root/.bashrc
