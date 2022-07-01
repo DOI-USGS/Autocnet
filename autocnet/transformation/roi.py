@@ -170,8 +170,14 @@ class Roi():
         """
         if self.ndv == None:
             return True
-        return np.isclose(self.ndv,self.array).all()
-        
+        if len(self.clipped_array) == 0:
+            return False
+        # Check if we have any ndv values this will return an inverted array
+        # where all no data values are true, we need to then invert the array
+        # and return the all result. This ensures that a valid array will return
+        # True
+        return np.invert(np.isclose(self.ndv, self.clipped_array)).all()
+
 
     @property
     def variance(self):
