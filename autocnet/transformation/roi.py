@@ -66,13 +66,17 @@ class Roi():
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
         self.buffer = buffer
-        self.clipped_array = None
-        self.clip_center = ()
         self.affine = affine
 
     @property
     def center(self):
         return (self.x, self.y)
+
+    @property
+    def clip_center(self):
+        if not getattr(self, '_clip_center', None):
+            self.clip()
+        return self._clip_center
 
     @property
     def affine(self):
@@ -184,13 +188,13 @@ class Roi():
         return np.var(self.array)
 
     @property
-    def array(self):
+    def clipped_array(self):
         """
         The clipped array associated with this ROI.
         """
-        if not self.clipped_array:
+        if not hasattr(self, "_clipped_array"):
             self.clip()
-        return self.clipped_array
+        return self._clipped_array
 
     def clip_coordinate_to_image_coordinate(self, x, y):
         """
