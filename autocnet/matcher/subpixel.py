@@ -395,7 +395,7 @@ def subpixel_register_point(pointid,
                              size_y=match_kwargs['template_size'][1],
                              buffer=5)
 
-        affine = estimate_local_affine(reference_roi, moving_roi)
+        baseline_affine = estimate_local_affine(reference_roi, moving_roi)
 
         # Updated so that the affine used is computed a single time.
         # Has not scale or shear or rotation.
