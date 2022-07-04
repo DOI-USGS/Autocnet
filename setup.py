@@ -5,17 +5,17 @@ from setuptools import setup, find_packages
 with open('README.md', 'r') as f:
     long_description = f.read()
 
-__version__ = '0.7.1'
+__version__ = '1.0.0-rc1'
 
 def setup_package():
     setup(
         name = "autocnet",
         version = __version__,
-        author = "Jay Laura",
+        author = "USGS Astrogeology",
         author_email = "jlaura@usgs.gov",
         description = ("Automated control network generation."),
         long_description = long_description,
-        license = "Public Domain",
+        license = "CC0-1.0",
         keywords = "Multi-image correspondence detection",
         url = "http://packages.python.org/autocnet",
         packages=find_packages(),
