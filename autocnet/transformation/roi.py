@@ -321,7 +321,7 @@ class Roi():
                                         mode=mode,
                                         order=3)
 
-            self._clip_center = (np.array(pixel_locked.shape)[::-1]) / 2.0
+            self._clip_center = tuple(np.array(pixel_locked.shape)[::-1]) / 2.0)
 
             self._clipped_array = img_as_float32(pixel_locked)
         else:
