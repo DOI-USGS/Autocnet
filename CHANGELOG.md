@@ -34,6 +34,15 @@ release.
 -->
 ## [Unreleased]
 
+### Changed
+- Redis queue population pushed to a background thread for non-blocking data processing.
+
+### Fixed
+- clip_center property in the roi object was checking for existence using getattr which fails on ndarrays that expect to use all() or any() for boolean checks. Fixed to use only tuples for clip_center.
+
+
+## [1.0.0-rc1]
+
 ### Added
 - [`pool_pre_ping`](https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic) to the sqlalchemy engine connection to handle instances where hundreds of connections are simultaneously connecting to the database.
 - verbose option to the smart subpixel matcher that will visualize the reference and moving ROIs in order to better support single point visualization.
