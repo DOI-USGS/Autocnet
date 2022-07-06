@@ -32,7 +32,16 @@ When preparing for a bug fix release create a new 2nd heading above the Fixed
 heading to indicate that only the bug fixes and security fixes are in the bug fix
 release.
 -->
-## [Unreleased]
+## [1.0.0-rc2]
+
+### Changed
+- Redis queue population pushed to a background thread for non-blocking data processing.
+
+### Fixed
+- clip_center property in the roi object was checking for existence using getattr which fails on ndarrays that expect to use all() or any() for boolean checks. Fixed to use only tuples for clip_center.
+
+
+## [1.0.0-rc1]
 
 ### Added
 - [`pool_pre_ping`](https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic) to the sqlalchemy engine connection to handle instances where hundreds of connections are simultaneously connecting to the database.
