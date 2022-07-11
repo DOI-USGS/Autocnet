@@ -74,19 +74,9 @@ class Roi():
 
     @property
     def clip_center(self):
-        if not getattr(self, '_clip_center', None):
+        if not hasattr(self, '_clip_center'):
             self.clip()
         return self._clip_center
-
-    @property
-    def clipped_array(self):
-        """
-        The clipped array associated with this ROI.
-        """
-        if not hasattr(self, "_clipped_array"):
-            self.clip()
-        return self._clipped_array
-
 
     @property
     def affine(self):
@@ -236,7 +226,7 @@ class Roi():
 
         return x_in_image_space, y_in_image_space
 
-    def clip(self, size_x=None, size_y=None, affine=None, dtype=None, mode="reflect"):
+    def clip(self, size_x=None, size_y=None, affine=None, dtype=None, warp_mode="reflect", coord_mode="reflect"):
         """
         Compatibility function that makes a call to the array property.
         Warning: The dtype passed in via this function resets the dtype attribute of this
@@ -299,7 +289,7 @@ class Roi():
             warped_data = tf.warp(data,
                          self.affine,
                          order=3,
-                         mode='reflect')
+                         mode=warp_mode)
 
             self.warped_array_center = self.affine.inverse(data_center)[0]
 
@@ -318,7 +308,7 @@ class Roi():
             # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
             pixel_locked = ndimage.map_coordinates(warped_data,
                                         np.meshgrid(yi, xi, indexing='ij'),
-                                        mode=mode,
+                                        mode=coord_mode,
                                         order=3)
 
             self._clip_center = (np.array(pixel_locked.shape)[::-1]) / 2.0
@@ -337,7 +327,7 @@ class Roi():
             # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
             pixel_locked = ndimage.map_coordinates(data,
                                         np.meshgrid(yi, xi, indexing='ij'),
-                                        mode=mode,
+                                        mode=coord_mode,
                                         order=3)
 
             if self.buffer != 0:
