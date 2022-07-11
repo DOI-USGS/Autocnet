@@ -100,7 +100,7 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
     """
     reference_roi.clip()
     reference_image = reference_roi.clipped_array
-    moving_roi.clip(affine=affine)
+    moving_roi.clip(affine=affine, warp_mode="constant", coord_mode="constant")
     walking_template = moving_roi.clipped_array
 
     if reference_image.shape != walking_template.shape:
@@ -125,8 +125,11 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
         reference_roi.size_x, reference_roi.size_y = size
         moving_roi.size_x, moving_roi.size_y = size
 
-        reference_image = reference_roi.clip()
-        walking_template = moving_roi.clip(affine)
+        reference_roi.clip()
+        reference_image = reference_roi.clipped_array
+        moving_roi.clip(affine=affine)
+        walking_template = moving_roi.clipped_array
+
     (shift_y, shift_x), error, diffphase = registration.phase_cross_correlation(reference_image,
                                                                                 walking_template,
                                                                                 **kwargs)
@@ -236,8 +239,6 @@ def iterative_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), redu
     moving_roi : Object
                   An Roi object from autocnet, the walking image to move around and make comparisons to
                   the reference roi. Contains either an ndarray or a GeoDataset Object
-    size : tuple
-           Size of the template in the form (x,y)
     reduction : int
                 With each recursive call to this func, the size is reduced by this amount
     convergence_threshold : float
@@ -267,7 +268,7 @@ def iterative_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), redu
         # Compute the amount of move the matcher introduced
         delta_dx, delta_dy = abs(new_subpixel_affine.translation)
         subpixel_affine += new_subpixel_affine
-        dx, dy = subpixel_affine.inverse((reference_roi.x, reference_roi.y))[0]
+        dx, dy = subpixel_affine.inverse((moving_roi.x, moving_roi.y))[0]
         moving_roi.x, moving_roi.y = dx, dy
 
         # Break if the solution has converged
@@ -793,43 +794,39 @@ def fourier_mellen(ref_image, moving_image, affine=tf.AffineTransform(), verbose
       Error returned by the iterative phase matcher
     """
     # Get the affine transformation for scale + rotation invariance
-    affine = estimate_logpolar_transform(ref_image.array, moving_image.array, verbose=verbose)
-
-    # warp the source image to match the destination
-    ref_warped = ref_image.clip(affine)
-    sx, sy = affine.inverse(np.asarray(ref_image.array.shape)/2)[0]
+    affine = estimate_logpolar_transform(ref_image.clipped_array, moving_image.clipped_array, verbose=verbose)
 
     # get translation with iterative phase
-    newx, newy, error = iterative_phase(sx, sy, sx, sy, ref_warped, moving_image, **phase_kwargs)
+    subpixel_affine, error, diffphase = iterative_phase(ref_image, moving_image, affine=affine, **phase_kwargs)
 
-    if verbose:
-        fig, axes = plt.subplots(2, 2, figsize=(8, 8))
-        ax = axes.ravel()
+    # if verbose:
+    #     fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+    #     ax = axes.ravel()
+    #
+    #     ax[0].imshow(ref_warped)
+    #     ax[0].set_title("Image 1 Transformed")
+    #     ax[0].axhline(y=sy, color="red", linestyle="-", alpha=1, linewidth=1)
+    #     ax[0].axvline(x=sx, color="red", linestyle="-", alpha=1, linewidth=1)
+    #
+    #     ax[2].imshow(ref_image)
+    #     ax[2].set_title("Image 1")
+    #     ax[2].axhline(y=ref_image.array.shape[0]/2, color="red", linestyle="-", alpha=1, linewidth=1)
+    #     ax[2].axvline(x=ref_image.array.shape[1]/2, color="red", linestyle="-", alpha=1, linewidth=1)
+    #
+    #     ax[1].imshow(moving_image)
+    #     ax[3].imshow(moving_image)
+    #
+    #     if not newx or not newy:
+    #         ax[1].set_title("Image 2 REGISTRATION FAILED")
+    #         ax[3].set_title("Image 2 REGISTRATION FAILED")
+    #     else :
+    #         ax[3].set_title("Image 2 Registered")
+    #         ax[1].axhline(y=newy, color="red", linestyle="-", alpha=1, linewidth=1)
+    #         ax[1].axvline(x=newx, color="red", linestyle="-", alpha=1, linewidth=1)
+    #         ax[3].axhline(y=newy, color="red", linestyle="-", alpha=1, linewidth=1)
+    #         ax[3].axvline(x=newx, color="red", linestyle="-", alpha=1, linewidth=1)
 
-        ax[0].imshow(ref_warped)
-        ax[0].set_title("Image 1 Transformed")
-        ax[0].axhline(y=sy, color="red", linestyle="-", alpha=1, linewidth=1)
-        ax[0].axvline(x=sx, color="red", linestyle="-", alpha=1, linewidth=1)
-
-        ax[2].imshow(ref_image)
-        ax[2].set_title("Image 1")
-        ax[2].axhline(y=ref_image.array.shape[0]/2, color="red", linestyle="-", alpha=1, linewidth=1)
-        ax[2].axvline(x=ref_image.array.shape[1]/2, color="red", linestyle="-", alpha=1, linewidth=1)
-
-        ax[1].imshow(moving_image)
-        ax[3].imshow(moving_image)
-
-        if not newx or not newy:
-            ax[1].set_title("Image 2 REGISTRATION FAILED")
-            ax[3].set_title("Image 2 REGISTRATION FAILED")
-        else :
-            ax[3].set_title("Image 2 Registered")
-            ax[1].axhline(y=newy, color="red", linestyle="-", alpha=1, linewidth=1)
-            ax[1].axvline(x=newx, color="red", linestyle="-", alpha=1, linewidth=1)
-            ax[3].axhline(y=newy, color="red", linestyle="-", alpha=1, linewidth=1)
-            ax[3].axvline(x=newx, color="red", linestyle="-", alpha=1, linewidth=1)
-
-    return newx, newy, error
+    return subpixel_affine, error, diffphase
 
 def subpixel_register_point_smart(pointid,
                             cost_func=lambda x,y: 1/x**2 * y,
