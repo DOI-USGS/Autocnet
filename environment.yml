@@ -1,7 +1,6 @@
 channels:
   - conda-forge
   - usgs-astrogeology
-  - menpo
 
 dependencies:
   - python>=3
@@ -10,10 +9,9 @@ dependencies:
   - cyvlfeat
   - matplotlib
   - dill
-  - gdal
+  - conda-forge::gdal
   - geoalchemy2
   - geopandas
-  - gdal
   - hoggorm
   - imageio
   - kalasiris
@@ -28,7 +26,7 @@ dependencies:
   - plurmy
   - psycopg2
   - pvl = 1.0
-  - pyproj
+  - conda-forge::pyproj 
   - richdem
   - scikit-image=0.17
   - scikit-learn
