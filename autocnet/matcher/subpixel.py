@@ -28,7 +28,7 @@ import pvl
 import PIL
 from PIL import Image
 
-from autocnet.matcher.naive_template import pattern_match
+from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg
 from autocnet.matcher.mutual_information import mutual_information
 from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder

@@ -212,7 +212,8 @@ def find_most_interesting_ground(apriori_lon_lat,
         log.warning('No interesting feature found. This is likely caused by either large contiguous no data areas in the base or a mismatch in the base_dtype.')
         return
 
-    left_x, _, top_y, _ = image.image_extent
+    left_x = floor(image.x) - image.size_x
+    top_y = floor(image.y) - image.size_y
     newsample = left_x + interesting.x
     newline = top_y + interesting.y
 
