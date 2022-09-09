@@ -9,20 +9,32 @@ from autocnet.io.db.model import Measures
 from autocnet.spatial.isis import isis2np_types
 from ... import sql
 
-def db_to_df(engine, sql = sql.db_to_df_sql_string):
+def db_to_df(ncg, ground_radius=None, ground_xyz=None, sql=sql.db_to_df_sql_string):
         """
         Given a set of points/measures in an autocnet database, generate an ISIS
         compliant control network.
 
         Parameters
         ----------
-        engine : Object
-                 sqlalchemy engine object to read from
+        ncg : Object
+              A NetworkCandidateGraph object connected to the target database.
+
+        ground_radius : str
+                        Description of file used to generate radius values. This value
+                        can take the form of a file path to a DEM or a general 'EllipsoidDem'. 
+
+        ground_xyz: str
+                    Path to the file that determined image coordinates of ground points,
+                    if different than dem argument. This is the file typically used in 
+                    the image registration step of ground points creation.
 
         sql : str
-              The sql query to execute in the database.
+              The sql query to execute in the database. Default grabs information 
+              for all non-ignored (including jigsaw ignored) points and measures 
+              that exist on images with 3 or more measures. 
         """
-        df = pd.read_sql(sql, engine)
+        
+        df = pd.read_sql(sql, ncg.engine)
 
         # measures.id DB column was read in to ensure the proper ordering of DF
         # so the correct measure is written as reference
@@ -32,31 +44,33 @@ def db_to_df(engine, sql = sql.db_to_df_sql_string):
                              'measureType': 'measuretype'}, inplace=True)
         df['id'] = df.apply(lambda row: f"{row['identifier']}_{row['id']}", axis=1)
 
-        #create columns in the dataframe; zeros ensure plio (/protobuf) will
-        #ignore unless populated with alternate values
+        # create columns in the dataframe; zeros ensure plio (/protobuf) will
+        # ignore unless populated with alternate values
         df['aprioriX'] = 0
         df['aprioriY'] = 0
-        df['aprioriZ'] = 0
-        df['adjustedX'] = 0
-        df['adjustedY'] = 0
-        df['adjustedZ'] = 0
+        df['aprioriZ'] = 0        
         df['aprioriCovar'] = [[] for _ in range(len(df))]
+        df['aprioriSurfPointSource'] = 0 
+        df['aprioriSurfPointSourceFile'] = None 
+        df['aprioriRadiusSource'] = 0
+        df['aprioriRadiusSourceFile'] = None
 
-        #only populate the new columns for ground points. Otherwise, isis will
-        #recalculate the control point lat/lon from control measures which where
-        #"massaged" by the phase and template matcher.
+        # only populate the new columns for ground points. Otherwise, isis will
+        # recalculate the control point lat/lon from the average location of the 
+        # control measures projection to ground after autocnet matching.
         for i, row in df.iterrows():
             if row['pointtype'] == 3 or row['pointtype'] == 4:
                 if row['apriori']:
                     apriori_geom = swkb.loads(row['apriori'], hex=True)
                     row['aprioriX'] = apriori_geom.x
                     row['aprioriY'] = apriori_geom.y
-                    row['aprioriZ'] = apriori_geom.z
-                if row['adjusted']:
-                    adjusted_geom = swkb.loads(row['adjusted'], hex=True)
-                    row['adjustedX'] = adjusted_geom.x
-                    row['adjustedY'] = adjusted_geom.y
-                    row['adjustedZ'] = adjusted_geom.z
+                    row['aprioriZ'] = apriori_geom.z # this is a height measurement
+                if ground_radius is not None:
+                    row['aprioriRadiusSource'] = 5 # corresponds to DEM in plio AprioriSource protobuf Enum
+                    row['aprioriRadiusSourceFile'] = ground_radius
+                if ground_xyz is not None:
+                    row['aprioriSurfPointSource'] = 6 # corresponds to Basemap in plio AprioriSource protobuf Enum
+                    row['aprioriSurfPointSourceFile'] = ground_xyz
                 df.iloc[i] = row
 
         return df

@@ -202,10 +202,12 @@ class Roi():
         Parameters
         ----------
         x : float
-            The x coordinate in the clipped array to be transformed into full image coordinates
+            The x coordinate in an affinely tranfromed clipped array to be transformed 
+            into full image coordinates
 
         y : float
-            The y coordinate in the clipped array to be transformed into full image coordinates
+            The y coordinate in an affinely transfromed clipped array to be transformed 
+            into full image coordinates
 
         Returns
         -------
@@ -219,7 +221,7 @@ class Roi():
         y_in_affine_space = y + self._clip_start_y
 
         x_in_clip_space, y_in_clip_space = self.affine((x_in_affine_space,
-                                                                y_in_affine_space))[0]
+                                                        y_in_affine_space))[0]
 
         x_in_image_space = x_in_clip_space + self._roi_x_to_clip_center
         y_in_image_space = y_in_clip_space + self._roi_y_to_clip_center
@@ -267,15 +269,12 @@ class Roi():
         x_read_length = (self.size_x * 2) + 1 + (self.buffer * 2)
         y_read_length = (self.size_y * 2) + 1 + (self.buffer * 2)
 
-        if min_x < 1:
-            min_x = 1
-        if min_y < 1:
-            min_y = 1
-
-        pixels = [min_x, min_y, x_read_length, y_read_length]
-        if (np.asarray(pixels) < 0).any():
+        # series of checks to make sure all pixels inside image limits
+        raster_xsize, raster_ysize = self.data.raster_size
+        if min_x < 0 or min_y < 0 or min_x+x_read_length > raster_xsize or min_y+y_read_length > raster_ysize:
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
+        pixels = [min_x, min_y, x_read_length, y_read_length]
         # This data is an nd-array that is larger than originally requested, because it may be affine warped.
         data = self.data.read_array(pixels=pixels, dtype=dtype)
 
@@ -287,9 +286,11 @@ class Roi():
             self.affine = affine
             # The cval is being set to the mean of the array,
             warped_data = tf.warp(data,
-                         self.affine,
-                         order=3,
-                         mode=warp_mode)
+                                self.affine,
+                                order=3,
+                                mode=warp_mode,
+                                cval=0.1)
+
 
             self.warped_array_center = self.affine.inverse(data_center)[0]
 
@@ -314,8 +315,8 @@ class Roi():
             self._clip_center = tuple(np.array(pixel_locked.shape)[::-1] / 2.0)
 
             self._clipped_array = img_as_float32(pixel_locked)
-        else:
 
+        else:
             # Now that the whole pixel array has been read, interpolate the array to align pixel edges
             xi = np.linspace(self._remainder_x,
                             ((self.buffer*2) + self._remainder_x + (self.size_x*2)),
@@ -329,10 +330,13 @@ class Roi():
                                         np.meshgrid(yi, xi, indexing='ij'),
                                         mode=coord_mode,
                                         order=3)
-
+            
             if self.buffer != 0:
                 pixel_locked = pixel_locked[self.buffer:-self.buffer,
                                             self.buffer:-self.buffer]
+
             self._clip_center = tuple(np.array(pixel_locked.shape)[::-1] / 2.)
             self.warped_array_center = self._clip_center
             self._clipped_array = img_as_float32(pixel_locked)
+
+

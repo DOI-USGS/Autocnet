@@ -14,6 +14,7 @@ dependencies:
   - geopandas
   - hoggorm
   - imageio
+  - ipykernel
   - kalasiris
   - knoten=0.2.0
   - ncurses
@@ -25,7 +26,8 @@ dependencies:
   - pyyaml
   - plurmy
   - psycopg2
-  - pvl = 1.0
+  - pvl=1.0
+  - proj=7.0.0
   - conda-forge::pyproj 
   - richdem
   - scikit-image=0.17

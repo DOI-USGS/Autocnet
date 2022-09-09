@@ -111,6 +111,7 @@ def extract_most_interesting(image, extractor_method='orb', extractor_parameters
        The keypoints row with the higest variance. The row has 'x' and 'y' columns to
        get the location.
     """
+
     kps, desc = extract_features(image,
                                  extractor_method=extractor_method,
                                  extractor_parameters=extractor_parameters)
