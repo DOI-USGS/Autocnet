@@ -6,11 +6,12 @@ import geopandas as gpd
 from shapely.geometry import Point
 
 from autocnet.matcher import subpixel as sp
+from autocnet.transformation.spatial import reproject
 
 from plio.io.io_controlnetwork import to_isis, write_filelist
 from plio.utils import covariance
 
-def compute_covariance(df, latsigma, lonsigma, radsigma, radius):
+def compute_covariance(df, dem, latsigma, lonsigma, radsigma):
     """
     Compute the covariance matrices for constrained or fixed points.
 
@@ -18,6 +19,9 @@ def compute_covariance(df, latsigma, lonsigma, radsigma, radius):
     ----------
     df : pd.DataFrame
          with columns pointtype, adjustedY, and adjustedX
+    
+    dem : ~autocnet.spatial.surface.EllipsoidDem or ~autocnet.spatial.surface.GdalDem
+          Digital Elevation Model (DEM) object described the target body
 
     latsigma : int/float
                The estimated sigma (error) in the latitude direction
@@ -27,19 +31,31 @@ def compute_covariance(df, latsigma, lonsigma, radsigma, radius):
 
     radsigma : int/float
                The estimated sigma (error) in the radius direction
-
-    radius : int/float
-             The body semimajor radius
     """
-    def compute_covar(row, latsigma, lonsigma, radsigma, radius):
+
+    semi_major = dem.a
+    semi_minor = dem.c
+
+    def compute_covar(row, latsigma, lonsigma, radsigma, semi_major, semi_minor):
         if row['pointtype'] == 3 or row['pointtype'] == 4:
-            return covariance.compute_covariance(row['adjustedY'], 
-                                                    row['adjustedX'], 
-                                                    radius, 
-                                                    latsigma=latsigma, 
-                                                    lonsigma=lonsigma, 
-                                                    radsigma=radsigma, 
-                                                    semimajor_axis=radius)
+            
+            if semi_minor is None:
+                semi_minor = semi_major
+
+            x,y,z = row[['aprioriX', 'aprioriY', 'aprioriZ']]
+            lon, lat, _ = reproject([x,y,z],
+                                        semi_major, semi_minor,
+                                        'geocent', 'latlon')
+            # compute_covariance requires the radius, autocnet operates in height
+            radius = dem.get_radius(lat, lon)
+
+            return covariance.compute_covariance(lat,
+                                                 lon,
+                                                 radius,
+                                                 latsigma=latsigma,
+                                                 lonsigma=lonsigma,
+                                                 radsigma=radsigma,
+                                                 semimajor_axis=semi_major)
         return []
 
     df['aprioriCovar'] = df.apply(compute_covar, 
@@ -47,7 +63,8 @@ def compute_covariance(df, latsigma, lonsigma, radsigma, radius):
                                   args=(latsigma,
                                   lonsigma,
                                   radsigma,
-                                  radius))
+                                  semi_major,
+                                  semi_minor))
     return df
 
 def identify_potential_overlaps(cg, cn, overlap=True):

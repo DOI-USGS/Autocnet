@@ -63,8 +63,8 @@ def pattern_match_autoreg(template, image, subpixel_size=3, metric=cv2.TM_CCOEFF
 
     # If the area is not square and large enough, this method should fail
     if area.shape != (subpixel_size+2, subpixel_size+2):
-        log.warning("Max correlation is too close to the boundary.")
-        return None, None, 0, None
+        raise Exception("Max correlation is too close to the boundary.")
+        # return None, None, 0, None
 
     cmass = center_of_mass(area)
     subpixel_y_shift = subpixel_size - 1 - cmass[0]

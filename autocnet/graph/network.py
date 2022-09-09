@@ -7,6 +7,7 @@ import os
 from shutil import copyfile
 import threading
 from time import gmtime, strftime, time, sleep
+import time
 import logging
 from itertools import combinations
 
@@ -1475,9 +1476,9 @@ class CandidateGraph(nx.Graph):
 
         df["serialnumber"] = serials
 
-        #only populate the new columns for ground points. Otherwise, isis will
-        #recalculate the control point lat/lon from control measures which where
-        #"massaged" by the phase and template matcher.
+        # only populate the new columns for ground points. Otherwise, isis will
+        # recalculate the control point lat/lon from the average location of the 
+        # control measures projection to ground after autocnet matching.
         for i, group in df.groupby('point_id'):
             zero_group = group.iloc[0]
             apriori_geom = np.array(point_info(self.nodes[zero_group.image_index]['data'].geodata.file_name, zero_group.x, zero_group.y, 'image')['BodyFixedCoordinate'].value) * 1000
@@ -2105,10 +2106,12 @@ class NetworkCandidateGraph(CandidateGraph):
 
     def to_isis(self,
                 path,
+                dem = None,
                 flistpath=None,
                 latsigma=10,
                 lonsigma=10,
                 radsigma=15,
+                ground_xyz=None,
                 **db_kwargs):
         """
         Write a NetworkCandidateGraph to an ISIS control network
@@ -2117,6 +2120,9 @@ class NetworkCandidateGraph(CandidateGraph):
         ----------
         path : str
                Outpath to write the control network
+
+        dem : ~autocnet.spatial.surface.EllipsoidDem or ~autocnet.spatial.surface.GdalDem
+              Digital Elevation Model (DEM) object described the target body
 
         flishpath : str
                     Outpath to write the associated file list. If None (default),
@@ -2131,8 +2137,10 @@ class NetworkCandidateGraph(CandidateGraph):
         radsigma : int/float
                 The estimated sigma (error) in the radius direction
 
-        radius : int/float
-                The body semimajor radius
+        ground_xyz: str
+                    Path to the file that determined image coordinates of ground points,
+                    if different than dem argument. This is the file typically used in 
+                    the image registration step of ground points creation.
 
         db_kwargs : dict
                     Kwargs that are passed to the io.db.controlnetwork.db_to_df function
@@ -2146,15 +2154,26 @@ class NetworkCandidateGraph(CandidateGraph):
                  of paths to the images being included in the control network
 
         """
+
+        if dem is None:
+            dem_file = None
+            log.warning(f'No dem argument passed; covariance matrices will be computed for the points.')
+        else:
+            if isinstance(dem, EllipsoidDem): # not sure about this
+                dem_file = f'EllipsoidDem a={dem.a} b {dem.b} c={dem.c}'
+            elif isinstance(dem, GdalDem):
+                dem_file = dem.dem.file_name
+
         # Read the cnet from the db
-        df = io_controlnetwork.db_to_df(self.engine, **db_kwargs)
+        df = io_controlnetwork.db_to_df(self, ground_radius=dem_file, ground_xyz=ground_xyz, **db_kwargs)
 
         # Add the covariance matrices to ground measures
-        df = control.compute_covariance(df,
-                                        latsigma,
-                                        lonsigma,
-                                        radsigma,
-                                        self.config['spatial']['semimajor_rad'])
+        if dem is not None:
+            df = control.compute_covariance(df,
+                                            dem,
+                                            latsigma,
+                                            lonsigma,
+                                            radsigma)
 
         if flistpath is None:
             flistpath = os.path.splitext(path)[0] + '.lis'
@@ -2241,7 +2260,7 @@ class NetworkCandidateGraph(CandidateGraph):
 
         return obj
 
-    def add_from_filelist(self, filelist, clear_db=False):
+    def add_from_filelist(self, filelist, clear_db=False, exist_check=False):
         """
         Parse a filelist to add nodes to the database.
 
@@ -2265,17 +2284,37 @@ class NetworkCandidateGraph(CandidateGraph):
             self.clear_db()
 
         total=len(filelist)
+        db_images = []
         for cnt, f in enumerate(filelist):
             # Create the nodes in the graph. Really, this is creating the
             # images in the DB
             log.info('loading {} of {}'.format(cnt+1, total))
-            self.add_image(f)
+
+            image_name = os.path.basename(f)
+            node = NetworkNode(image_path=f, image_name=image_name)
+            node.parent = self
+            
+            i = node.create_db_element(exist_check=exist_check)
+            db_images.append(i)
+            break
+
+            if cnt%1000 == 0:
+                log.info('uploading 1000 images to database...')
+                with self.session_scope() as session:
+                    session.add_all(db_images)
+                    db_images = []
+            
+        with self.session_scope() as session:
+            log.info(f'uploading final {len(db_images)} images to database.')
+            session.add_all(db_images)
+
+        
 
         self.from_database()
         # Execute the computation to compute overlapping geometries
         self._execute_sql(sql.compute_overlaps_sql)
 
-    def add_image(self, img_path):
+    def add_image(self, img_path, exist_check=True, add_keypoints=False):
         """
         Upload a single image to NetworkCandidateGraph associated DB.
 
@@ -2292,7 +2331,7 @@ class NetworkCandidateGraph(CandidateGraph):
         image_name = os.path.basename(img_path)
         node = NetworkNode(image_path=img_path, image_name=image_name)
         node.parent = self
-        node.populate_db()
+        node.populate_db(exist_check=exist_check, add_keypoints=add_keypoints)
         return node['node_id']
 
     def copy_images(self, newdir):
@@ -2771,7 +2810,7 @@ class NetworkCandidateGraph(CandidateGraph):
             # return missing image id pairs
             return [e for e in all_edges if e not in graph.edges]
 
-    def cluster_propagate_control_network(self,
+    def cluster_propagate_ground_points(self,
                                           base_cnet,
                                           walltime='00:20:00',
                                           chunksize=1000,
@@ -2910,8 +2949,8 @@ class NetworkCandidateGraph(CandidateGraph):
     def subpixel_regiter_mearure(self, measureid, **kwargs):
         subpixel.subpixel_register_measure(self.Session, measureid, **kwargs)
 
-    def propagate_control_network(self, control_net, **kwargs):
-        cim.propagate_control_network(self.Session,
+    def propagate_ground_points(self, control_net, **kwargs):
+        cim.propagate_ground_points(self.Session,
                                       self.config,
                                       self.dem,
                                       control_net)
