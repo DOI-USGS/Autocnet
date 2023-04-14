@@ -11,7 +11,6 @@ import shapely
 import sqlalchemy
 from plio.io.io_gdal import GeoDataset
 
-from math import floor
 
 from autocnet.cg import cg as compgeom
 from autocnet.graph.node import NetworkNode
@@ -76,6 +75,7 @@ def place_points_in_overlap(overlap,
                             point_type=2,
                             ncg=None,
                             use_cache=False,
+                            ratio_size=0.1,
                             **kwargs):
     """
     Place points into an overlap geometry by back-projecting using sensor models.
@@ -113,6 +113,10 @@ def place_points_in_overlap(overlap,
                 and measures directly to the respective tables. If True, this method writes
                 messages to the point_insert (defined in ncg.config) redis queue for
                 asynchronous (higher performance) inserts.
+    
+    ratio_size : float
+                Used in calling the function distribute_points_in_geom to determine the
+                minimum size the ratio can be to be considered a sliver and ignored.
 
     Returns
     -------
@@ -146,7 +150,7 @@ def place_points_in_overlap(overlap,
     ta = time.time()
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
-    valid = compgeom.distribute_points_in_geom(geom, **distribute_points_kwargs, **kwargs)
+    valid = compgeom.distribute_points_in_geom(geom, ratio_size=ratio_size, **distribute_points_kwargs, **kwargs)
     if not valid.any():
         warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
@@ -218,8 +222,7 @@ def place_points_in_overlap(overlap,
             # kps are in the image space with upper left origin and the roi
             # could be the requested size or smaller if near an image boundary.
             # So use the roi upper left_x and top_y for the actual origin.
-            left_x = floor(image_roi.x) - image_roi.size_x
-            top_y = floor(image_roi.y) - image_roi.size_y
+            left_x, _, top_y, _ = image_roi.image_extent
             newsample = left_x + interesting.x
             newline = top_y + interesting.y
 
@@ -449,8 +452,7 @@ def place_points_in_image(image,
         # kps are in the image space with upper left origin and the roi
         # could be the requested size or smaller if near an image boundary.
         # So use the roi upper left_x and top_y for the actual origin.
-        left_x = floor(image_roi.x) - image_roi.size_x
-        top_y = floor(image_roi.y) - image_roi.size_y
+        left_x, _, top_y, _ = image_roi.image_extent
         newsample = left_x + interesting.x
         newline = top_y + interesting.y
 

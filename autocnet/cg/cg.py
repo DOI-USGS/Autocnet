@@ -459,6 +459,7 @@ def distribute_points_in_geom(geom, method="classic",
                               nspts_func=lambda x: ceil(round(x,1)*10),
                               ewpts_func=lambda x: ceil(round(x,1)*5),
                               Session=None,
+                              ratio_size=0.1,
                               **kwargs):
     """
     Given a geometry, attempt a basic classification of the shape.
@@ -486,6 +487,9 @@ def distribute_points_in_geom(geom, method="classic",
 
     ewpts_func : obj
                  Function taking a Number and returning an int
+    ratio_size : float
+                 A number that represent the minimum size the
+                 ratio is set at to be considered a sliver.
 
     Returns
     -------
@@ -532,7 +536,7 @@ def distribute_points_in_geom(geom, method="classic",
         ew = True
 
     # Decision Tree
-    if ratio < 0.1 and geom.area < 0.01:
+    if ratio < ratio_size and geom.area < 0.01:
         # Class: Slivers - ignore.
         return np.array([])
     elif geom.area <= 0.004 and ratio >= 0.25:
