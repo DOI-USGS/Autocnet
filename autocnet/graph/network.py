@@ -1579,13 +1579,17 @@ class NetworkCandidateGraph(CandidateGraph):
                          that manage asynchronous database inserts. This is primarily
                          used for increased write performance.
         """
+        
         self.config = config_dict
+        
         self.async_watchers = async_watchers
+        print('Watchers setup')
         # Setup REDIS
         self._setup_queues()
-
+        print('Queues setup')
         # Setup the database
         self._setup_database()
+        print('Database setup')
 
         # Setup threaded queue watchers
         if self.async_watchers == True:
@@ -1637,6 +1641,7 @@ class NetworkCandidateGraph(CandidateGraph):
         sleeptime = 2
         retries = 0
         while retries < 5:
+            print(f'Database connection attempt {retries}')
             try:
                 self.Session, self.engine = new_connection(self.config['database'])
 

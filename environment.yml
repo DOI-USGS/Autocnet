@@ -1,9 +1,5 @@
-name: root
-prefix: /opt/conda
 channels:
   - conda-forge
-  - usgs-astrogeology
-  - menpo
 
 dependencies:
   - python>=3
@@ -24,10 +20,9 @@ dependencies:
   - ipykernel
   - jupyter
   - kalasiris
-  - knoten=0.2.0
+  - conda-forge::knoten
   - ncurses
-  - networkx=2
-  - numexpr
+  - networkx>=2,<3
   - numpy
   - opencv <= 3.5
   - pillow
@@ -36,6 +31,7 @@ dependencies:
   - pyyaml
   - plurmy
   - psycopg2
+  - pvl>=1.0,<2
   - proj=7.0.0
   - pvl = 1.0
   - pyproj
@@ -44,14 +40,14 @@ dependencies:
   - pytest-mock
   - runipy
   - richdem
-  - scikit-image=0.17
+  - scikit-image>=0.17
   - scikit-learn
   - scipy=1.2.1
   - shapely
-  - sqlalchemy=1.4
-  - sqlalchemy-utils=0.37.0
+  - sqlalchemy
+  - sqlalchemy-utils
   - redis-py
-  - usgscsm
+  - conda-forge::usgscsm>=1.6.0
   - vlfeat
   - pip
   - protobuf
