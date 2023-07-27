@@ -2,21 +2,21 @@ import math
 import os
 import sys
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, MagicMock, Mock, PropertyMock
 import logging
 
-
 from skimage import transform as tf
-from skimage.util import img_as_float   
-from skimage import color 
+from skimage.util import img_as_float
+from skimage import color
 from skimage import data
 
 import pytest
+import tempfile
 
 import numpy as np
 from imageio import imread
 
-from plio.io.io_gdal import GeoDataset
+from plio.io.io_gdal import GeoDataset, array_to_raster
 
 from autocnet.examples import get_path
 import autocnet.matcher.subpixel as sp
@@ -34,49 +34,49 @@ def iris_pair():
     rotated = tf.rotate(translated, angle)
     rescaled = tf.rescale(rotated, scale)
     sizer, sizec = image.shape
-    rts_image = rescaled[:sizer, :sizec] 
-    return image, rts_image
+    rts_image = rescaled[:sizer, :sizec]
+
+    roi_raster1 = tempfile.NamedTemporaryFile()
+    roi_raster2 = tempfile.NamedTemporaryFile()
+
+    array_to_raster(image, roi_raster1.name)
+    array_to_raster(rts_image, roi_raster2.name)
+
+    roi1 = roi.Roi(GeoDataset(roi_raster1.name), x=705, y=705, size_x=50, size_y=50)
+    roi2 = roi.Roi(GeoDataset(roi_raster2.name), x=705, y=705, size_x=50, size_y=50)
+    return roi1, roi2
+
+def clip_side_effect(arr, clip=False):
+    if not clip:
+        return arr
+    else:
+        center_y = arr.shape[0] / 2
+        center_x = arr.shape[1] / 2
+        xr, x = math.modf(center_x)
+        yr, y = math.modf(center_y)
+        x = int(x)
+        y = int(y)
+        return arr[y-10:y+11, x-10:x+11]
 
 @pytest.fixture
 def apollo_subsets():
-    # These need to be geodata sets or just use mocks...
-    arr1 = imread(get_path('AS15-M-0295_SML(1).png'))[100:201, 123:224]
-    arr2 = imread(get_path('AS15-M-0295_SML(2).png'))[235:336, 95:196]
-    return arr1, arr2
-
-
-@pytest.mark.parametrize("center_x, center_y, size, expected", [(4, 4, 9, 404),
-                                                          (55.4, 63.1, 27, 6355)])
-def test_clip_roi(center_x, center_y, size, expected):
-    img = np.arange(10000).reshape(100, 100)
-
-    clip, axr, ayr = sp.clip_roi(img, center_x, center_y, size)
-
-    assert clip.mean() == expected
-
-def clip_side_effect(*args, **kwargs):
-    if np.array_equal(a, args[0]):
-        return a, 0, 0
-    else:
-        center_y = b.shape[0] / 2
-        center_x = b.shape[1] / 2
-        bxr, bx = math.modf(center_x)
-        byr, by = math.modf(center_y)
-        bx = int(bx)
-        by = int(by)
-        return b[by-10:by+11, bx-10:bx+11], bxr, byr
+    roi1 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(1).png')), x=173, y=150, size_x=50, size_y=50)
+    roi2 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(2).png')), x=145, y=285, size_x=50, size_y=50)
+    roi1.clip()
+    roi2.clip()
+    return roi1, roi2
 
 def test_subpixel_template(apollo_subsets):
     a = apollo_subsets[0]
     b = apollo_subsets[1]
-    with patch('autocnet.matcher.subpixel.clip_roi', side_effect=clip_side_effect):
-        nx, ny, strength, _ = sp.subpixel_template(a.shape[1]/2, a.shape[0]/2,
-                                                b.shape[1]/2, b.shape[0]/2,
-                                                a, b, upsampling=16)
-
-    assert strength >= 0.99
-    assert nx == 50.5
-    assert ny == 52.4375
+    b.size_x = 10
+    b.size_y = 10
+    affine, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16)
+    nx, ny = affine.translation
+    assert nx == -0.3125
+    assert ny == 1.5
+    assert np.max(corr_map) >= 0.9367293
+    assert metrics >= 0.9367293
 
 @pytest.mark.parametrize("loc, failure", [((0,4), True),
                                           ((4,0), True),
@@ -84,103 +84,68 @@ def test_subpixel_template(apollo_subsets):
 def test_subpixel_template_at_edge(apollo_subsets, loc, failure):
     a = apollo_subsets[0]
     b = apollo_subsets[1]
+    b.size_x = 10
+    b.size_y = 10
 
     def func(*args, **kwargs):
         corr = np.zeros((10,10))
         corr[loc[0], loc[1]] = 10
         return 0, 0, 0, corr
 
-    with patch('autocnet.matcher.subpixel.clip_roi', side_effect=clip_side_effect):
-        if failure:
-            # with pytest.warns(UserWarning, match=r'Maximum correlation \S+'):
-            # match=r'Maximum correlation \S+'
-            nx, ny, strength, _ = sp.subpixel_template(a.shape[1]/2, a.shape[0]/2,
-                                                    b.shape[1]/2, b.shape[0]/2,
-                                                    a, b, upsampling=16,
-                                                    func=func)
-        else:
-            nx, ny, strength, _ = sp.subpixel_template(a.shape[1]/2, a.shape[0]/2,
-                                                        b.shape[1]/2, b.shape[0]/2,
-                                                        a, b, upsampling=16,
-                                                        func=func)
-            assert nx == 50.5
-
-def test_subpixel_transformed_template(apollo_subsets):
-    a = apollo_subsets[0]
-    b = apollo_subsets[1]
-    transform = tf.AffineTransform(rotation=math.radians(1), scale=(1.1,1.1))
-    with patch('autocnet.matcher.subpixel.clip_roi', side_effect=clip_side_effect):
-        nx, ny, strength, _ = sp.subpixel_transformed_template(a.shape[1]/2, a.shape[0]/2,
-                                                b.shape[1]/2, b.shape[0]/2,
-                                                a, b, transform, upsampling=16)
-
-    assert strength >= 0.83
-    assert nx == pytest.approx(50.576284)
-    assert ny == pytest.approx(54.0081)
+    if failure:
+        affine, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16,
+                                                         func=func)
+    else:
+        affine, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16,
+                                                         func=func)
+        nx, ny = affine.translation
+        assert nx == 0
 
 
 def test_estimate_logpolar_transform(iris_pair):
-    img1, img2 = iris_pair 
-    affine = sp.estimate_logpolar_transform(img1, img2) 
+    roi1, roi2 = iris_pair
+    roi1.size_x = 705
+    roi1.size_y = 705
+    roi2.size_x = 705
+    roi2.size_y = 705
+    roi1.clip()
+    roi2.clip()
+    affine = sp.estimate_logpolar_transform(roi1.clipped_array, roi2.clipped_array)
 
     assert pytest.approx(affine.scale, 0.1) == 0.71
-    assert pytest.approx(affine.rotation, 0.1) == 0.34 
+    assert pytest.approx(affine.rotation, 0.1) == 0.34
     assert pytest.approx(affine.translation[0], 0.1) == 283.68
-    assert pytest.approx(affine.translation[1], 0.1) == -198.62 
+    assert pytest.approx(affine.translation[1], 0.1) == -198.62
 
 
 def test_fourier_mellen(iris_pair):
-    img1, img2 = iris_pair 
-    nx, ny, error = sp.fourier_mellen(img1, img2, phase_kwargs = {"reduction" : 11, "size":(401, 401), "convergence_threshold" : 1, "max_dist":100}) 
-    
-    assert pytest.approx(nx, 0.01) == 996.39 
-    assert pytest.approx(ny, 0.01) ==  984.912 
-    assert pytest.approx(error, 0.01) == 0.0422 
+    roi1, roi2 = iris_pair
+    roi1.size_x = 200
+    roi1.size_y = 200
+    roi2.size_x = 200
+    roi2.size_y = 200
+    roi1.clip()
+    roi2.clip()
+    affine, metrics, corrmap = sp.fourier_mellen(roi1, roi2, phase_kwargs = {"reduction" : 11, "convergence_threshold" : 1, "max_dist":100})
+
+    assert pytest.approx(nx, 0.01) == 996.39
+    assert pytest.approx(ny, 0.01) ==  984.912
+    assert pytest.approx(error, 0.01) == 0.0422
 
 
-@pytest.mark.parametrize("loc, failure", [((0,4), True),
-                                          ((4,0), True),
-                                          ((1,1), False)])
-def test_subpixel_transformed_template_at_edge(apollo_subsets, loc, failure):
-    a = apollo_subsets[0]
-    b = apollo_subsets[1]
-
-    def func(*args, **kwargs):
-        corr = np.zeros((5,5))
-        corr[loc[0], loc[1]] = 10
-        return 0, 0, 0, corr
-
-    transform = tf.AffineTransform(rotation=math.radians(1), scale=(1.1,1.1))
-    with patch('autocnet.matcher.subpixel.clip_roi', side_effect=clip_side_effect):
-        if failure:
-            print(a.shape[1]/2, a.shape[0]/2,b.shape[1]/2, b.shape[0]/2,
-                                                    a, b)
-            nx, ny, strength, _ = sp.subpixel_transformed_template(a.shape[1]/2, a.shape[0]/2,
-                                                    b.shape[1]/2, b.shape[0]/2,
-                                                    a, b, transform, upsampling=16,
-                                                    func=func)
-        else:
-            nx, ny, strength, _ = sp.subpixel_transformed_template(a.shape[1]/2, a.shape[0]/2,
-                                                        b.shape[1]/2, b.shape[0]/2,
-                                                        a, b, transform, upsampling=16,
-                                                        func=func)
-            assert nx == 50.5
-
-@pytest.mark.parametrize("convergence_threshold, expected", [(2.0, (50.49, 52.08, -9.5e-20))])
+@pytest.mark.parametrize("convergence_threshold, expected", [(2.0, (-0.32, 1.66, -9.5e-20))])
 def test_iterative_phase(apollo_subsets, convergence_threshold, expected):
     a = apollo_subsets[0]
     b = apollo_subsets[1]
-    dx, dy, strength = sp.iterative_phase(a.shape[1]/2, a.shape[0]/2,
-                                          b.shape[1]/2, b.shape[1]/2,
-                                          a, b, 
-                                          size=(51,51), 
-                                          convergence_threshold=convergence_threshold,
-                                          upsample_factor=100)
+    affine, metrics, corr_map = sp.iterative_phase(a, b,
+                                                   convergence_threshold=convergence_threshold,
+                                                   upsample_factor=100)
+    dx, dy = affine.translation
     assert dx == expected[0]
     assert dy == expected[1]
     if expected[2] is not None:
         # for i in range(len(strength)):
-        assert pytest.approx(strength,6) == expected[2]
+        assert pytest.approx(metrics,6) == expected[2]
 
 @pytest.mark.parametrize("data, expected", [
     ((21,21), (10, 10)),

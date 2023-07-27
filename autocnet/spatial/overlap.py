@@ -75,6 +75,7 @@ def place_points_in_overlap(overlap,
                             point_type=2,
                             ncg=None,
                             use_cache=False,
+                            ratio_size=0.1,
                             **kwargs):
     """
     Place points into an overlap geometry by back-projecting using sensor models.
@@ -112,6 +113,10 @@ def place_points_in_overlap(overlap,
                 and measures directly to the respective tables. If True, this method writes
                 messages to the point_insert (defined in ncg.config) redis queue for
                 asynchronous (higher performance) inserts.
+    
+    ratio_size : float
+                Used in calling the function distribute_points_in_geom to determine the
+                minimum size the ratio can be to be considered a sliver and ignored.
 
     Returns
     -------
@@ -145,7 +150,7 @@ def place_points_in_overlap(overlap,
     ta = time.time()
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
-    valid = compgeom.distribute_points_in_geom(geom, **distribute_points_kwargs, **kwargs)
+    valid = compgeom.distribute_points_in_geom(geom, ratio_size=ratio_size, **distribute_points_kwargs, **kwargs)
     if not valid.any():
         warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
@@ -181,12 +186,10 @@ def place_points_in_overlap(overlap,
             # reference_index is the index into the list of measures for the image that is not shifted and is set at the
             # reference against which all other images are registered.
             if cam_type == "isis":
-                try:
-                    sample, line = isis.ground_to_image(node["image_path"], lon, lat)
-                except CalledProcessError as e:
-                    if 'Requested position does not project in camera model' in e.stderr:
-                        log.exception(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
-                        continue
+                sample, line = isis.ground_to_image(node["image_path"], lon, lat)
+                if sample == None or line == None:
+                    log.warning(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
+                    continue
             if cam_type == "csm":
                 lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
                 x, y, z = reproject([lon_og, lat_og, height],

@@ -54,8 +54,6 @@ requirements:
       - pvl >= 1.0
       - psycopg2
       - pyproj
-      - pytest
-      - pytest-cov
       - python>=3
       - pyyaml
       - redis-py
