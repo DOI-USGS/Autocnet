@@ -32,6 +32,10 @@ When preparing for a bug fix release create a new 2nd heading above the Fixed
 heading to indicate that only the bug fixes and security fixes are in the bug fix
 release.
 -->
+## [Unreleased]
+
+### Fixed
+- `place_points_in_overlap` bug where if any of the points in the overlap failed to project into an image, all points in the overlap were lost. This was caused by #580, which allowed for multiple (a list) of inputs. The error handling was removed from the `image_to_ground` call so the `except` in `place_points_in_overlap` was never called.
 ## [1.0.0-rc2]
 
 ### Changed
