@@ -186,12 +186,10 @@ def place_points_in_overlap(overlap,
             # reference_index is the index into the list of measures for the image that is not shifted and is set at the
             # reference against which all other images are registered.
             if cam_type == "isis":
-                try:
-                    sample, line = isis.ground_to_image(node["image_path"], lon, lat)
-                except CalledProcessError as e:
-                    if 'Requested position does not project in camera model' in e.stderr:
-                        log.exception(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
-                        continue
+                sample, line = isis.ground_to_image(node["image_path"], lon, lat)
+                if sample == None or line == None:
+                    log.warning(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
+                    continue
             if cam_type == "csm":
                 lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
                 x, y, z = reproject([lon_og, lat_og, height],
