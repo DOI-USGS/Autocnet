@@ -3,6 +3,8 @@ import itertools
 import os
 import logging
 
+import time
+
 from csmapi import csmapi
 import numpy as np
 import pandas as pd
@@ -507,27 +509,30 @@ class NetworkNode(Node):
         # If this is the first time that the image is seen, add it to the DB
         self.job_status = defaultdict(dict)
 
-    def populate_db(self):
-        with self.parent.session_scope() as session:
-            res = session.query(Images).filter(Images.path == self['image_path']).first()
-            if res:
-                # Image already exists
-                return
+
+    def create_db_element(self, exist_check=False, add_keypoints=False):
+        if exist_check:
+            with self.parent.session_scope() as session:
+                res = session.query(Images).filter(Images.path == self['image_path']).first()
+                if res:
+                    # Image already exists
+                    return
 
         # If the geodata is not valid, do no create an assocaited keypoints file
         #  One instance when invalid is during testing.
-        if hasattr(self.geodata, 'file_name'):
-            kpspath = io_keypoints.create_output_path(self.geodata.file_name)
-            # Create the keypoints entry
-            kps = Keypoints(path=kpspath, nkeypoints=0)
-        else:
-            kps = None
+        kps = None
+        if add_keypoints:
+            if hasattr(self.geodata, 'file_name'):
+                kpspath = io_keypoints.create_output_path(self.geodata.file_name)
+                # Create the keypoints entry
+                kps = Keypoints(path=kpspath, nkeypoints=0)
 
         try:
-            fp, cam_type = self.footprint
+            fp, cam_type = self.generate_footprint(exist_check=exist_check)
         except Exception as e:
             log.warning('Unable to generate image footprint.\n{}'.format(e))
             fp = cam_type = None
+
         # Create the image
         i = Images(name=self['image_name'],
                    path=self['image_path'],
@@ -536,6 +541,11 @@ class NetworkNode(Node):
                    #cameras=cam,
                    serial=self.isis_serial,
                    cam_type=cam_type)
+        
+        return i
+
+    def populate_db(self, exist_check=False, add_keypoints=False):
+        i = self.create_db_element(exist_check=exist_check, add_keypoints=add_keypoints)
 
         with self.parent.session_scope() as session:
             session.add(i)
@@ -663,33 +673,62 @@ class NetworkNode(Node):
                 self._camera = plugin.constructModelFromState(res.camera)
         return self._camera
 
-    @property
-    def footprint(self):
+    
+    def footprint_from_database(self):
         with self.parent.session_scope() as session:
             res = session.query(Images).filter(Images.id == self['node_id']).first()
+            if res is None:
+                return None, None
+            else:
+                footprint_latlon = res.geom
+                cam_type = res.cam_type
+        return footprint_latlon, cam_type
+
+    def footprint_from_isis(self):
+        footprint_latlon =  shapely.wkt.loads(self.geodata.footprint.ExportToWkt())
+        if isinstance(footprint_latlon, shapely.geometry.Polygon):
+            footprint_latlon = shapely.geometry.MultiPolygon(list(footprint_latlon))
+        cam_type = 'isis'
+        return footprint_latlon, cam_type
+
+    def footprint_from_csm(self):
+        boundary = generate_boundary(self.geodata.raster_size[::-1])  # yx to xy
+        footprint_latlon = generate_latlon_footprint(self.camera,
+                                                        boundary,
+                                                        dem=parent.dem)
+        footprint_latlon.FlattenTo2D()
+        cam_type = 'csm'
+        return footprint_latlon, cam_type
+
+    def generate_footprint(self, exist_check=True):        
+        footprint_latlon = cam_type = None
+
+        if exist_check:
+            print('ERRORRRORORORORRR!!!')
+            footprint_latlon, cam_type = self.footprint_from_database()
 
         # not in database, create footprint
-        if res is None:
-            # get ISIS footprint if possible
+        if footprint_latlon is None and cam_type is None:
             if utils.find_in_dict(self.geodata.metadata, "Polygon"):
-                footprint_latlon =  shapely.wkt.loads(self.geodata.footprint.ExportToWkt())
-                if isinstance(footprint_latlon, shapely.geometry.Polygon):
-                    footprint_latlon = shapely.geometry.MultiPolygon(list(footprint_latlon))
-                cam_type = 'isis'
-                return footprint_latlon, cam_type
-            # Get CSM footprint
+                # get ISIS footprint if possible
+                t1 = time.time()
+                footprint_latlon, cam_type = self.footprint_from_isis()
+                t2 = time.time()
+                print(f'time to get ISIS footprint: {t2 - t1}')
             else:
-                boundary = generate_boundary(self.geodata.raster_size[::-1])  # yx to xy
-                footprint_latlon = generate_latlon_footprint(self.camera,
-                                                             boundary,
-                                                             dem=parent.dem)
-                footprint_latlon.FlattenTo2D()
-                cam_type = 'csm'
-                return footprint_latlon, cam_type
-        else:
-            # in database, return footprint
-            footprint_latlon = res.footprint_latlon
-            return footprint_latlon
+                # Get CSM footprint
+                t1 = time.time()
+                footprint_latlon, cam_type = self.footprint_from_csm()
+                t2 = time.time()
+                print(f'time to get CSM footprint: {t2 - t1}')
+       
+        return footprint_latlon, cam_type
+
+    @property
+    def footprint(self):
+        if not hasattr(self, '_footprint'):
+            self._footprint = self.generate_footprint()
+        return self._footprint
 
     @property
     def points(self):

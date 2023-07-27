@@ -53,7 +53,7 @@ def estimate_affine_from_sensors(reference_image,
 
     match_size = reference_image.raster_size
 
-    '''# for now, require the entire window resides inside both cubes.
+    # for now, require the entire window resides inside both cubes.
     if base_stopx > match_size[0]:
         raise Exception(f"Window: {base_stopx} > {match_size[0]}, center: {bcenter_x},{bcenter_y}")
     if base_startx < 0:
@@ -62,7 +62,7 @@ def estimate_affine_from_sensors(reference_image,
         raise Exception(f"Window: {base_stopy} > {match_size[1]}, center: {bcenter_x},{bcenter_y} ")
     if base_starty < 0:
         raise Exception(f"Window: {base_starty} < 0, center: {bcenter_x},{bcenter_y}")
-    '''
+    
     x_coords = [base_startx, base_startx, base_stopx, base_stopx, bcenter_x]
     y_coords = [base_starty, base_stopy, base_stopy, base_starty, bcenter_y]
 
@@ -109,10 +109,15 @@ def estimate_local_affine(reference_roi, moving_roi):
     """
     # get initial affine
     roi_buffer = reference_roi.buffer
-    size_x = 60# reference_roi.size_x + roi_buffer
-    size_y = 60# reference_roi.size_y + roi_buffer
+    size_x = 60 # reference_roi.size_x + roi_buffer
+    size_y = 60 # reference_roi.size_y + roi_buffer
     
-    affine_transform = estimate_affine_from_sensors(reference_roi.data, moving_roi.data, reference_roi.x, reference_roi.y, size_x=size_x, size_y=size_y)
+    affine_transform = estimate_affine_from_sensors(reference_roi.data, 
+                                                    moving_roi.data, 
+                                                    reference_roi.x, 
+                                                    reference_roi.y, 
+                                                    size_x=size_x, 
+                                                    size_y=size_y)
 
 
     # The above coordinate transformation to get the center of the ROI handles translation. 
@@ -123,7 +128,10 @@ def estimate_local_affine(reference_roi, moving_roi):
                                    scale=affine_transform.scale)
 
     # This rotates about the center of the image
-    shift_x, shift_y = (30.5, 30.5) #moving_roi.center
+    shift_x, shift_y = moving_roi.clip_center
+    if moving_roi.buffer:
+        shift_x += moving_roi.buffer
+        shift_y += moving_roi.buffer
         
     tf_shift = tf.SimilarityTransform(translation=[shift_x, shift_y])
     tf_shift_inv = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
