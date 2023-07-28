@@ -202,11 +202,14 @@ def place_points_in_overlap(overlap,
 
             # Extract ORB features in a sub-image around the desired point
             image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
-            if image_roi.variance == 0:
-                log.warning(f'Failed to find interesting features in image {node.image_name}.')
+            try:
+                if image_roi.variance == 0:
+                    log.warning(f'Failed to find interesting features in image.')
+                    continue
+            except:
+                log.warning(f'Failed to find interesting features in image.')
                 continue
             # Extract the most interesting feature in the search window
-            image_roi.clip()
             interesting = extract_most_interesting(image_roi.clipped_array)
             if interesting is not None:
                 # We have found an interesting feature and have identified the reference point.
@@ -292,11 +295,11 @@ def place_points_in_overlap(overlap,
                 # If this try/except fails, then the reference_index could be wrong because the length
                 # of the measures list is different than the length of the nodes list that was used
                 # to find the most interesting feature.
-                try:
-                    sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
+                sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
+                if sample == None or line == None:
                 #except CalledProcessError as e:
-                except:  # CalledProcessError is not catching the ValueError that this try/except is attempting to handle.
-                    log.exception(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
+                #except:  # CalledProcessError is not catching the ValueError that this try/except is attempting to handle.
+                    log.warning(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
                     # If the current_index is greater than the reference_index, the change in list size does
                     # not impact the positional index of the reference. If current_index is less than the
                     # reference_index, then the reference_index needs to de-increment by one for each time
@@ -305,7 +308,6 @@ def place_points_in_overlap(overlap,
                         reference_index -= 1
                     log.debug('Reference de-incremented.')
                     continue
-
             point.measures.append(Measures(sample=sample,
                                            line=line,
                                            apriorisample=sample,
