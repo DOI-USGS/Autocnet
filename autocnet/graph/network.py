@@ -1817,7 +1817,7 @@ class NetworkCandidateGraph(CandidateGraph):
             log.warning('Use of filters and query_string are mutually exclusive.')
 
         with self.session_scope() as session:
-            t1 = time()
+            t1 = time.time()
             # Support either an SQL query string, or a simple dict based query
             if query_string:
                 log.info(f'Executing query {query_string} to generate objects for queuing.')
@@ -1834,7 +1834,7 @@ class NetworkCandidateGraph(CandidateGraph):
                 res = query.order_by(query_obj.id).all()
             # Expunge so that the connection can be rapidly returned to the pool
             session.expunge_all()
-            t2 = time()
+            t2 = time.time()
         log.debug(f'Query time: {t2-t1}')
 
         if len(res) == 0:
