@@ -69,7 +69,8 @@ def estimate_affine_from_sensors(reference_image,
     # Dispatch to the sensor to get the a priori pixel location in the input image
     lons, lats = isis.image_to_ground(reference_image.file_name, x_coords, y_coords, allowoutside=True)
     xs, ys = isis.ground_to_image(moving_image.file_name, lons, lats, allowoutside=True)
-
+    log.debug(f'Lon/Lats for affine estimate are: {list(zip(lons, lats))}')
+    log.debug(f'Image X / Image Y for affine estimate are: {list(zip(xs, ys))}')
 
     # Check for any coords that do not project between images
     base_gcps = []
@@ -82,7 +83,10 @@ def estimate_affine_from_sensors(reference_image,
     if len(dst_gcps) < 3:
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_corners)} points, but need at least 3.')
 
+    log.debug(f'Number of GCPs for affine estimation: {len(dst_gcps)}')
+
     affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
+    log.debug(f'Computed afffine: {affine}')
     t2 = time.time()
     log.debug(f'Estimation of local affine took {t2-t1} seconds.')
     return affine
@@ -119,7 +123,13 @@ def estimate_local_affine(reference_roi, moving_roi):
                                                     size_x=size_x, 
                                                     size_y=size_y)
 
-
+    log.debug(f'Affine shear: {affine_transform.shear}')
+    if abs(affine_transform.shear) > 1e-2:
+        # Matching LROC NAC high slew images to nadir images demonstrated that affine transformations
+        # with high shear match poorly. The search templates also have reflection (ROI object, x/y_read_length)
+        # because a high shear affine requires  alot of data to be read in. 
+        # TODO: Consider handling this differently in the future should nadir to high slew image matching be required.
+        log.warn(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match.')
     # The above coordinate transformation to get the center of the ROI handles translation. 
     # So, we only need to rotate/shear/scale the ROI. Omitting scale, which should be 1 (?) results
     # in an affine transoformation that does not match the full image affine
