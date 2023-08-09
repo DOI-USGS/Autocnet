@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 import json
@@ -295,6 +296,9 @@ def place_points_in_overlap(overlap,
                 # If this try/except fails, then the reference_index could be wrong because the length
                 # of the measures list is different than the length of the nodes list that was used
                 # to find the most interesting feature.
+                if not os.path.exists(node["image_path"]):
+                    log.warning(f'Unable to find input image {node["image_path"]}')
+                    continue
                 sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
                 if sample == None or line == None:
                 #except CalledProcessError as e:

@@ -34,6 +34,9 @@ release.
 -->
 ## [Unreleased]
 
+### Added
+- Logging to `affine` transformation that warns when the absolute value of the shear on the affine transformation is greater than 1e-2. High shear in the transformation matric was observed attempting to match nadir LROC-NAC to high slew LROC-NAC data. These high slew images do not match well to nadir images. Additionally, the `x_read_length` and `y_read_length` variables in the `Roi` class (`roi.py`) have a hard coded read length of two times the passed size. This read size is insufficient as the affine shear increases. A candidate enhancement would be to automatically compute the read size based on the affine transformation. This was not done in this addition as matching between high slew and nadir images using a correlation coefficient based approach is quite poor.
+- Image check into `place_points_in_overlap` that ensures that the candidate reference image exists on disk. If it does not, the algorithm skips attempting to place points in that image and attempts to use the next image. This was added for LROC NAC control as some images may fail to download.
 ### Fixed
 - `place_points_in_overlap` bug where if any of the points in the overlap failed to project into an image, all points in the overlap were lost. This was caused by #580, which allowed for multiple (a list) of inputs. The error handling was removed from the `image_to_ground` call so the `except` in `place_points_in_overlap` was never called.
 ## [1.0.0-rc2]
