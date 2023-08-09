@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 with open('README.md', 'r') as f:
     long_description = f.read()
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 def setup_package():
     setup(
