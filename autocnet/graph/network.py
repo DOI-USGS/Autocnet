@@ -1906,6 +1906,18 @@ class NetworkCandidateGraph(CandidateGraph):
         This methods returns the number of jobs submitted. The job status is then asynchronously
         updated as the jobs complete.
 
+        Functions passed to this method can be a string in the form `module.function_name`. When passed this way,
+        the function will be discovered in the `autocnet` root. For example, `spatial.overlay.place_points_in_overlaps`
+        can be passed to apply the `place_points_in_overlaps` function defined within autocnet. Alternatively, a function
+        can be passed that will be pickled and sent to each child job. The pickled function must inline all needed
+        dependencies (e.g., import math).
+
+        Functions passed to apply can be applied to objects or arbitrary iterables. In the case of object, the 
+        `on` parameter defines how to specifiy a specific autocnet data structure. For an arbitrary iterable, any
+        python iterable can be passed. The first argument passed to the function is the element from the iterable. For
+        example, if `on = [[1,2,3], [4,5,6]]`, the first argument passed to each function invocation will be
+        `[1,2,3]` and `[4,5,6]`, each in an independent job.
+
         Parameters
         ----------
 
@@ -1915,11 +1927,12 @@ class NetworkCandidateGraph(CandidateGraph):
                    function requires imports external to this library, those imports must be made
                    within the function scope.
 
-        on : str
+        on : str / list
              {'edge', 'edges', 'e', 0} for an edge
              {'node', 'nodes', 'n' 1} for a node
              {'measures', 'measure', 'm', '2'} for measures
              {'points', 'point', 'p', '3'} for points
+             an arbitrary iterable upon which the function is applied.
 
         args : tuple
                Of additional arguments to pass to the apply function
@@ -1981,6 +1994,9 @@ class NetworkCandidateGraph(CandidateGraph):
                      is being used to orchestrate queue population and another process is being
                      used to process the messages. Default: False.
 
+        exclude : string
+                  nodes to exclude from the processing jobs, passed to slurm
+                     
         Returns
         -------
         job_str : str
