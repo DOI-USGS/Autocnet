@@ -45,5 +45,3 @@ doc-build-and-deploy:
   artifacts:
     paths:
       - public
-  rules:
-    - if: $COMMIT_REF_NAME == $CI_DEFAULT_BRANCH   
