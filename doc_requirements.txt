@@ -1,0 +1,3 @@
+sphinx
+numpydoc
+jupyter-sphinx
