@@ -17,7 +17,7 @@ before_script:
   - conda init
   - source /root/.bashrc
   - source activate autocnet_env
-  - pip install -r test_requirements.txt
+  - pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r test_requirements.txt
 
 stages:
   - test
