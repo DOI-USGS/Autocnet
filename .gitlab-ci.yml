@@ -44,4 +44,4 @@ doc-build-and-deploy:
     paths:
       - public
   rules:
-    - if $COMMIT_REF_NAME == $CI_DEFAULT_BRANCH   
+    - if: $COMMIT_REF_NAME == $CI_DEFAULT_BRANCH   
