@@ -1,4 +1,5 @@
 sphinx
 numpydoc
 jupyter-sphinx
+nbsphinx
 make
