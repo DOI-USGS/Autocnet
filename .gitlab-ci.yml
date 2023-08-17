@@ -42,6 +42,7 @@ doc-build-and-deploy:
   script:
     - pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r doc_requirements.txt
     - cd docs 
+    - ls
     - make html
   artifacts:
     paths:
