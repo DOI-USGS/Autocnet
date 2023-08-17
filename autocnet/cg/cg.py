@@ -597,7 +597,7 @@ def alpha_shape(points, alpha):
     circums = a * b * c / (4.0 * areas)
 
     # avoid devide by zero
-    thresh = 1.0/alpha if alpha is not 0 else circums.max()
+    thresh = 1.0/alpha if alpha != 0 else circums.max()
     filtered = triangles[circums < thresh]
 
     edge1 = filtered[:,(0,1)]
