@@ -12,19 +12,24 @@ variables:
     POSTGRES_PASSWORD: NotTheDefault
     POSTGRES_HOST_AUTH_METHOD: trust
 
+before_script:
+  - mamba env create -f environment.yml -n autocnet_env
+  - conda init
+  - source /root/.bashrc
+  - source activate autocnet_env
+  - mamba install pip
+
 stages:
   - test
+  - deploy
+
 unit-test-job:
   stage: test
   script:
+    - mamba install --file test_requirements.txt
     - wget "https://asc-isisdata.s3.us-west-2.amazonaws.com/autocnet_test_data/B08_012650_1780_XN_02S046W.l1.cal.destriped.crop.cub" -P tests/test_subpixel_match/
     - wget "https://asc-isisdata.s3.us-west-2.amazonaws.com/autocnet_test_data/D16_033458_1785_XN_01S046W.l1.cal.destriped.crop.cub" -P tests/test_subpixel_match/
     - wget "https://asc-isisdata.s3.us-west-2.amazonaws.com/autocnet_test_data/J04_046447_1777_XI_02S046W.l1.cal.destriped.crop.cub" -P tests/test_subpixel_match/
-    - mamba env create -f environment.yml -n autocnet_env
-    - conda init
-    - source /root/.bashrc
-    - source activate autocnet_env
-    - pip install -r test_requirements.txt
     - psql -h $POSTGRES_HOST -c 'create database template_postgis;' -U postgres ;
     - psql template_postgis -h $POSTGRES_HOST -U postgres -c 'create extension postgis';
     - psql template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -c 'create extension postgis_topology';
@@ -32,3 +37,14 @@ unit-test-job:
     - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -c 'GRANT ALL ON geography_columns TO PUBLIC;';
     - psql -d template_postgis -U $POSTGRES_USER -h $POSTGRES_HOST -c 'GRANT ALL ON spatial_ref_sys TO PUBLIC;';
     - pytest .
+
+doc-build-and-deploy:
+  stage: test 
+  script:
+    - mamba install --file doc_requirements.txt
+    - cd docs 
+    - ls
+    - make html
+  artifacts:
+    paths:
+      - public
