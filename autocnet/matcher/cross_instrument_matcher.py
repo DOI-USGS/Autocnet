@@ -3,7 +3,11 @@ import numpy as np
 import os
 import os.path
 import pvl
-import kalasiris
+try:
+    import kalasiris as isis
+except Exception as exception:
+    from autocnet.utils.utils import FailedImport
+    isis = FailedImport(exception)
 
 import pandas as pd
 from plio.utils.utils import find_in_dict
@@ -285,7 +289,7 @@ def propagate_point(lon,
         if dest_res is None:
             try:
                 # use camera
-                dest_campt = pvl.loads(kalasiris.campt(dest_image.file_name).stdout)["GroundPoint"]
+                dest_campt = pvl.loads(isis.campt(dest_image.file_name).stdout)["GroundPoint"]
                 dest_res = dest_campt["LineResolution"]
             except:
                 log.error(f'{dest_image} does not have associated camera or mapping information. Please attach spice kernels or map project.')
@@ -293,7 +297,7 @@ def propagate_point(lon,
         base_res = find_in_dict(base_image.metadata, 'PixelResolution')
         if base_res is None:
             try:
-                base_campt = pvl.loads(kalasiris.campt(base_image.file_name).stdout)["GroundPoint"]
+                base_campt = pvl.loads(isis.campt(base_image.file_name).stdout)["GroundPoint"]
                 base_res = base_campt["LineResolution"]
             except:
                 log.error(f'{base_image} does not have associated camera or mapping information. Please attach spice kernels or map project.')
