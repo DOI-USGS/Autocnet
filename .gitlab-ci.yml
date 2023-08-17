@@ -17,6 +17,7 @@ before_script:
   - conda init
   - source /root/.bashrc
   - source activate autocnet_env
+  - mamba install pip
 
 stages:
   - test
