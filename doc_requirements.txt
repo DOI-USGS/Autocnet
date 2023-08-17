@@ -1,4 +1,4 @@
-sphinx
+sphinx<7
 numpydoc
 jupyter-sphinx
 nbsphinx
