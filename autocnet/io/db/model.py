@@ -689,7 +689,7 @@ def try_db_creation(engine, config):
                                      Cameras.__table__, Points.__table__,
                                      Measures.__table__, Images.__table__,
                                      Keypoints.__table__, CandidateGroundPoints.__table__,
-                                     JobsHistory.__table__, MeasuresHistory.__table__, PointsHistory.__table__])
-
+                                     JobsHistory.__table__, MeasuresHistory.__table__, PointsHistory.__table__],
+                             bind=engine)
 
 

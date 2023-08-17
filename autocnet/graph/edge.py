@@ -1,4 +1,5 @@
-from collections import defaultdict, MutableMapping, Counter
+from collections import defaultdict, Counter
+from collections.abc import MutableMapping
 from functools import wraps, singledispatch
 import json
 import logging

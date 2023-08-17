@@ -46,4 +46,5 @@ def new_connection(dbconfig):
                 isolation_level="AUTOCOMMIT",
                 pool_pre_ping=True)
     Session = orm.sessionmaker(bind=engine, autocommit=False)
+    print(Session, engine)
     return Session, engine

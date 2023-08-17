@@ -1,4 +1,5 @@
-from collections import defaultdict, MutableMapping
+from collections import defaultdict
+from collections.abc import MutableMapping
 import itertools
 import os
 import logging

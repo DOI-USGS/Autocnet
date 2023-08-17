@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock, MagicMock
 import pytest
 
-import ogr
+from osgeo import ogr
 import numpy as np
 import pandas as pd
 from plio.io import io_gdal
