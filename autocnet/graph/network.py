@@ -94,8 +94,8 @@ class CandidateGraph(nx.Graph):
 
     """
 
-    #node_factory = Node
-    #edge_factory = Edge
+    node_factory = Node
+    edge_factory = Edge
     measures_keys = ['point_id', 'image_index', 'keypoint_index',
                      'edge', 'match_idx', 'x', 'y', 'x_off', 'y_off', 'corr']
     # dtypes are usful for allowing merges, otherwise they default to object
@@ -138,7 +138,7 @@ class CandidateGraph(nx.Graph):
             self.graph['node_name_map'][i] = node_id
 
         # Relabel the nodes in place to use integer node ids
-        nx.relabel_nodes(self, self.graph['node_name_map'], copy=False)
+        # nx.relabel_nodes(self, self.graph['node_name_map'], copy=False)
         for s, d, e in self.edges(data=True):
             if s > d:
                 s, d = d, s
