@@ -705,7 +705,6 @@ class NetworkNode(Node):
         footprint_latlon = cam_type = None
 
         if exist_check:
-            print('ERRORRRORORORORRR!!!')
             footprint_latlon, cam_type = self.footprint_from_database()
 
         # not in database, create footprint
@@ -715,13 +714,11 @@ class NetworkNode(Node):
                 t1 = time.time()
                 footprint_latlon, cam_type = self.footprint_from_isis()
                 t2 = time.time()
-                print(f'time to get ISIS footprint: {t2 - t1}')
             else:
                 # Get CSM footprint
                 t1 = time.time()
                 footprint_latlon, cam_type = self.footprint_from_csm()
                 t2 = time.time()
-                print(f'time to get CSM footprint: {t2 - t1}')
        
         return footprint_latlon, cam_type
 
