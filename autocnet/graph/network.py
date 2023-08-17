@@ -20,6 +20,7 @@ import shapely
 import scipy.special
 
 import geoalchemy2
+from sqlalchemy import text
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.sql import func
 import shapely.affinity
@@ -93,8 +94,8 @@ class CandidateGraph(nx.Graph):
 
     """
 
-    node_factory = Node
-    edge_factory = Edge
+    #node_factory = Node
+    #edge_factory = Edge
     measures_keys = ['point_id', 'image_index', 'keypoint_index',
                      'edge', 'match_idx', 'x', 'y', 'x_off', 'y_off', 'corr']
     # dtypes are usful for allowing merges, otherwise they default to object
@@ -149,6 +150,10 @@ class CandidateGraph(nx.Graph):
 
         if overlaps:
             self.compute_overlaps()
+
+    def __post_init__(self):
+        # Relabel the nodes in place to use integer node ids
+        nx.relabel_nodes(self, self.graph['node_name_map'], copy=False)
 
     def __key(self):
         # TODO: This needs to be a real self identifying key
@@ -400,8 +405,8 @@ class CandidateGraph(nx.Graph):
 
         # If image name is provided, build the node from the image before
         # calling nx.add_node()
-        if len(image_name) is not 0:
-            if len(basepath) is not 0:
+        if len(image_name) != 0:
+            if len(basepath) != 0:
                 image_path = os.path.join(basepath, image_name)
             else:
                 image_path = image_name
@@ -1584,13 +1589,10 @@ class NetworkCandidateGraph(CandidateGraph):
         self.config = config_dict
         
         self.async_watchers = async_watchers
-        print('Watchers setup')
         # Setup REDIS
         self._setup_queues()
-        print('Queues setup')
         # Setup the database
         self._setup_database()
-        print('Database setup')
 
         # Setup threaded queue watchers
         if self.async_watchers == True:
@@ -1642,7 +1644,7 @@ class NetworkCandidateGraph(CandidateGraph):
         sleeptime = 2
         retries = 0
         while retries < 5:
-            print(f'Database connection attempt {retries}')
+            log.debug(f'Database connection attempt {retries}')
             try:
                 self.Session, self.engine = new_connection(self.config['database'])
 
@@ -2487,11 +2489,10 @@ class NetworkCandidateGraph(CandidateGraph):
           SELECT * FROM Images WHERE (split_part(path, '/', 6) ~ 'P[0-9]+_.+') = True
         """
 
-        composite_query = sql.from_database_composite.format(formatInput=sql.select_pub_image)
+        composite_query = text(sql.from_database_composite.format(formatInput=sql.select_pub_image))
 
         with self.session_scope() as session:
-            res = session.execute(composite_query)
-
+            res = session.execute(composite_query)            
             adjacency = defaultdict(list)
             adjacency_lookup = {}
             for r in res:

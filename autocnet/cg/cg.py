@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 import geopandas as gpd
-import ogr
+from osgeo import ogr
 import logging
 
 from skimage import transform as tf
