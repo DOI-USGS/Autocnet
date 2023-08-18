@@ -53,7 +53,6 @@ def test_manage_simple_messages(args, queue, simple_message, mocker, capfd, ncg)
     
     # Check that logging to stdout is working
     out, err = capfd.readouterr()
-    print('OE', out, err)
     assert out.strip() == str(response_msg).strip() 
 
     # Check that the messages are finalizing

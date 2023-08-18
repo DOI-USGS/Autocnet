@@ -42,9 +42,7 @@ doc-build-and-deploy:
   stage: test 
   script:
     - mamba install --file doc_requirements.txt
-    - cd docs 
-    - ls
-    - make html
+    - sphinx-build -b html docs public
   artifacts:
     paths:
       - public
