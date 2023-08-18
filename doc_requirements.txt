@@ -1,4 +1,6 @@
-sphinx
+sphinx<7
 numpydoc
 jupyter-sphinx
+nbsphinx
+sphinx-markdown-tables
 make

@@ -4,11 +4,14 @@ import sqlalchemy
 from sqlalchemy import create_engine, pool, orm
 from sqlalchemy.orm import create_session, scoped_session, sessionmaker
 
+import logging
 import os
 import socket
 import warnings
 import yaml
 
+# set up the logging file
+log = logging.getLogger(__name__)
 
 class Parent:
     def __init__(self, config):
@@ -46,4 +49,5 @@ def new_connection(dbconfig):
                 isolation_level="AUTOCOMMIT",
                 pool_pre_ping=True)
     Session = orm.sessionmaker(bind=engine, autocommit=False)
+    log.debug(Session, engine)
     return Session, engine
