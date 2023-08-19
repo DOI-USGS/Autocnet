@@ -77,7 +77,7 @@ def default_configuration():
               'database': {'type': 'postgresql',
                   'username': 'postgres',
                   'password': 'NotTheDefault',
-                  'host': 'postgres',
+                  'host': 'localhost',
                   'port': 5432,
                   'pgbouncer_port': 5432,
                   'name': 'travis_ci_test',
