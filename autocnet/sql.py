@@ -1,7 +1,8 @@
 # This file is to centralize all the sql strings that are used throughout autocnet
 # into one place
+from sqlalchemy import text
 
-compute_overlaps_sql = """
+compute_overlaps_sql = text("""
 WITH intersectiongeom AS
 (SELECT geom AS geom FROM ST_Dump((
    SELECT ST_Polygonize(the_geom) AS the_geom FROM (
@@ -19,19 +20,19 @@ iid AS (
 INSERT INTO overlay(intersections, geom) SELECT row.intersections, row.geom FROM
 (SELECT iid.geom, array_agg(iid.id) AS intersections
   FROM iid GROUP BY iid.geom) AS row WHERE array_length(intersections, 1) > 1;
-"""
+""")
 
-select_ten_pub_image = 'SELECT * FROM public.images LIMIT 10'
+select_ten_pub_image = text('SELECT * FROM public.images LIMIT 10')
 
-select_pub_image = 'SELECT * FROM public.images'
+select_pub_image = text('SELECT * FROM public.images')
 
-from_database_composite = '''WITH i as ({formatInput}) SELECT i1.id
+from_database_composite = text('''WITH i as ({formatInput}) SELECT i1.id
         as i1_id,i1.path as i1_path, i2.id as i2_id, i2.path as i2_path
         FROM i  as i1, i as i2
         WHERE ST_INTERSECTS(i1.geom, i2.geom) = TRUE
-        AND i1.id < i2.id'''
+        AND i1.id < i2.id''')
 
-db_to_df_sql_string = """
+db_to_df_sql_string = text("""
 SELECT measures."pointid",
         points."pointType",
         points."apriori",
@@ -63,10 +64,10 @@ WHERE
         GROUP BY measures."imageid"
         HAVING COUNT(DISTINCT measures."pointid")  < 3)
 ORDER BY measures."pointid", measures."id";
-"""
+""")
 
 
-valid_geom_func_str = """
+valid_geom_func_str = text("""
 CREATE OR REPLACE FUNCTION validate_geom()
   RETURNS trigger AS
 $BODY$
@@ -81,17 +82,17 @@ $BODY$
 
 LANGUAGE plpgsql VOLATILE -- Says the function is implemented in the plpgsql language; VOLATILE says the function has side effects.
 COST 100; -- Estimated execution cost of the function.
-"""
+""")
 
-valid_geom_trig_str = """
+valid_geom_trig_str = text("""
 CREATE TRIGGER image_inserted
   BEFORE INSERT OR UPDATE
   ON images
   FOR EACH ROW
 EXECUTE PROCEDURE validate_geom();
-"""
+""")
 
-valid_point_func_str ="""
+valid_point_func_str =text("""
 CREATE OR REPLACE FUNCTION validate_points()
   RETURNS trigger AS
 $BODY$
@@ -115,17 +116,17 @@ $BODY$
 
 LANGUAGE plpgsql VOLATILE -- Says the function is implemented in the plpgsql language; VOLATILE says the function has side effects.
 COST 100; -- Estimated execution cost of the function.
-"""
+""")
 
-valid_point_trig_str = """
+valid_point_trig_str = text("""
 CREATE TRIGGER active_measure_changes
   AFTER UPDATE
   ON measures
   FOR EACH ROW
 EXECUTE PROCEDURE validate_points();
-"""
+""")
 
-ignore_image_fun_str = """
+ignore_image_fun_str = text("""
 CREATE OR REPLACE FUNCTION ignore_image()
   RETURNS trigger AS
 $BODY$
@@ -143,18 +144,18 @@ $BODY$
 
 LANGUAGE plpgsql VOLATILE -- Says the function is implemented in the plpgsql language; VOLATILE says the function has side effects.
 COST 100; -- Estimated execution cost of the function.
-"""
+""")
 
 
-ignore_image_trig_str = """
+ignore_image_trig_str = text("""
 CREATE TRIGGER image_ignored
   AFTER UPDATE
   ON images
   FOR EACH ROW
 EXECUTE PROCEDURE ignore_image();
-"""
+""")
 
-json_delete_func_str = """
+json_delete_func_str = text("""
 SET search_path = 'public';
 
 CREATE OR REPLACE FUNCTION jsonb_delete_left(a jsonb, b text) 
@@ -211,9 +212,9 @@ COMMENT ON FUNCTION jsonb_delete_left(jsonb, jsonb) IS 'delete matching pairs in
 
 CREATE OPERATOR - ( PROCEDURE = jsonb_delete_left, LEFTARG = jsonb, RIGHTARG = jsonb);
 COMMENT ON OPERATOR - (jsonb, jsonb) IS 'delete matching pairs from left operand';
-"""
+""")
 
-history_update_func_str = """
+history_update_func_str = text("""
   CREATE OR REPLACE FUNCTION {formatInput}_history_update()
   RETURNS TRIGGER AS $$
   DECLARE
@@ -226,9 +227,9 @@ history_update_func_str = """
   END;
 
   $$ LANGUAGE plpgsql;
-  """
+  """)
 
-history_insert_func_str = """
+history_insert_func_str = text("""
   CREATE OR REPLACE FUNCTION {formatInput}_history_insert()
   RETURNS TRIGGER AS $$
   DECLARE 
@@ -239,9 +240,9 @@ history_insert_func_str = """
     RETURN NEW;
   END;
   $$ LANGUAGE plpgsql;
-  """
+  """)
 
-history_delete_func_str = """
+history_delete_func_str = text("""
   CREATE OR REPLACE FUNCTION {formatInput}_history_delete()
   RETURNS TRIGGER AS $$
   DECLARE
@@ -252,19 +253,19 @@ history_delete_func_str = """
     RETURN NEW;
   END;
   $$ LANGUAGE plpgsql;
-  """
+  """)
 
-history_insert_trig_str = """
+history_insert_trig_str = text("""
   CREATE TRIGGER {formatInput}_history_insert AFTER INSERT ON {formatInput}
     FOR EACH ROW EXECUTE PROCEDURE {formatInput}_history_insert();
-  """
+  """)
 
-history_delete_trig_str = """
+history_delete_trig_str = text("""
   CREATE TRIGGER {formatInput}_history_delete AFTER DELETE ON {formatInput}
     FOR EACH ROW EXECUTE PROCEDURE {formatInput}_history_delete();
-  """
+  """)
 
-history_update_trig_str = """
+history_update_trig_str = text("""
   CREATE TRIGGER {formatInput}_history_update AFTER UPDATE ON {formatInput}
     FOR EACH ROW EXECUTE PROCEDURE {formatInput}_history_update();
-  """
+  """)
