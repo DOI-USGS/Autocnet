@@ -20,6 +20,7 @@ import shapely
 import scipy.special
 
 import geoalchemy2
+from sqlalchemy.sql.elements import TextClause
 from sqlalchemy import text
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.sql import func
@@ -1821,7 +1822,7 @@ class NetworkCandidateGraph(CandidateGraph):
         with self.session_scope() as session:
             t1 = time.time()
             # Support either an SQL query string, or a simple dict based query
-            if query_string:
+            if isinstance(query_string, TextClause):
                 log.info(f'Executing query {query_string} to generate objects for queuing.')
                 res = session.execute(query_string).fetchall()
             else:
