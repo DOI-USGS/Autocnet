@@ -118,7 +118,7 @@ class TestNode(object):
     def test_masks(self, node):
         assert isinstance(node.masks, pd.DataFrame)
         # Create an artificial mask
-        node.masks['foo'] =  np.array([0, 0, 1, 1, 1], dtype=np.bool)
+        node.masks['foo'] =  np.array([0, 0, 1, 1, 1], dtype=np.bool_)
         assert node.masks['foo'].sum() == 3
 
     def test_convex_hull_ratio_fail(self):

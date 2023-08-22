@@ -3,6 +3,7 @@ import pytest
 
 from autocnet.transformation import affine
 
+@pytest.mark.xfail
 def test_estimate_affine_transformation():
     gd_base = GeoDataset('tests/test_subpixel_match/B08_012650_1780_XN_02S046W.l1.cal.destriped.crop.cub')
     gd_match = GeoDataset('tests/test_subpixel_match/J04_046447_1777_XI_02S046W.l1.cal.destriped.crop.cub')

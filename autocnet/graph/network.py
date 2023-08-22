@@ -21,7 +21,7 @@ import scipy.special
 
 import geoalchemy2
 from sqlalchemy.sql.elements import TextClause
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.sql import func
 import shapely.affinity
@@ -132,7 +132,6 @@ class CandidateGraph(nx.Graph):
             else:
                 node_id = self.graph['node_counter']
                 self.graph['node_counter'] += 1
-
             n['data'] = self.node_factory(
                 image_name=i, image_path=image_path, node_id=node_id)
 
@@ -1644,6 +1643,9 @@ class NetworkCandidateGraph(CandidateGraph):
         # A non-linear timeout if the DB is spinning up or loaded with many connections.
         sleeptime = 2
         retries = 0
+        self.Session, self.engine = new_connection(self.config['database'])
+        try_db_creation(self.engine, self.config)
+        return
         while retries < 5:
             log.debug(f'Database connection attempt {retries}')
             try:
@@ -2525,12 +2527,13 @@ class NetworkCandidateGraph(CandidateGraph):
                 if isinstance(tables, str):
                     tables = [tables]
             else:
-                tables = self.engine.table_names()
+                inspection = inspect(self.engine)
+                tables = inspection.get_table_names()
 
             for t in tables:
                 if t != 'spatial_ref_sys':
                     try:
-                        session.execute(f'TRUNCATE TABLE {t} CASCADE')
+                        session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
                     except Exception as e:
                         raise RuntimeError(f'Failed to truncate table {t}, {t} not modified').with_traceback(e.__traceback__)
                     try:
@@ -2641,7 +2644,7 @@ class NetworkCandidateGraph(CandidateGraph):
             # Execute an SQL COPY from a CSV buffer into the DB
 
             if engine.dialect.has_table(engine.connect(), 'points', schema='public') and clear_tables:
-                connection.execute('DROP TABLE measures, points;')
+                connection.execute(text('DROP TABLE measures, points;'))
                 Points.__table__.create(bind=engine, checkfirst=True)
                 Measures.__table__.create(bind=engine, checkfirst=True)
 

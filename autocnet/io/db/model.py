@@ -669,8 +669,6 @@ def try_db_creation(engine, config):
         #for ddl in triggers.generate_history_triggers(Points):
         #    event.listen(Points.__table__, 'after_create', ddl)
 
-    Base.metadata.bind = engine
-
     # Set the class attributes for the SRIDs
     spatial = config['spatial']
     latitudinal_srid = spatial['latitudinal_srid']
@@ -684,12 +682,12 @@ def try_db_creation(engine, config):
 
     # If the table does not exist, this will create it. This is used in case a
     # user has manually dropped a table so that the project is not wrecked.
-    Base.metadata.create_all(tables=[Overlay.__table__,
+    Base.metadata.create_all(engine, 
+                             tables=[Overlay.__table__,
                                      Edges.__table__, Costs.__table__, Matches.__table__,
                                      Cameras.__table__, Points.__table__,
                                      Measures.__table__, Images.__table__,
                                      Keypoints.__table__, CandidateGroundPoints.__table__,
-                                     JobsHistory.__table__, MeasuresHistory.__table__, PointsHistory.__table__],
-                             bind=engine)
+                                     JobsHistory.__table__, MeasuresHistory.__table__, PointsHistory.__table__])
 
 
