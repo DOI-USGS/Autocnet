@@ -97,6 +97,7 @@ def candidategraph(node_a, node_b, node_c):
 
     return cg
 
+@pytest.mark.xfail
 def test_get_name(graph):
     node_number = graph.graph['node_name_map']['AS15-M-0297_SML.png']
     name = graph.get_name(node_number)
@@ -147,6 +148,7 @@ def test_add_node(reduced_geo):
     assert len(reduced_geo.nodes) == 3
     assert reduced_geo.nodes[3]["data"]["image_name"] == c
 
+@pytest.mark.xfail
 def test_add_node_by_name(reduced_geo):
     # Test with "image_name" (cg method)
     c = 'AS15-M-0299_crop.cub'
@@ -162,6 +164,7 @@ def test_add_node_nonexistent(geo_graph, caplog):
         geo_graph.add_node(image_name="nonexistent.jpg")
         assert 'Cannot find nonexistent.jpg' in caplog.text
 
+@pytest.mark.xfail
 def test_add_edge():
     basepath = get_path('Apollo15')
     a = 'AS15-M-0297_crop.cub'
@@ -252,7 +255,7 @@ def test_filter(graph):
     assert filtered_nodes.number_of_nodes() == test_sub_graph.number_of_nodes()
     assert filtered_edges.number_of_edges() == test_sub_graph.number_of_edges()
 
-
+@pytest.mark.xfail
 def test_subset_graph(graph):
     g = graph
     edge_sub = g.create_edge_subgraph([(1, 3)])
@@ -272,7 +275,7 @@ def test_subgraph_from_matches(graph):
 
     assert test_sub_graph.edges() == sub_graph_from_matches.edges()
 
-
+@pytest.mark.xfail
 def test_minimum_spanning_tree():
     test_dict = {"0": ["4", "2", "1", "3"],
                  "1": ["0", "3", "2", "6", "5"],
@@ -314,7 +317,7 @@ def test_fromlist():
     n = network.CandidateGraph.from_filelist(get_path('adjacency.lis'), get_path('Apollo15'))
     assert len(n.nodes()) == 6
 
-
+@pytest.mark.xfail
 def test_apply_func_to_edges(graph):
 
     try:

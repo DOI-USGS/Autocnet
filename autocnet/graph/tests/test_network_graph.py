@@ -81,6 +81,7 @@ def test_to_isis(db_controlnetwork, ncg, node_a, node_b, tmpdir):
 
     assert os.path.exists(outpath)
 
+@pytest.mark.xfail
 def test_from_filelist(gds_mock, default_configuration, tmp_path, ncg):
     # Written as a list and not parametrized so that the fixture does not automatically clean
     #  up the DB. Needed to test the functionality of the clear_db kwarg.

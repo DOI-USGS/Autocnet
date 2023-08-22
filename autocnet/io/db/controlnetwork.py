@@ -9,6 +9,8 @@ from autocnet.io.db.model import Measures
 from autocnet.spatial.isis import isis2np_types
 from ... import sql
 
+from sqlalchemy import text
+
 def db_to_df(ncg, ground_radius=None, ground_xyz=None, sql=sql.db_to_df_sql_string):
         """
         Given a set of points/measures in an autocnet database, generate an ISIS
@@ -160,8 +162,8 @@ def update_from_jigsaw(cnet, measures, engine, pointid_func=None):
         measures.to_sql('measures_tmp', connection, schema='public', if_exists='replace', index=False, method=copy_from_method)
 
         # Drop the old measures table and then rename the tmp measures table to be the 'new' measures table
-        connection.execute('DROP TABLE measures;')
-        connection.execute('ALTER TABLE measures_tmp RENAME TO measures;')
+        connection.execute(text('DROP TABLE measures;'))
+        connection.execute(text('ALTER TABLE measures_tmp RENAME TO measures;'))
 
 # This is not a permanent placement for this function
 # TO DO: create a new module for parsing/cleaning points from a controlnetwork

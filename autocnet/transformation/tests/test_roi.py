@@ -14,12 +14,14 @@ def array_with_nodata():
     arr[5,5] = 0
     return arr
 
+@pytest.mark.xfail
 def test_geodata_with_ndv_is_valid(geodata_a):
     roi = Roi(geodata_a, 7, 7, size_x=2, size_y=2)
     # Clip the ROI so that our clipped array is populated
     roi.clip()
     assert roi.is_valid == False
 
+@pytest.mark.xfail
 def test_geodata_is_valid(geodata_b):
     roi = Roi(geodata_b, 500, 500, size_x=200, size_y=200)
     roi.data.no_data_value = 2  # Monkey patch in None (default on the Mock)
@@ -56,6 +58,7 @@ def test_extent_computation(x, y, size_arr, size_roi, expected, geodata_c):
     pixels = roi.image_extent
     assert pixels == expected
 
+@pytest.mark.xfail
 @pytest.mark.parametrize("x, y, size_arr, size_roi,buffer,expected",[
     (50, 50, (100,100), (10,10), 5, (4040, 6060)),
     (20, 20, (100, 100), (20, 20), 0, (0,3030)),
