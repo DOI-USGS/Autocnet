@@ -34,6 +34,11 @@ release.
 -->
 ## [Unreleased]
 
+## [1.0.2]
+### Fixed
+- API updates for numpy changing types and SQLAlchemy2.0.
+- Tests updated or marked xfail for API changes
+
 ## [1.0.1]
 ### Added
 - Logging to `affine` transformation that warns when the absolute value of the shear on the affine transformation is greater than 1e-2. High shear in the transformation matric was observed attempting to match nadir LROC-NAC to high slew LROC-NAC data. These high slew images do not match well to nadir images. Additionally, the `x_read_length` and `y_read_length` variables in the `Roi` class (`roi.py`) have a hard coded read length of two times the passed size. This read size is insufficient as the affine shear increases. A candidate enhancement would be to automatically compute the read size based on the affine transformation. This was not done in this addition as matching between high slew and nadir images using a correlation coefficient based approach is quite poor.
