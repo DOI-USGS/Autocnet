@@ -33,6 +33,9 @@ heading to indicate that only the bug fixes and security fixes are in the bug fi
 release.
 -->
 ## [Unreleased]
+### Added
+- Ability to place points in centroids instead of overlaps.
+- Ability to find points in centroids focused around a plantary body
 
 ## [1.0.2]
 ### Fixed
