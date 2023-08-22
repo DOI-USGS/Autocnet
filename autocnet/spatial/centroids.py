@@ -20,7 +20,8 @@ log = logging.getLogger(__name__)
 def get_number_of_points(target_distance_km, latitude, radius):
     """
     Calculate the number of points needed to maintain a certain target distance (in km)
-    around a specific latitude for a target planetary body.
+    around a specific latitude for a target planetary body. This assume that the body
+    is spherical and not ellipsoidal.
 
     Parameters
     ___________
@@ -42,55 +43,101 @@ def get_number_of_points(target_distance_km, latitude, radius):
     # Convert to radians
     target_distance_rad = target_distance_km / radius
 
-    # Calculate longitudal dustance between two points
+    # Calculate longitudal distance between two points
     longitudinal_distance = 2 * math.asin(math.sqrt(math.sin(target_distance_rad/2)**2 / (math.cos(math.radians(latitude))**2)))
 
-    # Calculate the circumfrance of the planetary body at the given latitude
-    body_circumfrance = 2 * math.pi * radius * math.cos(math.radians(latitude))
+    # Calculate the circumference of the planetary body at the given latitude
+    body_circumference = 2 * math.pi * radius * math.cos(math.radians(latitude))
 
     # Calculate points needed
-    num_points = int(body_circumfrance / longitudinal_distance) + 1
+    num_points = int(body_circumference / longitudinal_distance) + 1
 
     return num_points
 
-def find_points_in_centroids(polygon, radius, target_distance_in_km):
+def winnow_points(polygon, list_of_points):
     """
-    This finds points within a specified geometry.
-    It finds those points be placing points in a centroid pattern
-    around latitude lines (longitude: -180, 180)
+    This removes any points in a list that arent within a given polygon
 
     Parameters
     ___________
+
     polygon : shapely.geom
         A shapely geometry object
     
+    list_of_points : list
+        list of point coordinates in the form
+        [(x1,y1), (x2,y2), ..., (xn, yn)]
+    
+    Returns
+    _______
+    points : list
+        list of point coordinates in the form
+        [(x1,y1), (x2,y2), ..., (xn, yn)]
+    """
+    return [(point[0], point[1]) for point in list_of_points if polygon.contains(shapely.geometry.Point(point[0], point[1]))]
+
+def find_points_in_centroids(radius, 
+                             target_distance_in_km,
+                             polygon=None,
+                             min_lat=None,
+                             max_lat=None,
+                             longitude_min=-180,
+                             longitude_max=180):
+    """
+    This finds points within a specified geometry.
+    It finds those points be placing points in a centroid pattern
+    around latitude lines (default longitude: -180, 180) where the center
+    is the center of the min_lat/max_lat/min_lon/max_lon
+
+    Parameters
+    ___________
     radius : int
         radius of the planetary body
     
     target_distance_in_km : int
         The target distance to maintain between points
+
+    polygon : shapely.geom
+        A shapely geometry object
+    
+    min_lat : int
+        The minimum latitude of the wanted area
+        If polygon is passed, not necessary
+    
+    min_long : int
+        The minimum longitude of the wanted area
+        If polygon is passed, not necessary
+    
+    longitude_min : int
+        The minimum longitde (ex. -180 or 0)
+
+    longitude_max : int
+        The maximum longitde (ex. 180 or 360)
     
     Returns
     _______
-    points : list of list
-        list of list of point coordinates in the form
-        [[(1x1,1y1), (1x2,1y2), ..., (1xn, 1yn)], ... [(nx1,y1), (nx2,y2), ..., (nxn, nyn)]]
+    points : list
+        list of point coordinates in the form
+        [(x1,y1), (x2,y2), ..., (xn, yn)]
     """
     # Set up processes
-    pole_center = polygon.centroid.coords[0]
-    _, min_lat, _, max_lat = polygon.bounds
+    if polygon:
+        _, min_lat, _, max_lat = polygon.bounds
     latitude_intervals = np.arange(max_lat, min_lat, -0.005)
     points=[]
 
     # Itterate through each latitude, decrimenting at -0.005
     # TODO: decide if this decrement should be a user input
     for lat in latitude_intervals:
-        # Calculate the number of points ndeed to space points along a latitude line every __km
+        # Calculate the number of points needed to space points along a latitude line every __km
         num_points = get_number_of_points(target_distance_in_km, lat, radius)
-        p1 = (-180, lat)
-        p2 = (180, lat)
-        # Create a list of points for latitude line that are within in the bounds of the pokygon
-        line_points = [(point[0], point[1]) for point in create_points_along_line(p1, p2, num_points) if polygon.contains(shapely.geometry.Point(point[0], point[1]))]
+        p1 = (longitude_min, lat)
+        p2 = (longitude_max, lat)
+        # Create a list of points for latitude lines
+        line_points = [(point[0], point[1]) for point in create_points_along_line(p1, p2, num_points)]
+        # If a polygon was given limit points so that they are only within the polygon
+        if polygon:
+            line_points = winnow_points(polygon, line_points)
         if len(line_points)!=0:
             points.extend(line_points)
     return points
