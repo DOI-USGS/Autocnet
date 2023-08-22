@@ -89,7 +89,7 @@ def ransac_permute(ref_points, tar_points, tolerance_val, target_points):
     # Determine which points are within the tolerance
     q1 = dist >= minlim
     q2 = dist <= maxlim
-    q = (q1*q2).astype(np.int)
+    q = (q1*q2).astype(np.int_)
     # How many points are within the tolerance?
     s = np.sum(q, axis=1)
     # If the number of points within the tolerance are greater than the number of desired points
@@ -225,12 +225,12 @@ def ring_match(ref_feats, tar_feats, ref_desc, tar_desc, ring_radius=4000,
     # Counters
     numr = len(ref_feats)
     rad_num = int(max_radius / ring_radius) # Number of radial rings
-    points_num = np.zeros(rad_num, dtype=np.int)  # Number of points per ring vector
+    points_num = np.zeros(rad_num, dtype=np.int_)  # Number of points per ring vector
     metr = 1
     
     # Initial array for holding candidate points
     p = np.zeros((target_points, 4 * rad_num))
-    p_idx = np.zeros((target_points, 2 * rad_num), dtype=np.int)
+    p_idx = np.zeros((target_points, 2 * rad_num), dtype=np.int_)
 
     while ref_mask.any():
         # Grab a random reference point
@@ -255,7 +255,7 @@ def ring_match(ref_feats, tar_feats, ref_desc, tar_desc, ring_radius=4000,
                 if match is not None:
                     if points_num[i] == p.shape[0]:
                         p = dynamically_grow_array(p, target_points)
-                        p_idx = dynamically_grow_array(p_idx, target_points, dtype=np.int)
+                        p_idx = dynamically_grow_array(p_idx, target_points, dtype=np.int_)
                     p[points_num[i], 4*i:4*i+4] = [current_ref_xy[0], current_ref_xy[1], current_tar_xys[match][0], current_tar_xys[match][1]]
                     # Set the id of the point
                     p_idx[points_num[i], 2*i:2*i+2] = [r, z_idx[match]]
@@ -400,7 +400,7 @@ def directed_ring_match(ref_feats, tar_feats, ref_desc, tar_desc, ring_min, ring
     numr = len(ref_feats)
 
     p = np.zeros((numr, 4))
-    p_idx = np.zeros((numr, 2), dtype=np.int)
+    p_idx = np.zeros((numr, 2), dtype=np.int_)
     points_num = 0
     # Iterate over all of the reference points seeking a match
     for r in range(numr):

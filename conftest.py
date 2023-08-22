@@ -6,6 +6,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
+from sqlalchemy import inspect, text
 
 from autocnet.control import control
 from autocnet.graph.network import CandidateGraph, NetworkCandidateGraph
@@ -17,7 +18,8 @@ from plio.io.io_gdal import GeoDataset
 
 @pytest.fixture
 def queue():
-    return fakeredis.FakeStrictRedis()
+    queue = fakeredis.FakeStrictRedis()
+    return queue
 
 
 @pytest.fixture(scope='session')
@@ -107,16 +109,17 @@ def ncg(default_configuration, request):
         with ncg.session_scope() as session:
             session.rollback()  # Necessary because some tests intentionally fail
             engine = ncg.Session().get_bind()
-            for t in reversed(engine.table_names()):
+            inspector = inspect(engine)
+            for t in reversed(inspector.get_table_names()):
                 # Skip the srid table
                 if t != 'spatial_ref_sys':
-                    res = session.execute(f'TRUNCATE TABLE {t} CASCADE')
+                    res = session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
                 # Reset the autoincrementing
                 if t in ['Images', 'Cameras', 'Matches', 'Measures']:
-                    session.execute(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1')
+                    session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
             session.commit()
             # Ensure that this is the only connection to the DB
-            num_con = session.execute('SELECT sum(numbackends) FROM pg_stat_database;').scalar()
+            num_con = session.execute(text('SELECT sum(numbackends) FROM pg_stat_database;')).scalar()
             assert num_con == 1
             session.close()
 
@@ -127,7 +130,8 @@ def ncg(default_configuration, request):
 @pytest.fixture
 def tables(ncg):
     engine = ncg.Session().get_bind()
-    return engine.table_names()
+    inspection = inspect(engine)
+    return inspection.get_table_names()
 
 @pytest.fixture(scope='session')
 def node_a(geodata_a):
@@ -227,10 +231,10 @@ def session(tables, request, ncg):
         for t in reversed(tables):
             # Skip the srid table
             if t != 'spatial_ref_sys':
-                session.execute(f'TRUNCATE TABLE {t} CASCADE')
+                session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
             # Reset the autoincrementing
             if t in ['Images', 'Cameras', 'Matches', 'Measures']:
-                session.execute(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1')
+                session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
         session.commit()
 
     request.addfinalizer(cleanup)

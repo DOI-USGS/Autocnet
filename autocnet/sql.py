@@ -67,7 +67,7 @@ ORDER BY measures."pointid", measures."id";
 """)
 
 
-valid_geom_func_str = text("""
+valid_geom_func_str = """
 CREATE OR REPLACE FUNCTION validate_geom()
   RETURNS trigger AS
 $BODY$
@@ -82,17 +82,17 @@ $BODY$
 
 LANGUAGE plpgsql VOLATILE -- Says the function is implemented in the plpgsql language; VOLATILE says the function has side effects.
 COST 100; -- Estimated execution cost of the function.
-""")
+"""
 
-valid_geom_trig_str = text("""
+valid_geom_trig_str = """
 CREATE TRIGGER image_inserted
   BEFORE INSERT OR UPDATE
   ON images
   FOR EACH ROW
 EXECUTE PROCEDURE validate_geom();
-""")
+"""
 
-valid_point_func_str =text("""
+valid_point_func_str ="""
 CREATE OR REPLACE FUNCTION validate_points()
   RETURNS trigger AS
 $BODY$
@@ -116,17 +116,17 @@ $BODY$
 
 LANGUAGE plpgsql VOLATILE -- Says the function is implemented in the plpgsql language; VOLATILE says the function has side effects.
 COST 100; -- Estimated execution cost of the function.
-""")
+"""
 
-valid_point_trig_str = text("""
+valid_point_trig_str = """
 CREATE TRIGGER active_measure_changes
   AFTER UPDATE
   ON measures
   FOR EACH ROW
 EXECUTE PROCEDURE validate_points();
-""")
+"""
 
-ignore_image_fun_str = text("""
+ignore_image_fun_str = """
 CREATE OR REPLACE FUNCTION ignore_image()
   RETURNS trigger AS
 $BODY$
@@ -144,18 +144,18 @@ $BODY$
 
 LANGUAGE plpgsql VOLATILE -- Says the function is implemented in the plpgsql language; VOLATILE says the function has side effects.
 COST 100; -- Estimated execution cost of the function.
-""")
+"""
 
 
-ignore_image_trig_str = text("""
+ignore_image_trig_str = """
 CREATE TRIGGER image_ignored
   AFTER UPDATE
   ON images
   FOR EACH ROW
 EXECUTE PROCEDURE ignore_image();
-""")
+"""
 
-json_delete_func_str = text("""
+json_delete_func_str = """
 SET search_path = 'public';
 
 CREATE OR REPLACE FUNCTION jsonb_delete_left(a jsonb, b text) 
@@ -212,7 +212,7 @@ COMMENT ON FUNCTION jsonb_delete_left(jsonb, jsonb) IS 'delete matching pairs in
 
 CREATE OPERATOR - ( PROCEDURE = jsonb_delete_left, LEFTARG = jsonb, RIGHTARG = jsonb);
 COMMENT ON OPERATOR - (jsonb, jsonb) IS 'delete matching pairs from left operand';
-""")
+"""
 
 history_update_func_str = text("""
   CREATE OR REPLACE FUNCTION {formatInput}_history_update()

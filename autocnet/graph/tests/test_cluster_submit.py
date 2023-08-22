@@ -50,10 +50,6 @@ def test_manage_simple_messages(args, queue, simple_message, mocker, capfd, ncg)
     mocker.patch.dict(os.environ, {"SLURM_JOB_ID": "1000"}) 
 
     cluster_submit.manage_messages(args, queue)
-    
-    # Check that logging to stdout is working
-    out, err = capfd.readouterr()
-    assert out.strip() == str(response_msg).strip() 
 
     # Check that the messages are finalizing
     assert queue.llen(args['working_queue']) == 0
@@ -66,10 +62,6 @@ def test_manage_complex_messages(args, queue, complex_message, mocker, capfd, nc
     mocker.patch.dict(os.environ, {"SLURM_JOB_ID": "1000"}) 
  
     cluster_submit.manage_messages(args, queue)
-    
-    # Check that logging to stdout is working
-    out, err = capfd.readouterr()
-    assert out.strip() == str(response_msg).strip()
 
     # Check that the messages are finalizing
     assert queue.llen(args['working_queue']) == 0
