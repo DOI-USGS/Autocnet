@@ -37,6 +37,9 @@ release.
 - Ability to place points in centroids instead of overlaps.
 - Ability to find points in centroids focused around a plantary body
 
+### Fixed
+- string injection via format with sqlalchemy text() object.
+
 ## [1.0.2]
 ### Fixed
 - API updates for numpy changing types and SQLAlchemy2.0.

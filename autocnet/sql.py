@@ -26,11 +26,11 @@ select_ten_pub_image = text('SELECT * FROM public.images LIMIT 10')
 
 select_pub_image = text('SELECT * FROM public.images')
 
-from_database_composite = text('''WITH i as ({formatInput}) SELECT i1.id
+from_database_composite = '''WITH i as ({formatInput}) SELECT i1.id
         as i1_id,i1.path as i1_path, i2.id as i2_id, i2.path as i2_path
         FROM i  as i1, i as i2
         WHERE ST_INTERSECTS(i1.geom, i2.geom) = TRUE
-        AND i1.id < i2.id''')
+        AND i1.id < i2.id'''
 
 db_to_df_sql_string = text("""
 SELECT measures."pointid",
