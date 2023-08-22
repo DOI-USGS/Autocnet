@@ -5,6 +5,7 @@ from shapely.geometry import Polygon
 
 import pytest
 from autocnet.control import control
+from autocnet.spatial.surface import EllipsoidDem
 
 def test_identify_potential_overlaps(controlnetwork, candidategraph):
     res = control.identify_potential_overlaps(candidategraph,
@@ -32,8 +33,9 @@ def test_potential_overlap(controlnetwork, candidategraph):
                                  index=[6,7,8,9,10,11]))
 
 def test_compute_covariance():
-    df = pd.DataFrame([[0,0,3], [0,0,4], [0,0,2]], columns=['adjustedY', 'adjustedX', 'pointtype'])
-    df = control.compute_covariance(df, 10, 10, 15, 100)
+    df = pd.DataFrame([[0,0,0,3], [0,0,0,4], [0,0,0,2]], columns=['aprioriY', 'aprioriX', 'aprioriZ', 'pointtype'])
+    dem = EllipsoidDem(10, 10)
+    df = control.compute_covariance(df, dem, 10, 10, 15)
     
     def assertexists(row):
         if row['pointtype'] > 2:

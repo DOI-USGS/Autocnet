@@ -71,12 +71,12 @@ def test_dynamically_grow():
     assert y.shape == (9,3)
     
 def test_dynamically_grow_dtype():
-    x = np.ones((3,3), dtype=np.int8)
+    x = np.ones((3,3), dtype=np.byte)
     y = rm.dynamically_grow_array(x,6)
     assert np.issubdtype(y.dtype, np.float64)
 
-    y = rm.dynamically_grow_array(x,6,dtype=np.int8)
-    assert np.issubdtype(y.dtype, np.int8)
+    y = rm.dynamically_grow_array(x,6,dtype=np.byte)
+    assert np.issubdtype(y.dtype, np.byte)
 
 def test_points_in_ring():
     x = np.array([1,1,1,1,1,2,2,2,2,2,3,3,3,3,3,4,4,4,4,4])
@@ -118,6 +118,6 @@ def test_ring_match():
                                      target_points=target_points, tolerance_val=tolerance,
                                      iteration_break_point=2)
     assert ring == (0.0, 0.5)
-    sorted_pidx = p_idx[p_idx[:,0].astype(np.int).argsort()]
+    sorted_pidx = p_idx[p_idx[:,0].astype(np.int_).argsort()]
     np.testing.assert_array_equal(sorted_pidx,
                                   np.array([[0,0],[1,2],[2,4],[3,6]]))
