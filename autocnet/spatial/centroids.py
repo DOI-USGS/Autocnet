@@ -1,9 +1,11 @@
+import json
+import logging
+import math
+import os
+
 import numpy as np
 import shapely
-import math
-import csmapi
-import os
-import logging
+
 from sqlalchemy import text
 from autocnet.cg.cg import create_points_along_line
 from autocnet.io.db.model import Images, Measures, Overlay, Points, JsonEncoder
@@ -11,7 +13,6 @@ from autocnet.graph.node import NetworkNode
 from autocnet.spatial import isis
 from autocnet.transformation import roi
 from autocnet.matcher.cpu_extractor import extract_most_interesting
-from autocnet.transformation.spatial import reproject, og2oc, oc2og
 import time
 
 # Set up logging file
@@ -142,10 +143,128 @@ def find_points_in_centroids(radius,
             points.extend(line_points)
     return points
 
-def place_points_in_centroids(valid,
-                            identifier="autocnet",
-                            cam_type="csm", 
-                            size=71,
+def is_valid_lroc_polar_image(roi_array, 
+                   include_var=True, 
+                   include_mean=False,
+                   include_std=False):
+    """
+    Checks if a numpy array representing an ROI from an image is valid.
+    Can check using variance, mean, and standard deviation, baed on unser input. 
+    It is highly encouraged that at the very least the variance check is used.
+
+    Parameters
+    __________
+    roi_array : np.array
+        A numpy array representing a ROI from an image, meaning the values are pixels
+    include_var : bool
+        Choose whether to filter images based on variance. Default True.
+    include_mean : bool
+        Choose whether to filter images based on mean. Default True.
+        Goal is to get rid of overally dark images.
+    include_std : bool
+        Choose whether to filter images based on standard deviation. Default True.
+        Goal is to get rid of overally saturated images.
+    
+    Returns
+    _______
+    is_valid : bool
+        Returns True is passes the checks, returns false otherwise.
+    """
+    functions = []
+
+    if include_var:
+        # Get rid of super bad images
+        var_func = lambda x : False if np.var(roi_array) == 0 else True
+        functions.append(var_func)
+    if include_mean:
+        # Get rid of overally dark images
+        mean_func = lambda x : False if np.mean(roi_array) < 0.0005 else True
+        functions.append(mean_func)
+    if include_std:
+        # Get rid over overally saturated images
+        std_func = lambda x : False if np.std(roi_array) > 0.001 else True
+        functions.append(std_func)
+
+    return all(func(roi_array) for func in functions)
+
+def find_intresting_point(nodes, lon, lat, size=71):
+    """
+    Find an intresting point close the given lon, lat given a list data structure that contains
+    the image_path and the geodata for the image.
+
+    Parameters
+    ___________
+    nodes : list 
+        A list of autocnet.graph.node or data structure objects containing image_path and geodata
+        This contains the image data for all the images the intersect that lat/lon
+
+    lon : int
+        The longitude of the point one is interested in
+
+    lat : int
+        The latitude of the point one is interested in
+
+    size : int
+        The amount of pixel around a points initial location to search for an
+        interesting feature to which to shift the point.
+
+    Returns
+    _______
+    reference_index : int
+        An index that refers to image that was choosen to be used as the reference image.
+        This is the image in which an interesting point was found.
+        
+    point : shapely.geometry.point
+        The intresting point close to the given lat/lon
+
+    """
+    # Itterate through the images to find an interesting point
+    for reference_index, node in enumerate(nodes):
+        log.debug(f'Trying image: {node["image_path"].split("/")[-1]}')
+        # reference_index is the index into the list of measures for the image that is not shifted and is set at the
+        # reference against which all other images are registered.
+        sample, line = isis.ground_to_image(node["image_path"], lon, lat)
+
+        # If sample/line are None, point is not in image
+        if sample == None or line == None:
+            log.info(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
+            continue
+
+        # Extract ORB features in a sub-image around the desired point
+        image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
+        try:
+            roi_array = image_roi.clipped_array # Units are pixels for the array
+        except:
+            log.info(f'Failed to find interesting features in image.')
+            continue
+
+        # Check if the image is valid and could be used as the reference
+        if not is_valid_lroc_polar_image(roi_array, include_var=True, include_mean=True, include_std=True):
+            log.info('Failed to find interesting features in image due to poor quality image.')
+            continue
+
+        # Extract the most interesting feature in the search window
+        interesting = extract_most_interesting(image_roi.clipped_array)
+        
+        if interesting is not None:
+            # We have found an interesting feature and have identified the reference point.
+            # kps are in the image space with upper left origin and the roi could be the requested size 
+            # or smaller if near an image boundary. So use the roi upper left_x and top_y for the actual origin.
+            left_x, _, top_y, _ = image_roi.image_extent
+            newsample = left_x + interesting.x
+            newline = top_y + interesting.y
+            log.debug(f'Current reference index: {reference_index}.')
+            return reference_index, shapely.geometry.Point(newsample, newline)
+    
+    # Tried all the images, so return a shapely point un-modified, the last sample/line.
+    log.info('Unable to find an interesting point, falling back to the a priori pointing')
+    log.debug(f'Current reference index: {reference_index}.')
+    return reference_index, shapely.geometry.Point(sample, line)
+
+def place_points_in_centroids(candidate_points,
+                            identifier="place_points_in_centroid",
+                            interesting_func=find_intresting_point,
+                            interesting_func_kwargs={"size":71},
                             point_type=2,
                             ncg=None, 
                             use_cache=False, 
@@ -156,20 +275,16 @@ def place_points_in_centroids(valid,
 
     Parameters
     ----------
-    valid : list
+    candidate_points : list
         list of point coordinates in the form
         [(x1,y1), (x2,y2), ..., (xn, yn)]
 
-    identifier: str
-        The tag used to distinguish points laid down by this function.
+    interesting_func : callable
+        A function that takes a list of nodes, a longitude, a latitude, and arbitrary
+        kwargs and returns a tuple with a reference index (integer) and a shapely Point object
 
-    cam_type : str
-        options: {"csm", "isis"}
-        Pick what kind of camera model implementation to use.
-
-    size : int
-        The amount of pixel around a points initial location to search for an
-        interesting feature to which to shift the point.
+    interesting_func_kwargs : dict
+                              With keyword arguments required by the passed interesting_func
 
     point_type: int
         The type of point being placed. Default is pointtype=2, corresponding to
@@ -186,19 +301,64 @@ def place_points_in_centroids(valid,
         asynchronous (higher performance) inserts.
     """
     t1 = time.time()
-    points = []
+    for valid in candidate_points:
+        add_point_to_network(valid,
+                             identifier=identifier,
+                             interesting_func=interesting_func,
+                             interesting_func_kwargs=interesting_func_kwargs,
+                             point_type=point_type,
+                             ncg=ncg,
+                             use_cache=use_cache)
+    t2 = time.time()
+    log.info(f'Placed {len(candidate_points)} in {t2-t1} seconds.')
+
+def add_point_to_network(valid,
+                        identifier="place_points_in_centroid",
+                        interesting_func=find_intresting_point,
+                        interesting_func_kwargs={"size":71},
+                        point_type=2,
+                        ncg=None, 
+                        use_cache=False):
+    """
+    Place points into an centroid geometry by back-projecting using sensor models.
+    The DEM specified in the config file will be used to calculate point elevations.
+
+    Parameters
+    ----------
+    valid : list
+        point coordinates in the form (x1,y1)
+
+    interesting_func : callable
+        A function that takes a list of nodes, a longitude, a latitude, and arbitrary
+        kwargs and returns a tuple with a reference index (integer) and a shapely Point object
+
+    interesting_func_kwargs : dict
+                              With keyword arguments required by the passed interesting_func
+
+    point_type: int
+        The type of point being placed. Default is pointtype=2, corresponding to
+        free points.
+
+    ncg: obj
+        An autocnet.graph.network NetworkCandidateGraph instance representing the network
+        to apply this function to
+
+    use_cache : bool
+        If False (default) this func opens a database session and writes points
+        and measures directly to the respective tables. If True, this method writes
+        messages to the point_insert (defined in ncg.config) redis queue for
+        asynchronous (higher performance) inserts.
+    """
+    t1 = time.time()
     
-    semi_major = ncg.config['spatial']['semimajor_rad']
-    semi_minor = ncg.config['spatial']['semiminor_rad']
+    point = shapely.geometry.Point(valid[0], valid[1])
 
-    v=shapely.geometry.Point(valid[0], valid[1])
-    # Get all the images that the point intersects
-    sql_query=text(f"SELECT id FROM images WHERE ST_Intersects('SRID=30100;{v}', geom)")
+    # Extract the overlap ids for the point
     with ncg.session_scope() as session:
-        res = session.execute(sql_query).all()
-    overlap_ids = [id[0] for id in res]
+        overlap_ids = Images.get_images_intersecting_point(point, session)
 
-    # Make the nodes
+    # Instantiate the nodes in the NCG. This is done because we assume that the ncg passed is empty
+    # and part of a cluster submission.
     nodes = []
     with ncg.session_scope() as session:
         for id in overlap_ids:
@@ -207,166 +367,42 @@ def place_points_in_centroids(valid,
             nn.parent = ncg
             nodes.append(nn)
 
-    lon = v.x
-    lat = v.y
-    log.info(f'Point: {lon, lat}')
+    # Extract an interesting point 
+    log.info(f'Searching for an interesting point at {point.x}, {point.y} (lat,lon) in {len(nodes)} images.')
+    reference_index, interesting_sampline = interesting_func(nodes, point.x, point.y, **interesting_func_kwargs)
+    log.info(f'Found an interesting feature in {nodes[reference_index]["image_path"]} at {interesting_sampline.x}, {interesting_sampline.y}.')
 
-    # Need to get the first node and then convert from lat/lon to image space
-    for reference_index, node in enumerate(nodes):
-        log.debug(f'Starting with reference_index: {reference_index}')
-        # reference_index is the index into the list of measures for the image that is not shifted and is set at the
-        # reference against which all other images are registered.
-        if cam_type == "isis":
-            sample, line = isis.ground_to_image(node["image_path"], lon, lat)
-            if sample == None or line == None:
-                log.info(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
-                continue
-        if cam_type == "csm":
-            lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
-            x, y, z = reproject([lon_og, lat_og, height],
-                                semi_major, semi_minor,
-                                'latlon', 'geocent')
-            # The CSM conversion makes the LLA/ECEF conversion explicit
-            gnd = csmapi.EcefCoord(x, y, z)
-            image_coord = node.camera.groundToImage(gnd)
-            sample, line = image_coord.samp, image_coord.line
+    # Get the updated X,Y,Z location of the point and reproject to get the updates lon, lat.
+    # The io.db.Point class handles all xyz to lat/lon and ographic/ocentric conversions in it's 
+    # adjusted property setter.
+    reference_node = nodes[reference_index]
+    x,y,z = isis.linesamp2xyz(reference_node['image_path'], interesting_sampline.x, interesting_sampline.y)
 
-        # Extract ORB features in a sub-image around the desired point
-        image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
-        try:
-            if image_roi.variance == 0:
-                log.info(f'Failed to find interesting features in image.')
-                continue
-        except:
-            log.info(f'Failed to find interesting features in image.')
-            continue
-        # Extract the most interesting feature in the search window
-        interesting = extract_most_interesting(image_roi.clipped_array)
-        if interesting is not None:
-            # We have found an interesting feature and have identified the reference point.
-            break
-    log.debug(f'Current reference index: {reference_index}.')
-
-    if interesting is None:
-        log.info('Unable to find an interesting point, falling back to the a priori pointing')
-        newsample = sample
-        newline = line
-    else:
-        # kps are in the image space with upper left origin and the roi
-        # could be the requested size or smaller if near an image boundary.
-        # So use the roi upper left_x and top_y for the actual origin.
-        left_x, _, top_y, _ = image_roi.image_extent
-        newsample = left_x + interesting.x
-        newline = top_y + interesting.y
-
-    # Get the updated lat/lon from the feature in the node
-    if cam_type == "isis":
-        try:
-            p = isis.point_info(node["image_path"], newsample, newline, point_type="image")
-        except CalledProcessError as e:
-            if 'Requested position does not project in camera model' in e.stderr:
-                log.debug(node["image_path"])
-                log.info(f'interesting point ({newsample}, {newline}) does not project back to ground')
-        try:
-            x, y, z = p["BodyFixedCoordinate"].value
-        except:
-            x, y, z = ["BodyFixedCoordinate"]
-
-        if getattr(p["BodyFixedCoordinate"], "units", "None").lower() == "km":
-            x = x * 1000
-            y = y * 1000
-            z = z * 1000
-    elif cam_type == "csm":
-        image_coord = csmapi.ImageCoord(newline, newsample)
-        pcoord = node.camera.imageToGround(image_coord)
-        # Get the BCEF coordinate from the lon, lat
-        updated_lon_og, updated_lat_og, _ = reproject([pcoord.x, pcoord.y, pcoord.z],
-                                                    semi_major, semi_minor, 'geocent', 'latlon')
-        updated_lon, updated_lat = og2oc(updated_lon_og, updated_lat_og, semi_major, semi_minor)
-
-        updated_height = ncg.dem.get_height(updated_lat, updated_lon)
-
-
-        # Get the BCEF coordinate from the lon, lat
-        x, y, z = reproject([updated_lon_og, updated_lat_og, updated_height],
-                            semi_major, semi_minor, 'latlon', 'geocent')
-
-
-    updated_lon_og, updated_lat_og, updated_height = reproject([x, y, z], semi_major, semi_minor,
-                                                        'geocent', 'latlon')
-    updated_lon, updated_lat = og2oc(updated_lon_og, updated_lat_og, semi_major, semi_minor)
-
-    # Make the point
+    # Create the point object for insertion into the database
     point_geom = shapely.geometry.Point(x, y, z)
-    log.debug(f'Creating point with reference_index: {reference_index}')
-    point = Points(identifier=identifier,
-                apriori=point_geom,
-                adjusted=point_geom,
-                pointtype=point_type, # Would be 3 or 4 for ground
-                cam_type=cam_type,
-                reference_index=reference_index)
+    point = Points.create_point_with_reference_measure(point_geom, 
+                                                       reference_node, 
+                                                       interesting_sampline,
+                                                       choosername=identifier,
+                                                       point_type=point_type) 
+    log.debug(f'Created point: {point}.')
 
-    # Compute ground point to back project into measurtes
-    gnd = csmapi.EcefCoord(x, y, z)
+    # Remove the reference_indexed measure from the list of candidates.
+    # It has been added by the create_point_with_reference_measure function.
+    del nodes[reference_index]
 
-    for current_index, node in enumerate(nodes):
-        if cam_type == "csm":
-            image_coord = node.camera.groundToImage(gnd)
-            sample, line = image_coord.samp, image_coord.line
-        if cam_type == "isis":
-            # If this try/except fails, then the reference_index could be wrong because the length
-            # of the measures list is different than the length of the nodes list that was used
-            # to find the most interesting feature.
-            if not os.path.exists(node["image_path"]):
-                log.info(f'Unable to find input image {node["image_path"]}')
-                continue
-            try:
-                sample, line = isis.ground_to_image(node["image_path"], updated_lon, updated_lat)
-            except:
-                log.info(f"{node['image_path']} failed ground_to_image. Likely due to being processed incorrectly or is just a bad image that failed campt.")
-            if sample == None or line == None:
-            #except CalledProcessError as e:
-            #except:  # CalledProcessError is not catching the ValueError that this try/except is attempting to handle.
-                log.info(f'interesting point ({updated_lon},{updated_lat}) does not project to image {node["image_path"]}')
-                # If the current_index is greater than the reference_index, the change in list size does
-                # not impact the positional index of the reference. If current_index is less than the
-                # reference_index, then the reference_index needs to de-increment by one for each time
-                # a measure fails to be placed.
-                if current_index < reference_index:
-                    reference_index -= 1
-                    log.debug('Reference de-incremented.')
-                continue
-        if node.isis_serial:
-            point.measures.append(Measures(sample=sample,
-                                        line=line,
-                                        apriorisample=sample,
-                                        aprioriline=line,
-                                        imageid=node['node_id'],
-                                        serial=node.isis_serial,
-                                        measuretype=3,
-                                        choosername='place_points_in_centroid'))
-        else:
-            log.info(f"{node['node_id']} serial number is NULL")
-    log.debug(f'Current reference index in code: {reference_index}.')
-    log.debug(f'Current reference index on point: {point.reference_index}')
-    if len(point.measures) >= 2:
-        points.append(point)
-    log.info(f'Able to place {len(points)} points.')
+    # Iterate through all other, non-reference images in the overlap and attempt to add a measure.
+    point.add_measures_to_point(nodes, choosername=identifier)
 
-    if not points: return
-
-    # Insert the points into the database asynchronously (via redis) or synchronously via the ncg
+    # Insert the point into the database asynchronously (via redis) or synchronously via the ncg
     if use_cache:
-        pipeline = ncg.redis_queue.pipeline()
-        msgs = [json.dumps(point.to_dict(_hide=[]), cls=JsonEncoder) for point in points]
-        pipeline.rpush(ncg.point_insert_queue, *msgs)
-        pipeline.execute()
-        # Push
-        log.info('Using the cache')
-        ncg.redis_queue.incr(ncg.point_insert_counter, amount=len(points))
+        msgs = json.dumps(point.to_dict(_hide=[]), cls=JsonEncoder)
+        ncg.push_insertion_message(ncg.point_insert_queue,
+                                   ncg.point_insert_counter,
+                                   msgs)
     else:
         with ncg.session_scope() as session:
-            for point in points:
+            if len(point.measures) >= 2:
                 session.add(point)
     t2 = time.time()
     log.info(f'Total processing time was {t2-t1} seconds.')

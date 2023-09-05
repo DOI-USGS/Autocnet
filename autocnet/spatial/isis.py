@@ -10,11 +10,14 @@ coordinates."""
 #
 # SPDX-License-Identifier: CC0-1.0
 
-import os
 from collections import abc
+import logging
 from numbers import Number
+import os
+from subprocess import CalledProcessError
 
 import numpy as np
+import pvl
 
 try:
     import kalasiris as isis
@@ -22,7 +25,7 @@ except Exception as exception:
     from autocnet.utils.utils import FailedImport
     isis = FailedImport(exception)
 
-import pvl
+log = logging.getLogger(__name__)
 
 isis2np_types = {
         "UnsignedByte" : "uint8",
@@ -32,7 +35,6 @@ isis2np_types = {
 }
 
 np2isis_types = {v: k for k, v in isis2np_types.items()}
-
 
 def get_isis_special_pixels(arr):
     """
@@ -62,7 +64,6 @@ def get_isis_special_pixels(arr):
     sp = np.concatenate((null, lrs, lis, his, hrs))
 
     return sp
-
 
 def get_nodata_bounds(arr):
     """
@@ -114,7 +115,6 @@ def get_nodata_bounds(arr):
     bottom_y = cy + y_dist
 
     return left_x, right_x, top_y, bottom_y
-
 
 def point_info(
         cube_path: os.PathLike,
@@ -267,7 +267,6 @@ def point_info(
     else:
         return results[0]
 
-
 def image_to_ground(
         cube_path: os.PathLike,
         sample,
@@ -327,7 +326,6 @@ def image_to_ground(
 
     return lons, lats
 
-
 def _get_value(obj):
     """Returns *obj*, unless *obj* is of type pvl.collections.Quantity, in
     which case, the .value component of the object is returned."""
@@ -335,7 +333,6 @@ def _get_value(obj):
         return obj.value
     else:
         return obj
-
 
 def ground_to_image(cube_path, lon, lat, allowoutside=False):
     """
@@ -371,4 +368,49 @@ def ground_to_image(cube_path, lon, lat, allowoutside=False):
 
     return samples, lines
 
+def linesamp2xyz(cube_path, sample, line):
+    """
+    Uses the ISIS sensor model to convert from sample, line (x,y) pixel
+    coordinates to Body-Centered, Body-Fixed (BCBF) coordinates in meters.
 
+    Parameters
+    ----------
+
+    cube_path : str
+                Path to the ISIS cube
+
+    sample : float
+             The sample or x coordinate in the image
+
+    line : float
+           The line or y coordinate in the image
+
+    Returns
+    -------
+
+    x : float
+        The BCBF x coordinate in meters
+
+    y : float
+        The BCBF y coordinate in meters
+
+    z : float
+        The BCBF z coordinate in meters
+    """
+    try:
+        p = point_info(cube_path, sample, line, point_type='image')
+    except CalledProcessError as e:
+        if 'Requested position does not project in camera model' in e.stderr:
+            log.debug(f"Image coordinates {sample}, {line} do not project fot image {cube_path}.")
+
+    try:
+        x, y, z = p["BodyFixedCoordinate"].value
+    except:
+        x, y, z = p["BodyFixedCoordinate"]
+
+    if getattr(p["BodyFixedCoordinate"], "units", "None").lower() == "km":
+        x = x * 1000
+        y = y * 1000
+        z = z * 1000
+
+    return x,y,z        

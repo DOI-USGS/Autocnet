@@ -36,6 +36,12 @@ release.
 ### Added
 - Ability to place points in centroids instead of overlaps.
 - Ability to find points in centroids focused around a plantary body
+- Functionality to insert message into database
+- Reformated `test_model.py` and added more test for overlays and points
+- Functionality to create a point with reference measure
+- Functionality to add measure to a point
+- Functionality to convert from sample, line (x,y) pixel coordinates to Body-Centered, Body-Fixed (BCBF) coordinates in meters.
+- Functionality to test for valid input images.
 
 ### Fixed
 - string injection via format with sqlalchemy text() object.
