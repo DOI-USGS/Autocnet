@@ -1,5 +1,7 @@
 import enum
 import json
+import logging
+import os
 
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
@@ -13,6 +15,8 @@ from sqlalchemy_utils import database_exists, create_database
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm.attributes import QueryableAttribute
+from sqlalchemy import text
+from sqlalchemy.sql import func
 
 from geoalchemy2 import Geometry
 from geoalchemy2.shape import from_shape, to_shape
@@ -20,8 +24,12 @@ from geoalchemy2.shape import from_shape, to_shape
 import osgeo
 import shapely
 from shapely.geometry import Point
+
 from autocnet.transformation.spatial import reproject, og2oc
 from autocnet.utils.serializers import JsonEncoder
+from autocnet.spatial import isis
+
+log = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -353,6 +361,13 @@ class Images(BaseMixin, Base):
         res = session.query(cls.geom.ST_Union()).one()[0]
         return to_shape(res)
 
+    @classmethod
+    def get_images_intersecting_point(cls, point, session):
+        point = f"SRID={cls.latitudinal_srid};{point.wkt}"
+        res = session.query(cls.id).filter(func.ST_Intersects(cls.geom, point)).all()
+        image_ids = [i[0] for i in res]
+        return image_ids
+
 class Overlay(BaseMixin, Base):
     __tablename__ = 'overlay'
     latitudinal_srid = -1
@@ -379,7 +394,7 @@ class Overlay(BaseMixin, Base):
         self._geom = from_shape(geom, srid=self.latitudinal_srid)
 
     @classmethod
-    def overlapping_larger_than(cls, size_threshold, Session):
+    def overlapping_larger_than(cls, size_threshold, session):
         """
         Query the Overlay table for an iterable of responses where the objects
         in the iterable have an area greater than a given size.
@@ -389,13 +404,10 @@ class Overlay(BaseMixin, Base):
         size_threshold : Number
                         area >= this arg are returned
         """
-        session = Session()
         res = session.query(cls).\
                 filter(sqlalchemy.func.ST_Area(cls.geom) >= size_threshold).\
-                filter(sqlalchemy.func.array_length(cls.intersections, 1) > 1)
-        session.close()
+                filter(sqlalchemy.func.array_length(cls.intersections, 1) > 1).all()
         return res
-
 
 class PointType(enum.IntEnum):
     """
@@ -520,6 +532,97 @@ class Points(Base, BaseMixin):
     @maxresidual.setter
     def maxresidual(self, max_res):
         self._maxresidual = max_res
+
+    @classmethod
+    def create_point_with_reference_measure(cls, 
+                                            point_geom, 
+                                            reference_node, 
+                                            sampline, 
+                                            choosername='autocnet',
+                                            point_type=2):
+        """
+        Create a new point object with a single measure, the reference measure.
+
+        Parameters
+        ----------
+        point_geom : object
+                     a shapely PointZ object with X,Y,Z coordinates in the latitudinal SRID (BCBF)
+        
+        reference_node : object
+                         An autocnet Node object
+        
+        sampline : object
+                   a shapely Point object with x,y coordinates as the sample, line in the reference image
+
+        choosername : str
+                      The string identifier or chooser name added to the point id.
+
+        point_type : int
+                     The ISIS control network format point type. 
+
+        Returns
+        -------
+        point : object
+                A new Point object with a single measure, set as the reference measure.
+        """
+        # Create the point
+        point = cls(identifier=choosername,
+                apriori=point_geom,
+                adjusted=point_geom,
+                pointtype=point_type, # Would be 3 or 4 for ground
+                cam_type='isis',
+                reference_index=0)
+        
+        # Create the measure for the reference image and add it to the point
+        point.measures.append(Measures(sample=sampline.x,
+                                        line=sampline.y,
+                                        apriorisample=sampline.x,
+                                        aprioriline=sampline.y,
+                                        imageid=reference_node['node_id'],
+                                        serial=reference_node.isis_serial,
+                                        measuretype=3,
+                                        choosername=choosername))
+        return point 
+
+    def add_measures_to_point(self, candidates, choosername='autocnet'):
+        """
+        Attempt to add 1+ measures to a point from a list of candidate nodes. The
+        function steps over each node and attempts to use the node's sensor model
+        to reproject the point's lon/lat into the node's image space. If successful, 
+        The measure is added to the point.
+
+        Parameters
+        ----------
+        candidates : list
+                     of autocnet Node objects
+
+        choosername : the identidier or name of the algorithm that selected these measures.
+        """
+        for node in candidates:
+            # Skip images that are not on disk.
+            if not os.path.exists(node['image_path']):
+                log.info(f'Unable to find input image {node["image_path"]}')
+                continue
+            
+            try:
+                # ToDo: We want ot abstract away this to be a generic sensor model. No more 'isis' vs. 'csm' in the code
+                sample, line = isis.ground_to_image(node["image_path"], self.geom.x, self.geom.y)
+            except:
+                log.info(f"{node['image_path']} failed ground_to_image. Likely due to being processed incorrectly or is just a bad image that failed campt.")
+
+            if sample == None or line == None:
+                log.info(f'interesting point ({self.geom.x},{self.geom.y}) does not project to image {node["image_path"]}')
+                continue
+            
+            self.measures.append(Measures(sample=sample,
+                                        line=line,
+                                        apriorisample=sample,
+                                        aprioriline=line,
+                                        imageid=node['node_id'],
+                                        serial=node.isis_serial,
+                                        measuretype=3,
+                                        choosername=choosername))
+        log.info(f'Added {len(self.measures)-1} / {len(candidates)} measures to the point.')
 
     #def subpixel_register(self, Session, pointid, **kwargs):
     #    subpixel.subpixel_register_point(args=(Session, pointid), **kwargs)
