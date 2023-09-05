@@ -1757,7 +1757,6 @@ class NetworkCandidateGraph(CandidateGraph):
         if self.async_watchers:
             self._setup_asynchronous_workers()
 
-
     def _execute_sql(self, sql):
         """
         Execute a raw SQL string in the database currently specified
@@ -1884,6 +1883,27 @@ class NetworkCandidateGraph(CandidateGraph):
                 pipeline = self.redis_queue.pipeline()
         pipeline.execute()
         return job_counter + 1
+
+    def push_insertion_message(self, queue, queue_counter, msgs):
+        """
+        Use the redis write queue to stage inserts into the database.
+
+        Parameters
+        ----------
+        queue : str
+                The name of the queue to insert messages into
+        
+        queue_counter : str
+                        The name of queue that tracks the length of queue
+        
+        msgs : list
+               of messages formated for whatever asynchronous func is watching the ingest queue
+        """
+        pipeline = self.redis_queue.pipeline()
+        pipeline.rpush(queue, *msgs)
+        pipeline.execute()
+        self.redis_queue.incr(queue_counter, amount=len(msgs))
+        log.info(f'Pushed {len(msgs)} messages to the {queue} queue for insertion')
 
     def apply(self,
             function,
