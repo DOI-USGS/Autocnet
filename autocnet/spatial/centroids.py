@@ -1,18 +1,17 @@
 import json
 import logging
 import math
-import os
 
 import numpy as np
 import shapely
 
-from sqlalchemy import text
 from autocnet.cg.cg import create_points_along_line
-from autocnet.io.db.model import Images, Measures, Overlay, Points, JsonEncoder
+from autocnet.io.db.model import Images, Points, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.spatial import isis
 from autocnet.transformation import roi
 from autocnet.matcher.cpu_extractor import extract_most_interesting
+from autocnet.matcher.validation import is_valid_lroc_polar_image
 import time
 
 # Set up logging file
@@ -142,50 +141,6 @@ def find_points_in_centroids(radius,
         if len(line_points)!=0:
             points.extend(line_points)
     return points
-
-def is_valid_lroc_polar_image(roi_array, 
-                   include_var=True, 
-                   include_mean=False,
-                   include_std=False):
-    """
-    Checks if a numpy array representing an ROI from an image is valid.
-    Can check using variance, mean, and standard deviation, baed on unser input. 
-    It is highly encouraged that at the very least the variance check is used.
-
-    Parameters
-    __________
-    roi_array : np.array
-        A numpy array representing a ROI from an image, meaning the values are pixels
-    include_var : bool
-        Choose whether to filter images based on variance. Default True.
-    include_mean : bool
-        Choose whether to filter images based on mean. Default True.
-        Goal is to get rid of overally dark images.
-    include_std : bool
-        Choose whether to filter images based on standard deviation. Default True.
-        Goal is to get rid of overally saturated images.
-    
-    Returns
-    _______
-    is_valid : bool
-        Returns True is passes the checks, returns false otherwise.
-    """
-    functions = []
-
-    if include_var:
-        # Get rid of super bad images
-        var_func = lambda x : False if np.var(roi_array) == 0 else True
-        functions.append(var_func)
-    if include_mean:
-        # Get rid of overally dark images
-        mean_func = lambda x : False if np.mean(roi_array) < 0.0005 else True
-        functions.append(mean_func)
-    if include_std:
-        # Get rid over overally saturated images
-        std_func = lambda x : False if np.std(roi_array) > 0.001 else True
-        functions.append(std_func)
-
-    return all(func(roi_array) for func in functions)
 
 def find_intresting_point(nodes, lon, lat, size=71):
     """
