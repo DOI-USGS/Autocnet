@@ -42,6 +42,9 @@ release.
 - Functionality to add measure to a point
 - Functionality to convert from sample, line (x,y) pixel coordinates to Body-Centered, Body-Fixed (BCBF) coordinates in meters.
 - Functionality to test for valid input images.
+- Refactored place_points_in_overlap to make it easier to understand and work with
+- Created `sensor.py` that creates a class for either a 'csm' camera sensor or an 'isis' camera sensor. This removes confusing and wordy code. Now just need to create a sensor object based on the input 'csm' or 'isis'. Code inside classes will figure out the rest.
+- Fuctionality to convert between oc2xyz and xyz2oc in `spatial.py`
 
 ### Fixed
 - string injection via format with sqlalchemy text() object.

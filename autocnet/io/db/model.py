@@ -584,7 +584,7 @@ class Points(Base, BaseMixin):
                                         choosername=choosername))
         return point 
 
-    def add_measures_to_point(self, candidates, choosername='autocnet'):
+    def add_measures_to_point(self, candidates, sensor, choosername='autocnet', **kwargs):
         """
         Attempt to add 1+ measures to a point from a list of candidate nodes. The
         function steps over each node and attempts to use the node's sensor model
@@ -603,10 +603,9 @@ class Points(Base, BaseMixin):
             if not os.path.exists(node['image_path']):
                 log.info(f'Unable to find input image {node["image_path"]}')
                 continue
-            
             try:
-                # ToDo: We want ot abstract away this to be a generic sensor model. No more 'isis' vs. 'csm' in the code
-                sample, line = isis.ground_to_image(node["image_path"], self.geom.x, self.geom.y)
+                # TODO: Take this projection out of the CSM model and work it into the point
+                sample, line = sensor.calculate_sample_line(node, self.geom.x, self.geom.y, **kwargs)
             except:
                 log.info(f"{node['image_path']} failed ground_to_image. Likely due to being processed incorrectly or is just a bad image that failed campt.")
 

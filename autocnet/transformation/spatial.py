@@ -113,3 +113,68 @@ def reproject(record, semi_major, semi_minor, source_proj, dest_proj, **kwargs):
 
     y, x, z = pyproj.transform(source_pyproj, dest_pyproj, record[0], record[1], record[2], **kwargs)
     return y, x, z
+
+# TODO: Take this projection out of the CSM model and work it into the point
+def oc2xyz(lon, lat, semi_major, semi_minor, height):
+    """
+    Project from ocentric to graphic
+
+    Parameters
+    ----------
+    lon: int
+        longitude of point
+
+    lat: int
+        latitude of point
+    
+    semi_minor: int
+        Get from the plantery body in use
+    
+    semi_major: int
+        Get from the plantary body in use
+    
+    Returns
+    -------
+    x,y,z: int(s)
+        The x, y, z coordinated to the converted point
+    """
+    lon_og, lat_og = oc2og(lon, lat, semi_major, semi_minor)
+    x, y, z = reproject([lon_og, lat_og, height],
+                        semi_major, semi_minor,
+                        'latlon', 'geocent')
+    return x,y,z
+
+# TODO: Take this projection out of the CSM model and work it into the point
+def xyz2oc(x, y, z, semi_major, semi_minor):
+    """
+    Project from graphic to ocentric
+
+    Parameters
+    ----------
+    x: int
+        x coordinate of the point
+
+    y: int
+        y coordinate of the point
+    
+    z: int
+        z coordinate (height) of the point
+    
+    semi_minor: int
+        Get from the plantery body in use
+    
+    semi_major: int
+        Get from the plantary body in use
+    
+    Returns
+    -------
+    updated_lon: int
+        longitude of the point after conversion
+    
+    updated_lat: int
+        latitude of the point after conversion
+    """
+    lon_og, lat_og, _ = reproject([x, y, z], semi_major, semi_minor, 
+                                                  'geocent', 'latlon')
+    updated_lon, updated_lat = og2oc(lon_og, lat_og, semi_major, semi_minor)
+    return updated_lon, updated_lat
