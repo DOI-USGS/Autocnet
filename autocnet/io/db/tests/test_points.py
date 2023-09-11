@@ -3,6 +3,7 @@ import pytest
 
 import shapely
 from autocnet.io.db.model import Points
+from autocnet.spatial import sensor
 
 def test_points_exists(tables):
     assert Points.__tablename__ in tables
@@ -72,6 +73,7 @@ def test_create_point_with_reference_measure(session):
 def test_add_measures_to_point(session):
     point = Points()
     point.adjusted = shapely.Point(0,0,0)
+    test_sensor = sensor.create_sensor('isis')
     
     node = MagicMock()
     node.isis_serial = 'serial'
@@ -81,7 +83,7 @@ def test_add_measures_to_point(session):
 
     with patch('autocnet.spatial.isis.ground_to_image') as mocked_call:
         mocked_call.return_value = (0.5, 0.5)
-        point.add_measures_to_point(reference_nodes)
+        point.add_measures_to_point(reference_nodes, test_sensor)
 
     assert len(point.measures) == 4
     assert point.measures[0].line == 0.5
