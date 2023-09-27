@@ -216,7 +216,7 @@ def place_points_in_overlap(overlap,
         raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
     
     # Determine what sensor type to use
-    sensor = sensor.create_sensor(cam_type)
+    current_sensor = sensor.create_sensor(cam_type)
 
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
@@ -240,7 +240,7 @@ def place_points_in_overlap(overlap,
     for valid in candidate_points:
         add_point_to_overlap_network(valid,
                                     nodes,
-                                    sensor,
+                                    current_sensor,
                                     geom,
                                     identifier=identifier,
                                     interesting_func=interesting_func,
@@ -254,7 +254,7 @@ def place_points_in_overlap(overlap,
 
 def add_point_to_overlap_network(valid,
                                 nodes,
-                                sensor,
+                                current_sensor,
                                 geom,
                                 identifier="place_points_in_overlap",
                                 interesting_func=find_interesting_point,
@@ -275,8 +275,8 @@ def add_point_to_overlap_network(valid,
     nodes: list
         list of node objects (the images)
     
-    sensor: string
-        sensor that is being used, either isis or csm
+    current_sensor: string
+        current_sensor that is being used, either isis or csm
 
     geom: obj
         overlap geom to be used
@@ -358,7 +358,7 @@ def add_point_to_overlap_network(valid,
     # TODO: Take this projection out of the CSM model and work it into the point
     kwargs['needs_projection']=False
     # Iterate through all other, non-reference images in the overlap and attempt to add a measure.
-    point.add_measures_to_point(nodes, sensor, choosername=identifier, **csm_kwargs)
+    point.add_measures_to_point(nodes, current_sensor, choosername=identifier, **csm_kwargs)
 
     # Insert the point into the database asynchronously (via redis) or synchronously via the ncg
     if use_cache:
