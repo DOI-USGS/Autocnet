@@ -33,6 +33,9 @@ heading to indicate that only the bug fixes and security fixes are in the bug fi
 release.
 -->
 ## [Unreleased]
+### Fixed
+- Errors when importing sensor model in `overlap.py`
+- Dealt with None values trying to be converted to a shapely point in `centroids.py`
 
 ## [1.1.0]
 ### Added
