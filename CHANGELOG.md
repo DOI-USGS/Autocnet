@@ -36,6 +36,7 @@ release.
 ### Fixed
 - Errors when importing sensor model in `overlap.py`
 - Dealt with None values trying to be converted to a shapely point in `centroids.py`
+- Dealt with Key Error when finding file paths in the network nodes.
 
 ## [1.1.0]
 ### Added
