@@ -2225,8 +2225,7 @@ class NetworkCandidateGraph(CandidateGraph):
             flistpath = os.path.splitext(path)[0] + '.lis'
         target = self.config['spatial'].get('target', None)
 
-        ids = df['imageid'].unique()
-        fpaths = [self.nodes[i]['data']['image_path'] for i in ids]
+        fpaths = [str(path) for path in self.nodes]
         for f in self.files:
             if f not in fpaths:
                 log.warning(f'{f} in candidate graph but not in output network.')
