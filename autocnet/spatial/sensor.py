@@ -36,7 +36,7 @@ class ISISSensor:
         sample, line = isis.ground_to_image(node["image_path"], lon, lat)
         return sample, line
 
-    def linesamp2xyz(node, sample, line, **kwargs):
+    def linesamp2xyz(self, node, sample, line, **kwargs):
         """
         Convert a line and sample into and x,y,z point for isis camera model
 
@@ -132,7 +132,7 @@ class CSMSensor:
         sample, line = image_coord.samp, image_coord.line
         return sample,line
     
-    def linesamp2xyz(node, sample, line, **kwargs):
+    def linesamp2xyz(self, node, sample, line, **kwargs):
         """
         Convert a line and sample into and x,y,z point for csm camera model
 

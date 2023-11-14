@@ -83,7 +83,8 @@ def find_points_in_centroids(radius,
                              min_lat=None,
                              max_lat=None,
                              longitude_min=-180,
-                             longitude_max=180):
+                             longitude_max=180,
+                             latitude_decriment=-0.005):
     """
     This finds points within a specified geometry.
     It finds those points be placing points in a centroid pattern
@@ -124,11 +125,13 @@ def find_points_in_centroids(radius,
     # Set up processes
     if polygon:
         _, min_lat, _, max_lat = polygon.bounds
-    latitude_intervals = np.arange(max_lat, min_lat, -0.005)
+    latitude_intervals = np.arange(max_lat, min_lat, latitude_decriment)
+    # Remove intervals that cause divide by 0 errors
+    latitude_intervals = latitude_intervals[latitude_intervals != 270.0]
+    latitude_intervals = latitude_intervals[latitude_intervals != 90.0]
     points=[]
 
-    # Itterate through each latitude, decrimenting at -0.005
-    # TODO: decide if this decrement should be a user input
+    # Itterate through each latitude
     for lat in latitude_intervals:
         # Calculate the number of points needed to space points along a latitude line every __km
         num_points = get_number_of_points(target_distance_in_km, lat, radius)
@@ -338,6 +341,9 @@ def add_point_to_network(valid,
     reference_node = nodes[reference_index]
     x,y,z = isis.linesamp2xyz(reference_node['image_path'], interesting_sampline.x, interesting_sampline.y)
 
+    if x == None or y==None or z==None:
+        log.info("Updated point projects outside of image, ignoring")
+        return
     # Create the point object for insertion into the database
     point_geom = shapely.geometry.Point(x, y, z)
     point = Points.create_point_with_reference_measure(point_geom, 
