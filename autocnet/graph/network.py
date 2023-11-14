@@ -2225,7 +2225,7 @@ class NetworkCandidateGraph(CandidateGraph):
             flistpath = os.path.splitext(path)[0] + '.lis'
         target = self.config['spatial'].get('target', None)
 
-        fpaths = [str(path) for path in self.nodes]
+        fpaths = [path for path in self.nodes]
         for f in self.files:
             if f not in fpaths:
                 log.warning(f'{f} in candidate graph but not in output network.')
@@ -2405,7 +2405,7 @@ class NetworkCandidateGraph(CandidateGraph):
                 else:
                     continue
 
-    def add_from_remote_database(self, source_db_config, path=None,  query_string=sql.select_ten_pub_image):
+    def add_from_remote_database(self, source_db_config, path=None,  query_string=sql.select_ten_pub_image, overlaps=True):
         """
         This is a constructor that takes an existing database containing images and sensors,
         copies the selected rows into the project specified in the autocnet_config variable,
@@ -2476,7 +2476,8 @@ class NetworkCandidateGraph(CandidateGraph):
         if path:
             self.copy_images(path)
         self.from_database()
-        self._execute_sql(sql.compute_overlaps_sql)
+        if overlaps:
+            self._execute_sql(sql.compute_overlaps_sql)
 
     def from_database(self, query_string=sql.select_pub_image):
         """
