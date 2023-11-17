@@ -110,8 +110,8 @@ def reproject(record, semi_major, semi_minor, source_proj, dest_proj, **kwargs):
     """
     source_pyproj = pyproj.Proj(proj=source_proj, a=semi_major, b=semi_minor, lon_wrap=180)
     dest_pyproj = pyproj.Proj(proj=dest_proj, a=semi_major, b=semi_minor, lon_wrap=180)
-
-    y, x, z = pyproj.transform(source_pyproj, dest_pyproj, record[0], record[1], record[2], **kwargs)
+    transg = pyproj.Transformer.from_proj(source_pyproj, dest_pyproj)
+    y, x, z = transg.transform(record[0], record[1], record[2])
     return y, x, z
 
 # TODO: Take this projection out of the CSM model and work it into the point

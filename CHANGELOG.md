@@ -33,10 +33,17 @@ heading to indicate that only the bug fixes and security fixes are in the bug fi
 release.
 -->
 ## [Unreleased]
+### Added
+- Ability to choose whether to compute overlaps for a network candidate graph
+
 ### Fixed
 - Errors when importing sensor model in `overlap.py`
 - Dealt with None values trying to be converted to a shapely point in `centroids.py`
 - Dealt with Key Error when finding file paths in the network nodes.
+- Removed depreciated function from `spatial.py` and replaced
+- Fixed Errors in `network.py`
+- Finding points in polar areas that avoids dividing by zero errors
+- Small errors in `overlap.py` to get overlap function working.
 
 ## [1.1.0]
 ### Added
