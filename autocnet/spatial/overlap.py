@@ -61,7 +61,7 @@ def place_points_in_overlaps(size_threshold=0.0007,
                                 point_type=point_type,
                                 ncg=ncg)
 
-def find_interesting_point(nodes, lon, lat, sensor, size=71, **kwargs):
+def find_interesting_point(nodes, lon, lat, current_sensor, size=71, **kwargs):
     """
     Find an interesting point close the given lon, lat given a list data structure that contains
     the image_path and the geodata for the image.
@@ -100,17 +100,24 @@ def find_interesting_point(nodes, lon, lat, sensor, size=71, **kwargs):
         The intresting point close to the given lat/lon
 
     """
+    if not nodes:
+        log.info("Tried to itterate through a node that does not exist, skipping")
+        return None, None
     # Itterate through the images to find an interesting point
     for reference_index, node in enumerate(nodes):
         log.debug(f'Trying image: {node["image_path"].split("/")[-1]}')
         # reference_index is the index into the list of measures for the image that is not shifted and is set at the
         # reference against which all other images are registered.
-        sample, line = sensor.calculate_sample_line(node, lon, lat, **kwargs)
+        try_sample, try_line = isis.ground_to_image(node["image_path"], lon, lat)
 
         # If sample/line are None, point is not in image
-        if sample == None or line == None:
+        if try_sample == None or try_line == None:
             log.info(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
             continue
+
+        # This a prevention in case the last sample/line are NULL when itterating
+        sample = try_sample
+        line = try_line
 
         # Extract ORB features in a sub-image around the desired point
         image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
@@ -121,7 +128,7 @@ def find_interesting_point(nodes, lon, lat, sensor, size=71, **kwargs):
             continue
 
         # Check if the image is valid and could be used as the reference
-        if not is_valid_lroc_image(roi_array, include_var=True, include_mean=False, include_std=False):
+        if not is_valid_lroc_image(roi_array):
             log.info('Failed to find interesting features in image due to poor quality image.')
             continue
 
@@ -221,7 +228,7 @@ def place_points_in_overlap(overlap,
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
     candidate_points = compgeom.distribute_points_in_geom(geom, ratio_size=ratio_size, **distribute_points_kwargs, **kwargs)
-    if not valid.any():
+    if not candidate_points.any():
         warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
     
@@ -323,14 +330,18 @@ def add_point_to_overlap_network(valid,
     }
 
     # Find the intresting sampleline and what image it is in
-    reference_index, interesting_sampline = interesting_func(nodes, lon, lat, sensor, size=interesting_func_kwargs['size'], **csm_kwargs)
+    reference_index, interesting_sampline = interesting_func(nodes, lon, lat, current_sensor, size=interesting_func_kwargs['size'], **csm_kwargs)
+
+    if not interesting_sampline:
+        return
+
     log.info(f'Found an interesting feature in {nodes[reference_index]["image_path"]} at {interesting_sampline.x}, {interesting_sampline.y}.')
 
     # Get the updated X,Y,Z location of the point and reproject to get the updates lon, lat.
     # The io.db.Point class handles all xyz to lat/lon and ographic/ocentric conversions in it's 
     # adjusted property setter.
     reference_node = nodes[reference_index]
-    x,y,z = sensor.linesamp2xyz(reference_node, interesting_sampline.x, interesting_sampline.y, **csm_kwargs)
+    x,y,z = current_sensor.linesamp2xyz(reference_node, interesting_sampline.x, interesting_sampline.y, **csm_kwargs)
 
     # If the updated point is outside of the overlap, then revert back to the
     # original point and hope the matcher can handle it when sub-pixel registering
