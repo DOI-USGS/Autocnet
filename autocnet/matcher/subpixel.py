@@ -397,13 +397,15 @@ def subpixel_register_point(pointid,
                              size_y=match_kwargs['template_size'][1],
                              buffer=5)
 
-        baseline_affine = estimate_local_affine(reference_roi, moving_roi)
-
-        # Updated so that the affine used is computed a single time.
-        # Has not scale or shear or rotation.
-        updated_affine, maxcorr, _ = subpixel_template(reference_roi,
+        try:
+            baseline_affine = estimate_local_affine(reference_roi, moving_roi)
+            # Updated so that the affine used is computed a single time.
+            # Has not scale or shear or rotation.
+            updated_affine, maxcorr, _ = subpixel_template(reference_roi,
                                                         moving_roi,
                                                         affine=baseline_affine)
+        except:
+            updated_affine = None
         
         if updated_affine is None:
             log.warn('Unable to match with this parameter set.')
