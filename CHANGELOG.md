@@ -44,6 +44,7 @@ release.
 - Fixed Errors in `network.py`
 - Finding points in polar areas that avoids dividing by zero errors
 - Small errors in `overlap.py` to get overlap function working.
+- Raise an exception if the shear is too high when trying to find the baseline affine
 
 ## [1.1.0]
 ### Added
