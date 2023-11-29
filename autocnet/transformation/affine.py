@@ -129,7 +129,7 @@ def estimate_local_affine(reference_roi, moving_roi):
         # with high shear match poorly. The search templates also have reflection (ROI object, x/y_read_length)
         # because a high shear affine requires  alot of data to be read in. 
         # TODO: Consider handling this differently in the future should nadir to high slew image matching be required.
-        log.warn(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match.')
+        raise Exception(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match, so skipping.')
     # The above coordinate transformation to get the center of the ROI handles translation. 
     # So, we only need to rotate/shear/scale the ROI. Omitting scale, which should be 1 (?) results
     # in an affine transoformation that does not match the full image affine
