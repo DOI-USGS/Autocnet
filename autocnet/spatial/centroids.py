@@ -45,7 +45,12 @@ def get_number_of_points(target_distance_km, latitude, radius):
     target_distance_rad = target_distance_km / radius
 
     # Calculate longitudal distance between two points
-    longitudinal_distance = 2 * math.asin(math.sqrt(math.sin(target_distance_rad/2)**2 / (math.cos(math.radians(latitude))**2)))
+    try:
+        longitudinal_distance = 2 * math.asin(math.sqrt(math.sin(target_distance_rad/2)**2 / (math.cos(math.radians(latitude))**2)))
+    # If given latitude is too close to 90 or 270, taking the cosine of it will give 0, so will then have a divide by 0 error.
+    except:
+        log.info(f"Math domain error at {latitude}, skipping")
+        return None
 
     # Calculate the circumference of the planetary body at the given latitude
     body_circumference = 2 * math.pi * radius * math.cos(math.radians(latitude))
@@ -126,15 +131,14 @@ def find_points_in_centroids(radius,
     if polygon:
         _, min_lat, _, max_lat = polygon.bounds
     latitude_intervals = np.arange(max_lat, min_lat, latitude_decriment)
-    # Remove intervals that cause divide by 0 errors
-    latitude_intervals = latitude_intervals[latitude_intervals != 270.0]
-    latitude_intervals = latitude_intervals[latitude_intervals != 90.0]
     points=[]
 
     # Itterate through each latitude
     for lat in latitude_intervals:
         # Calculate the number of points needed to space points along a latitude line every __km
         num_points = get_number_of_points(target_distance_in_km, lat, radius)
+        if not num_points:
+            continue
         p1 = (longitude_min, lat)
         p2 = (longitude_max, lat)
         # Create a list of points for latitude lines
