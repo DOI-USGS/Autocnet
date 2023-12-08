@@ -45,6 +45,7 @@ release.
 - Finding points in polar areas that avoids dividing by zero errors
 - Small errors in `overlap.py` to get overlap function working.
 - Raise an exception if the shear is too high when trying to find the baseline affine
+- Catch divide by 0 errors when getting the number of points to place in `centroids.py`
 
 ## [1.1.0]
 ### Added
