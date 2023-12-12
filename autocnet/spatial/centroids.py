@@ -27,36 +27,26 @@ def get_number_of_points(target_distance_km, latitude, radius):
     Parameters
     ___________
     target_distance_km : int
-        The target distance to maintin between points
+        The target distance to maintin between points in km
 
     latitude : int
-        the latitude where points are needed
+        the latitude where points are needed in degrees
     
     radius : int
-        radius of the planetary body
+        radius of the planetary body in km
     
     Returns
     _______
     num_points : int
-        Number of points needed to maintin target distance
+        Number of points needed to maintin target distance at specified latitude
     """
 
-    # Convert to radians
-    target_distance_rad = target_distance_km / radius
-
-    # Calculate longitudal distance between two points
-    try:
-        longitudinal_distance = 2 * math.asin(math.sqrt(math.sin(target_distance_rad/2)**2 / (math.cos(math.radians(latitude))**2)))
-    # If given latitude is too close to 90 or 270, taking the cosine of it will give 0, so will then have a divide by 0 error.
-    except:
-        log.info(f"Math domain error at {latitude}, skipping")
-        return None
-
-    # Calculate the circumference of the planetary body at the given latitude
-    body_circumference = 2 * math.pi * radius * math.cos(math.radians(latitude))
-
-    # Calculate points needed
-    num_points = int(body_circumference / longitudinal_distance) + 1
+    # Convert latitude to radians
+    lat_rad = math.radians(latitude)
+    # Find the circumference of the planetary body
+    circumference = 2 * math.pi * radius * math.cos(lat_rad)
+    # Calculate the number of points
+    num_points = int(circumference/target_distance_km)
 
     return num_points
 
