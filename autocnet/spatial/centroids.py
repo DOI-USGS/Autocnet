@@ -180,6 +180,7 @@ def find_intresting_point(nodes, lon, lat, size=71):
 
         # If sample/line are None, point is not in image
         if try_sample == None or try_line == None:
+            sample, line = None, None
             log.info(f'point ({lon}, {lat}) does not project to reference image {node["image_path"]}')
             continue
 
@@ -216,6 +217,13 @@ def find_intresting_point(nodes, lon, lat, size=71):
     # Tried all the images, so return a shapely point un-modified, the last sample/line.
     log.info('Unable to find an interesting point, falling back to the a priori pointing')
     log.debug(f'Current reference index: {reference_index}.')
+
+    # This only occurs when all the nodes returned a null sample or line
+    if not sample or not line:
+        log.info('No point was ever in any of the images, return None')
+        return None, None
+    
+    # No interesting point was found but can use the last point in the itteration
     return reference_index, shapely.geometry.Point(sample, line)
 
 def place_points_in_centroids(candidate_points,
@@ -282,7 +290,7 @@ def add_point_to_network(valid,
 
     Parameters
     ----------
-    valid : list
+    valid : tupple
         point coordinates in the form (x1,y1)
 
     interesting_func : callable
@@ -324,9 +332,21 @@ def add_point_to_network(valid,
             nn.parent = ncg
             nodes.append(nn)
 
-    # Extract an interesting point 
+    # Extract an interesting point
+    
+    # Make sure that there were nodes found
+    if not nodes:
+        log.info(f'No nodes were found for the point {point.x}, {point.y}')
+        return
     log.info(f'Searching for an interesting point at {point.x}, {point.y} (lat,lon) in {len(nodes)} images.')
     reference_index, interesting_sampline = interesting_func(nodes, point.x, point.y, **interesting_func_kwargs)
+
+    # If no images worked at all, then this is just a bad area to find a good image
+    if not reference_index:
+        log.info('None of the possible images worked to find an interesting point, skipping')
+        return
+    
+    # Otherwise, something was found and can continue on
     log.info(f'Found an interesting feature in {nodes[reference_index]["image_path"]} at {interesting_sampline.x}, {interesting_sampline.y}.')
 
     # Get the updated X,Y,Z location of the point and reproject to get the updates lon, lat.
