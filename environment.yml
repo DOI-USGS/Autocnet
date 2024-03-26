@@ -18,8 +18,8 @@ dependencies:
   - conda-forge::knoten
   - networkx>=2,<3
   - numpy
-  - libopencv
-  - opencv
+  - libopencv *=headless*
+  - opencv 
   - py-opencv
   - conda-forge::plio>=1.5.4
   - pandas
