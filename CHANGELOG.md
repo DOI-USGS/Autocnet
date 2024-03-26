@@ -36,6 +36,9 @@ release.
 ### Added
 - Ability to choose whether to compute overlaps for a network candidate graph
 
+### Changed
+- CI on the library now uses a mocked sqlalchemy connection. All tests can now run locally without the need for a supplemental postgres container. This changed removed some non-optimal tests that were testing datbase triggers and database instantiation handled by SQLAlchemy.
+
 ### Fixed
 - Errors when importing sensor model in `overlap.py`
 - Dealt with None values trying to be converted to a shapely point in `centroids.py`
