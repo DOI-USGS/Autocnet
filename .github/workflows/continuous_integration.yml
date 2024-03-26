@@ -33,8 +33,6 @@ jobs:
         run: |
           curl "${{ env.hirise-pds-url }}/PSP_010502_2090_RED5_0.IMG" -o $GITHUB_WORKSPACE/test-resources/PSP_010502_2090_RED5_0.img
           curl "${{ env.hirise-pds-url }}/PSP_010502_2090_RED5_1.IMG" -o $GITHUB_WORKSPACE/test-resources/PSP_010502_2090_RED5_1.img
-      - name: Exit isis env
-        run: conda deactivate
       - name: Checkout Code
         uses: actions/checkout@v2
       - name: Cache conda
