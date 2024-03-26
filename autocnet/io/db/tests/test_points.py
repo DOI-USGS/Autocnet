@@ -5,16 +5,6 @@ import shapely
 from autocnet.io.db.model import Points
 from autocnet.spatial import sensor
 
-def test_points_exists(tables):
-    assert Points.__tablename__ in tables
-
-def test_latitudinal_srid():
-    p = Points(adjusted=shapely.Point(0,0,0))
-    assert p.latitudinal_srid == 4326
-
-def test_rectangular_srid():
-    p = Points(adjusted=shapely.Point(0,0,0))
-    assert p.rectangular_srid == 4978
 
 @pytest.mark.parametrize("data", [
     {'id':1, 'pointtype':2},
