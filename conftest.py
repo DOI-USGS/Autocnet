@@ -6,6 +6,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
+from mock_alchemy.mocking import UnifiedAlchemyMagicMock
 from sqlalchemy import inspect, text
 
 from autocnet.control import control
@@ -21,6 +22,10 @@ def queue():
     queue = fakeredis.FakeStrictRedis()
     return queue
 
+@pytest.fixture
+def session():
+    session = UnifiedAlchemyMagicMock()
+    return session
 
 @pytest.fixture(scope='session')
 def candidategraph(node_a, node_b, node_c):
@@ -222,24 +227,24 @@ def controlnetwork():
 
 
 
-@pytest.fixture
-def session(tables, request, ncg):
-    session = ncg.Session()
+# @pytest.fixture
+# def session(tables, request, ncg):
+#     session = ncg.Session()
 
-    def cleanup():
-        session.rollback()  # Necessary because some tests intentionally fail
-        for t in reversed(tables):
-            # Skip the srid table
-            if t != 'spatial_ref_sys':
-                session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
-            # Reset the autoincrementing
-            if t in ['Images', 'Cameras', 'Matches', 'Measures']:
-                session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
-        session.commit()
+#     def cleanup():
+#         session.rollback()  # Necessary because some tests intentionally fail
+#         for t in reversed(tables):
+#             # Skip the srid table
+#             if t != 'spatial_ref_sys':
+#                 session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
+#             # Reset the autoincrementing
+#             if t in ['Images', 'Cameras', 'Matches', 'Measures']:
+#                 session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
+#         session.commit()
 
-    request.addfinalizer(cleanup)
+#     request.addfinalizer(cleanup)
 
-    return session
+#     return session
 
 @pytest.fixture
 def db_controlnetwork(ncg):
