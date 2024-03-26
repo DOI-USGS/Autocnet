@@ -2211,7 +2211,8 @@ class NetworkCandidateGraph(CandidateGraph):
                 dem_file = dem.dem.file_name
 
         # Read the cnet from the db
-        df = io_controlnetwork.db_to_df(self, ground_radius=dem_file, ground_xyz=ground_xyz, **db_kwargs)
+        with self.session_scope() as session:
+            df = io_controlnetwork.db_to_df(session, ground_radius=dem_file, ground_xyz=ground_xyz, **db_kwargs)
 
         # Add the covariance matrices to ground measures
         if dem is not None:
@@ -2258,9 +2259,10 @@ class NetworkCandidateGraph(CandidateGraph):
                        For example, autocnet_14 becomes 14.
         """
         isis_network = cnet.from_isis(path)
-        io_controlnetwork.update_from_jigsaw(isis_network,
+        with self.session_scope() as session:
+            io_controlnetwork.update_from_jigsaw(isis_network,
                                              self.measures,
-                                             self.engine,
+                                             session.bind,
                                              pointid_func=pointid_func)
 
     @classmethod

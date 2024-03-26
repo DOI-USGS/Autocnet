@@ -11,7 +11,7 @@ from ... import sql
 
 from sqlalchemy import text
 
-def db_to_df(ncg, ground_radius=None, ground_xyz=None, sql=sql.db_to_df_sql_string):
+def db_to_df(session, ground_radius=None, ground_xyz=None, sql=sql.db_to_df_sql_string):
         """
         Given a set of points/measures in an autocnet database, generate an ISIS
         compliant control network.
@@ -36,8 +36,7 @@ def db_to_df(ncg, ground_radius=None, ground_xyz=None, sql=sql.db_to_df_sql_stri
               that exist on images with 3 or more measures. 
         """
         
-        df = pd.read_sql(sql, ncg.engine)
-
+        df = pd.read_sql(sql, session.bind)
         # measures.id DB column was read in to ensure the proper ordering of DF
         # so the correct measure is written as reference
         del df['id']
@@ -101,7 +100,7 @@ def copy_from_method(table, conn, keys, data_iter, pre_truncate=False, fatal_fai
     cur.copy_expert(sql=sql_query, file=s_buf)
     return cur.rowcount
 
-def update_from_jigsaw(cnet, measures, engine, pointid_func=None):
+def update_from_jigsaw(cnet, measures, session, pointid_func=None):
     """
     Updates a database fields: liner, sampler, measureJigsawRejected,
     samplesigma, and linesigma using an ISIS control network.

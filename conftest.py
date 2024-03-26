@@ -247,26 +247,25 @@ def controlnetwork():
 #     return session
 
 @pytest.fixture
-def db_controlnetwork(ncg):
-    with ncg.session_scope() as session:
-        # Create the images
-        i1 = {'id':0, 'serial':'foo'}
-        i2 = {'id':1, 'serial':'bar'}
-        for i in [i1, i2]:
-            model.Images.create(session, **i)
+def db_controlnetwork(session):
+    # Create the images
+    i1 = {'id':0, 'serial':'foo'}
+    i2 = {'id':1, 'serial':'bar'}
+    for i in [i1, i2]:
+        model.Images.create(session, **i)
 
-        for i, j in enumerate([0,2,4]):
-            ptype = 2
-            if j == 4:
-                ptype=3  # Ground
-            model.Points.create(session,
-                                id=i,
-                                _pointtype=ptype,
-                                measures=[model.Measures(id=k+j,
-                                                        imageid=k,
-                                                        serial=f'Random{k}:123',
-                                                        _measuretype=3,
-                                                        sample=k,
-                                                        line=k,
-                                                        aprioriline=k,
-                                                        apriorisample=k) for k in range(2)])
+    for i, j in enumerate([0,2,4]):
+        ptype = 2
+        if j == 4:
+            ptype=3  # Ground
+        model.Points.create(session,
+                            id=i,
+                            _pointtype=ptype,
+                            measures=[model.Measures(id=k+j,
+                                                    imageid=k,
+                                                    serial=f'Random{k}:123',
+                                                    _measuretype=3,
+                                                    sample=k,
+                                                    line=k,
+                                                    aprioriline=k,
+                                                    apriorisample=k) for k in range(2)])
