@@ -1,12 +1,12 @@
-name: Pull-Request-CI
+name: CI
 
 on:
   pull_request:
     branches:
-      - dev
+      - main
   push:
     branches:
-      - dev
+      - main
 
 env:
   isis-root: /usr/share/miniconda/envs/isis/
