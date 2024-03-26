@@ -34,7 +34,7 @@ jobs:
           curl "${{ env.hirise-pds-url }}/PSP_010502_2090_RED5_0.IMG" -o $GITHUB_WORKSPACE/test-resources/PSP_010502_2090_RED5_0.img
           curl "${{ env.hirise-pds-url }}/PSP_010502_2090_RED5_1.IMG" -o $GITHUB_WORKSPACE/test-resources/PSP_010502_2090_RED5_1.img
       - name: Checkout Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 
       - name: Cache conda
         uses: actions/cache@v2
         env:
@@ -46,16 +46,15 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
             hashFiles('environment.yml') }}
       - name: Setup ENV
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@3b0f2504dd76ef23b6d31f291f4913fb60ab5ff3
         with:
-          miniconda-version: "latest"
-          mamba-version: "*"
-          use-mamba: true
-          channels: conda-forge
-          channel-priority: strict
-          activate-environment: autocnet
-          environment-file: environment.yml
-          use-only-tar-bz2: true
+          miniforge-version: latest  
+          use-mamba: true  
+          channels: conda-forge  
+          activate-environment: ale  
+          environment-file: environment.yml  
+          auto-activate-base: false  
+          auto-update-conda: true  
           python-version: ${{ matrix.python-version }}
       - name: config ISIS vars
         run: |
