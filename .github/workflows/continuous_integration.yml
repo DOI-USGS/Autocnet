@@ -20,16 +20,7 @@ jobs:
       fail-fast: false
       matrix:
        os: [ubuntu-latest]
-       python-version: ["3.7"]
-    services:
-      postgres:
-        image: postgis/postgis:10-2.5
-        env:
-          POSTGRES_PASSWORD: NotTheDefault
-          POSTGRES_DB: postgres
-        ports:
-          - 35432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5   
+       python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
     defaults:
       run:
         shell: bash -l {0}
@@ -42,7 +33,7 @@ jobs:
           channels: usgs-astrogeology, conda-forge
       - name: Install ISIS
         run: |
-          conda install -q -y -c usgs-astrogeology isis
+          conda install -q -y -c usgs-astrogeology isislts
       - name: Setup test-resources/
         run: |
           mkdir $GITHUB_WORKSPACE/test-resources/
@@ -81,6 +72,9 @@ jobs:
         run: |
           conda env config vars set ISISROOT=${{ env.isis-root }}
           conda env config vars set ISISDATA=$GITHUB_WORKSPACE/${{ env.isis-data }}
+      - name: Install dev requirements
+        run: |
+          pip install test_requirements.txt
       - name: Check build environment
         run: |
           conda list
