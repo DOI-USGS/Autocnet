@@ -33,5 +33,5 @@ def test_get_images_intersecting_point(session):
     session.filter(Images)
 
     point = Point(1,0)
-    res = Images.get_images_intersecting_point(point, session)
+    Images.get_images_intersecting_point(point, session)
     session.filter.assert_called_once()

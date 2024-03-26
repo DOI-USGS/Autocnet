@@ -80,3 +80,9 @@ def test_add_measures_to_point(session):
     assert point.measures[1].sample == 0.5
     assert point.measures[2].serial == 'serial'
     assert point.measures[3].imageid == 0
+
+def test_bulk_add(session):
+    point = Points()
+    points = [point] * 10
+    Points.bulkadd(points, session)
+    assert len(session.query(Points).all()) == 10
