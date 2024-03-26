@@ -37,6 +37,6 @@ dependencies:
   - sqlalchemy
   - sqlalchemy-utils
   - redis-py<5
-  - conda-forge::usgscsm>=2
+  - conda-forge::usgscsm
   - vlfeat
   - protobuf
