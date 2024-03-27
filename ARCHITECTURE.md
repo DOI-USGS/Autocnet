@@ -7,8 +7,25 @@ The major data structures: graph, node, and edge have network versions (e.g., `N
 
 It is preferable to implement analytic capabilities in the non-network versions of the data structures. The goal is that the network versions simply retrieve data and push results to non-memory locations.
 
+### Graphs: CandidateGraph & NetworkCandidateGraph
+
+### Nodes: Node & NetworkNode
+
+### Edges: Edge & NetworkEdge
+
+### ControlNetworks
+ISIS compatible control networks are managed as pandas DataFrames within the library. When the control network is persisted to a database (usually via a `NetworkCandidateGraph`), pandas `read_sql` calls are used with the `db_to_df_sql_string` to select a dataframe representation. This data structure can be analyzed, manipulated, and ultimately either written back to the database or to a file (via the `to_isis` method in `plio`).
+
 ## Testing
-The library is tested via unit and integration tests.
+The library is tested via unit and integration tests using pytest. Endeavour to test as much of the software as is feasible, understanding that the code base has been developed to create a product and not unto itself.
+
+Tests are parameritized using the `pytest.ini` file in the repository root. This way, developers are all invoking the tests in a standard way and best practices can be propagated under version control.
+
+### Unit Tests
+The majority of the library is tested via unit tests.
+
+### Integration Tests
+The integration tests are longer running. Strive to keep integration tests less than 120s each. We assume that tests can run in parallel with at least 4 CPUs (GitHub free runners, as of March 2024 have 4 CPUs on ubuntu). Integration tests do not make use of any external resources. They should make liberal use of mocked REDIS and SQLAlchemy session objects.
 
 ## Sensor Models
 Sensor models are abstracted through a common interface. That interface is stored in 
