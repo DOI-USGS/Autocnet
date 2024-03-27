@@ -1221,6 +1221,7 @@ def validate_candidate_measure(measure_to_register,
 
     # Get the measure to be registered
     measure = session.query(Measures).filter(Measures.id == measure_to_register_id).order_by(Measures.id).one()
+
     # Get the references measure
     point = measure.point
     reference_index = point.reference_index
@@ -1360,12 +1361,10 @@ def smart_register_point(point,
 
     measure_results = subpixel_register_point_smart(point, session, parameters=parameters, **shared_kwargs)
     measures_to_update, measures_to_set_false = decider(measure_results)
-
     log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
     # Validate that the new position has consensus
     for measure in measures_to_update:
         reprojection_distances = validate_candidate_measure(measure, session, parameters=parameters, ncg=ncg, **shared_kwargs)
-        print(reprojection_distances)
         if np.sum(np.array(reprojection_distances) < valid_reprojection_distance) < 2:
             log.info(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")
             measures_to_set_false.append(measure['id'])
