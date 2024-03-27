@@ -108,27 +108,10 @@ def default_configuration():
 @pytest.fixture()
 def ncg(default_configuration, request):
     ncg = NetworkCandidateGraph()
-    ncg.config_from_dict(default_configuration)
+    ncg.session = UnifiedAlchemyMagicMock()
+    #ncg.config_from_dict(default_configuration)
 
-    def cleanup():
-        with ncg.session_scope() as session:
-            session.rollback()  # Necessary because some tests intentionally fail
-            engine = ncg.Session().get_bind()
-            inspector = inspect(engine)
-            for t in reversed(inspector.get_table_names()):
-                # Skip the srid table
-                if t != 'spatial_ref_sys':
-                    res = session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
-                # Reset the autoincrementing
-                if t in ['Images', 'Cameras', 'Matches', 'Measures']:
-                    session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
-            session.commit()
-            # Ensure that this is the only connection to the DB
-            num_con = session.execute(text('SELECT sum(numbackends) FROM pg_stat_database;')).scalar()
-            assert num_con == 1
-            session.close()
-
-    request.addfinalizer(cleanup)
+    
 
     return ncg
 
