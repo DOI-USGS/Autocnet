@@ -27,7 +27,7 @@ from autocnet.matcher.naive_template import pattern_match
 
 from autocnet.io.db.model import Images, Points, Measures
 from autocnet.cg.cg import distribute_points_in_geom, xy_in_polygon
-from autocnet.spatial import isis
+#from autocnet.spatial import isis
 from autocnet.spatial.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, oc2og
 from autocnet.matcher.cpu_extractor import extract_most_interesting

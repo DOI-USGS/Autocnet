@@ -25,7 +25,7 @@ class TestEllipsoidDem(unittest.TestCase):
 class TestGdalDem(unittest.TestCase):
 
     def test_height(self):
-        with mock.patch('autocnet.spatial.surface.GeoDataset') as mockDataset:
+        with mock.patch('autocnet.io.geodataset.AGeoDataset') as mockDataset:
             mockInstance = mockDataset.return_value
             mockInstance.latlon_to_pixel.return_value = (1,2)
             mockInstance.read_array.return_value = [[100]]
@@ -35,7 +35,7 @@ class TestGdalDem(unittest.TestCase):
             self.assertEqual(test_dem.get_height(90, 300), 100)
 
     def test_height_from_radius(self):
-        with mock.patch('autocnet.spatial.surface.GeoDataset') as mockDataset:
+        with mock.patch('autocnet.io.geodataset.AGeoDataset') as mockDataset:
             mockInstance = mockDataset.return_value
             mockInstance.latlon_to_pixel.return_value = (1,2)
             mockInstance.read_array.return_value = [[3396190]]
@@ -45,7 +45,7 @@ class TestGdalDem(unittest.TestCase):
             self.assertEqual(test_dem.get_height(90, 300), 19990)
 
     def test_radius(self):
-        with mock.patch('autocnet.spatial.surface.GeoDataset') as mockDataset:
+        with mock.patch('autocnet.io.geodataset.AGeoDataset') as mockDataset:
             mockInstance = mockDataset.return_value
             mockInstance.latlon_to_pixel.return_value = (1,2)
             mockInstance.read_array.return_value = [[3396190]]
@@ -55,7 +55,7 @@ class TestGdalDem(unittest.TestCase):
             self.assertEqual(test_dem.get_radius(90, 300), 3396190)
 
     def test_radius_from_height(self):
-        with mock.patch('autocnet.spatial.surface.GeoDataset') as mockDataset:
+        with mock.patch('autocnet.io.geodataset.AGeoDataset') as mockDataset:
             mockInstance = mockDataset.return_value
             mockInstance.latlon_to_pixel.return_value = (1,2)
             mockInstance.read_array.return_value = [[100]]

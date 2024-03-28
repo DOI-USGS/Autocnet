@@ -57,7 +57,7 @@ from autocnet.matcher import subpixel
 from autocnet.matcher import cross_instrument_matcher as cim
 from autocnet.vis.graph_view import plot_graph, cluster_plot
 from autocnet.control import control
-from autocnet.spatial.isis import point_info
+#from autocnet.spatial.isis import point_info
 from autocnet.spatial.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, og2oc
 

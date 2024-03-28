@@ -8,8 +8,6 @@ import shapely
 from autocnet.cg.cg import create_points_along_line
 from autocnet.io.db.model import Images, Points, JsonEncoder
 from autocnet.graph.node import NetworkNode
-from autocnet.spatial import isis
-from autocnet.spatial import sensor
 from autocnet.transformation import roi
 from autocnet.matcher.cpu_extractor import extract_most_interesting
 from autocnet.matcher.validation import is_valid_lroc_polar_image
@@ -176,7 +174,7 @@ def find_intresting_point(nodes, lon, lat, size=71):
         log.debug(f'Trying image: {node["image_path"].split("/")[-1]}')
         # reference_index is the index into the list of measures for the image that is not shifted and is set at the
         # reference against which all other images are registered.
-        try_sample, try_line = isis.ground_to_image(node["image_path"], lon, lat)
+        try_sample, try_line = node.geodata.lonlat2sampline(lon, lat)
 
         # If sample/line are None, point is not in image
         if try_sample == None or try_line == None:
@@ -333,7 +331,7 @@ def add_point_to_network(valid,
     # The io.db.Point class handles all xyz to lat/lon and ographic/ocentric conversions in it's 
     # adjusted property setter.
     reference_node = nodes[reference_index]
-    x,y,z = isis.linesamp2xyz(reference_node['image_path'], interesting_sampline.x, interesting_sampline.y)
+    x,y,z = reference_node.geodata.sensormodel.linesamp2xyz(interesting_sampline.x, interesting_sampline.y)
 
     if x == None or y==None or z==None:
         log.info("Updated point projects outside of image, ignoring")
@@ -351,11 +349,8 @@ def add_point_to_network(valid,
     # It has been added by the create_point_with_reference_measure function.
     del nodes[reference_index]
 
-    # Determine what sensor type to use
-    current_sensor = sensor.create_sensor('isis')
-
     # Iterate through all other, non-reference images in the overlap and attempt to add a measure.
-    point.add_measures_to_point(nodes, current_sensor, choosername=identifier)
+    point.add_measures_to_point(nodes, choosername=identifier)
 
     # Insert the point into the database asynchronously (via redis) or synchronously via the ncg
     if use_cache:

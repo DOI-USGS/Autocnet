@@ -10,18 +10,17 @@ from csmapi import csmapi
 import numpy as np
 import pandas as pd
 
-from plio.io.io_gdal import GeoDataset
 from plio.io.isis_serial_number import generate_serial_number
 from skimage.transform import resize
 import shapely
-from knoten.csm import generate_latlon_footprint, generate_vrt, create_camera, generate_boundary
+from knoten.csm import generate_latlon_footprint, generate_boundary
 
 from autocnet.matcher import cpu_extractor as fe
 from autocnet.matcher import cpu_outlier_detector as od
 from autocnet.cg import cg
 from autocnet.io.db.model import Images, Keypoints, Matches, Cameras,  Base, Overlay, Edges, Costs, Points, Measures
-from autocnet.io.db.connection import Parent
 from autocnet.io import keypoints as io_keypoints
+from autocnet.io.geodataset import AGeoDataset
 from autocnet.vis.graph_view import plot_node
 from autocnet.utils import utils
 
@@ -167,7 +166,7 @@ class Node(dict, MutableMapping):
     @property
     def geodata(self):
         if not hasattr(self, '_geodata'):
-            self._geodata = GeoDataset(self['image_path'])
+            self._geodata = AGeoDataset(self['image_path'])
         return self._geodata
 
     @property

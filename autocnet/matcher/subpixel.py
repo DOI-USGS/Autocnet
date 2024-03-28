@@ -29,12 +29,11 @@ import PIL
 
 from autocnet.matcher.naive_template import pattern_match
 from autocnet.matcher.mutual_information import mutual_information
-from autocnet.spatial import isis
+from autocnet.io import isis, geodataset
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
 from autocnet.transformation.affine import estimate_local_affine
-from autocnet import spatial
 from autocnet.utils.serializers import JsonEncoder
 
 from sqlalchemy import inspect
@@ -537,7 +536,7 @@ def register_to_base(pointid,
     session = ncg.Session()
 
     if isinstance(base_image, str):
-        base_image = GeoDataset(base_image)
+        base_image = geodataset.AGeoDataset(base_image)
 
     if isinstance(pointid, Points):
         point = pointid
@@ -554,13 +553,11 @@ def register_to_base(pointid,
         measures = point.measures
 
         # Attempt to project the point into the base image
-        bpoint = spatial.isis.point_info(base_image.file_name, point.geom.x, point.geom.y, 'ground')
-        if bpoint is None:
+        bsample, bline = base_image.sensormodel.lonlat2sampline(point.geom.x, point.geom.y)
+        if bsample is None:
             log.warning('unable to find point in ground image')
             # Need to set the point to False
             return
-        bline = bpoint.get('Line')
-        bsample = bpoint.get('Sample')
 
         # Setup a cache so that we can get the file handles one time instead of
         # once per measure in the measures list.

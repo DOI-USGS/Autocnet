@@ -6,7 +6,7 @@ import numpy as np
 import shapely.wkb as swkb
 from plio.io import io_controlnetwork as cnet
 from autocnet.io.db.model import Measures
-from autocnet.spatial.isis import isis2np_types
+from autocnet.io.isis import isis2np_types
 from ... import sql
 
 from sqlalchemy import text

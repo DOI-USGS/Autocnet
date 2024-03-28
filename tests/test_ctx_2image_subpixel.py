@@ -133,11 +133,12 @@ def test_ctx_pair_to_df(session,
     assert measures_to_set_false == []
 
     m0 = measures_to_update[0]
-    assert m0['sample'] == 364.7675611360247
+    print(m0)
+    assert m0['sample'] == 364.76756113601755
     assert m0['line'] == 525.3550626650527
     assert m0['template_metric'] == 0.625694990158081
     assert m0['ignore'] == False
-    assert m0['template_shift'] == 238.62787986416774
+    assert m0['template_shift'] == 238.62787986417288
 
     with mock.patch('pandas.read_sql') as db_response:
         db_cnet = pd.DataFrame([

@@ -5,7 +5,7 @@ from plio.io.io_gdal import GeoDataset
 from skimage import transform as tf
 
 from autocnet.transformation.roi import Roi
-from autocnet.spatial import isis
+from autocnet.io.geodataset import AGeoDataset
 
 log = logging.getLogger(__name__)
 
@@ -41,9 +41,9 @@ def estimate_affine_from_sensors(reference_image,
 
     """
     t1 = time.time()
-    if not isinstance(moving_image, GeoDataset):
+    if not isinstance(moving_image,AGeoDataset):
         raise Exception(f"Input cube must be a geodataset obj, but is type {type(moving_image)}.")
-    if not isinstance(reference_image, GeoDataset):
+    if not isinstance(reference_image, AGeoDataset):
         raise Exception(f"Match cube must be a geodataset obj, but is type {type(reference_image)}.")
 
     base_startx = int(bcenter_x - size_x)
@@ -67,8 +67,8 @@ def estimate_affine_from_sensors(reference_image,
     y_coords = [base_starty, base_stopy, base_stopy, base_starty, bcenter_y]
 
     # Dispatch to the sensor to get the a priori pixel location in the input image
-    lons, lats = isis.image_to_ground(reference_image.file_name, x_coords, y_coords, allowoutside=True)
-    xs, ys = isis.ground_to_image(moving_image.file_name, lons, lats, allowoutside=True)
+    lons, lats = reference_image.sensormodel.sampline2lonlat(x_coords, y_coords, allowoutside=True)
+    xs, ys = moving_image.sensormodel.lonlat2sampline(lons, lats, allowoutside=True)
     log.debug(f'Lon/Lats for affine estimate are: {list(zip(lons, lats))}')
     log.debug(f'Image X / Image Y for affine estimate are: {list(zip(xs, ys))}')
 
