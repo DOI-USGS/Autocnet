@@ -11,7 +11,7 @@ except Exception as exception:
     
 from subprocess import CalledProcessError
 
-from plio.io.io_gdal import GeoDataset
+from autocnet.io.geodataset import AGeoDataset
 
 from shapely import wkt
 import numpy as np
@@ -57,7 +57,7 @@ def segment_hirise(directory, offset=300):
 
 def load_segments(directory):
     images = glob(os.path.join(directory, "*RED*.*_*.cub"))
-    objs = [GeoDataset(image) for image in images]
+    objs = [AGeoDataset(image) for image in images]
     footprints = [o.footprint for o in objs]
     footprints = [wkt.loads(f.ExportToWkt()) for f in footprints]
     return gpd.GeoDataFrame(data=np.asarray([images, objs, footprints]).T, columns=["path", "image", "footprint"], geometry="footprint")

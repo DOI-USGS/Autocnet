@@ -13,7 +13,7 @@ from shapely.geometry import LinearRing
 
 
 from autocnet.examples import get_path
-from plio.io.io_gdal import GeoDataset
+from autocnet.io.geodataset import AGeoDataset
 
 from autocnet.graph.node import Node
 
@@ -48,13 +48,13 @@ class TestNode(object):
         assert node.camera == 'foo'
 
     def test_get_handle(self, geo_node):
-        assert isinstance(geo_node.geodata, GeoDataset)
+        assert isinstance(geo_node.geodata, AGeoDataset)
 
     def test_get_byte_array(self, node):
         dtype = np.float32
         return_value = np.arange(9, dtype=dtype).reshape(3,3)
         
-        mock_geodata = Mock(spec=GeoDataset)
+        mock_geodata = Mock(spec=AGeoDataset)
         mock_geodata.read_array = MagicMock(return_value=return_value)
         node._geodata = mock_geodata
 
@@ -78,7 +78,7 @@ class TestNode(object):
         dtype = np.float32
         return_value = np.arange(9, dtype=dtype).reshape(3,3)
         
-        mock_geodata = Mock(spec=GeoDataset)
+        mock_geodata = Mock(spec=AGeoDataset)
         mock_geodata.read_array = MagicMock(return_value=return_value)
         node._geodata = mock_geodata
 
@@ -150,7 +150,7 @@ class TestNode(object):
     def test_coverage(self, node):
         kps = pd.DataFrame(np.array([[0,0],[1,1], [1,2], [2,2]]), columns=['x', 'y'])
         extent = (2,2)
-        mock_geodata = Mock(spec=GeoDataset)
+        mock_geodata = Mock(spec=AGeoDataset)
         mock_geodata.raster_size = extent
         node._geodata = mock_geodata
         with patch('autocnet.graph.node.Node.keypoints', new_callable=PropertyMock, return_value=kps):

@@ -21,7 +21,6 @@ from sqlalchemy.sql.expression import bindparam
 
 from matplotlib import pyplot as plt
 
-from plio.io.io_gdal import GeoDataset
 
 import pvl
 
@@ -29,7 +28,8 @@ import PIL
 
 from autocnet.matcher.naive_template import pattern_match
 from autocnet.matcher.mutual_information import mutual_information
-from autocnet.io import isis, geodataset
+from autocnet.io import isis
+from autocnet.io.geodataset import AGeoDataset
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
@@ -536,7 +536,7 @@ def register_to_base(pointid,
     session = ncg.Session()
 
     if isinstance(base_image, str):
-        base_image = geodataset.AGeoDataset(base_image)
+        base_image = AGeoDataset(base_image)
 
     if isinstance(pointid, Points):
         point = pointid
@@ -573,7 +573,7 @@ def register_to_base(pointid,
             try:
                 measure_image = image_cache[res.id]
             except:
-                measure_image = GeoDataset(measure_image.path)
+                measure_image = AGeoDataset(measure_image.path)
                 image_cache[res.id] = measure_image
 
             # Attempt to match the base

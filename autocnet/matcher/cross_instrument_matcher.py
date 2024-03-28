@@ -1,4 +1,4 @@
-from plio.io.io_gdal import GeoDataset
+
 import numpy as np
 import os
 import os.path
@@ -24,10 +24,9 @@ from shapely.geometry import Point
 from autocnet.transformation.affine import estimate_local_affine
 from autocnet.matcher.subpixel import subpixel_template
 from autocnet.matcher.naive_template import pattern_match
-
 from autocnet.io.db.model import Images, Points, Measures
+from autocnet.io.geodataset import AGeoDataset
 from autocnet.cg.cg import distribute_points_in_geom, xy_in_polygon
-#from autocnet.spatial import isis
 from autocnet.spatial.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, oc2og
 from autocnet.matcher.cpu_extractor import extract_most_interesting
@@ -75,7 +74,7 @@ def generate_ground_points(Session,
     """
 
     if isinstance(ground_mosaic, str):
-        ground_mosaic = GeoDataset(ground_mosaic)
+        ground_mosaic = AGeoDataset(ground_mosaic)
 
     log.warning('There are no unit tests tracking the operation of this function, users should take care to verify the results of this function for each dataset it is applied to.')
 
@@ -272,11 +271,11 @@ def propagate_point(lon,
     match_results = []
     # lazily iterate for now
 
-    base_image = GeoDataset(path)
+    base_image = AGeoDataset(path)
     base_sample, base_line = sample, line
 
     for i,image in images.iterrows():
-        dest_image = GeoDataset(image["path"])
+        dest_image = AGeoDataset(image["path"])
         moving_sample, moving_line = isis.ground_to_image(dest_image.file_name, lon, lat)
 
         if os.path.basename(path) == os.path.basename(image['path']):
@@ -451,7 +450,7 @@ def propagate_point(lon,
         if image["path"] == best_path:
             continue
 
-        dest_image = GeoDataset(image["path"])
+        dest_image = AGeoDataset(image["path"])
         apriori_sample, apriori_line = isis.ground_to_image(dest_image.file_name, ls_lon, ls_lat)
 
         if apriori_sample is None or apriori_line is None:

@@ -5,14 +5,12 @@ import pytest
 from osgeo import ogr
 import numpy as np
 import pandas as pd
-from plio.io import io_gdal
 from shapely.geometry import Polygon as Poly
 
 from autocnet.matcher import cpu_outlier_detector as od
 from autocnet.examples import get_path
 from autocnet.graph.network import CandidateGraph
-from autocnet.utils.utils import array_to_poly
-
+from autocnet.io.geodataset import AGeoDataset
 from .. import edge
 from .. import node
 
@@ -35,8 +33,8 @@ class TestEdge(unittest.TestCase):
         destination = Mock(spec = node.Node)
         e.destination = destination
         e.source = source
-        geodata_s = Mock(spec = io_gdal.GeoDataset)
-        geodata_d = Mock(spec = io_gdal.GeoDataset)
+        geodata_s = Mock(spec = AGeoDataset)
+        geodata_d = Mock(spec = AGeoDataset)
         source.geodata = geodata_s
         destination.geodata = geodata_d
 
@@ -85,8 +83,8 @@ class TestEdge(unittest.TestCase):
         e.source = source_node
         e.destination = destination_node
 
-        source_geodata = PropertyMock(spec=io_gdal.GeoDataset)
-        destination_geodata = PropertyMock(spec=io_gdal.GeoDataset)
+        source_geodata = PropertyMock(spec=AGeoDataset)
+        destination_geodata = PropertyMock(spec=AGeoDataset)
 
         e.source.geodata = source_geodata
         e.destination.geodata = destination_geodata

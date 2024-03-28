@@ -32,7 +32,6 @@ import shapely.ops
 from plio.io.io_controlnetwork import to_isis, from_isis
 from plio.io import io_hdf, io_json
 from plio.utils import utils as io_utils
-from plio.io.io_gdal import GeoDataset
 from plio.io.isis_serial_number import generate_serial_number
 from plio.io import io_controlnetwork as cnet
 
@@ -40,7 +39,6 @@ from .. import sql
 
 from plurmy import Slurm
 
-import autocnet
 from autocnet.config_parser import parse_config
 from autocnet.cg import cg
 from autocnet.graph.asynchronous_funcs import watch_insert_queue, watch_update_queue
@@ -52,7 +50,8 @@ from autocnet.io.db import controlnetwork as io_controlnetwork
 from autocnet.io.db.model import (Images, Keypoints, Matches, Cameras, Points,
                                   Base, Overlay, Edges, Costs, Measures, CandidateGroundPoints,
                                   JsonEncoder, try_db_creation)
-from autocnet.io.db.connection import new_connection, Parent
+from autocnet.io.db.connection import new_connection
+from autocnet.io.geodataset import AGeoDataset
 from autocnet.matcher import subpixel
 from autocnet.matcher import cross_instrument_matcher as cim
 from autocnet.vis.graph_view import plot_graph, cluster_plot
@@ -229,10 +228,10 @@ class CandidateGraph(nx.Graph):
             filelist = io_utils.file_to_list(filelist)
         # TODO: Reject unsupported file formats + work with more file formats
         if basepath:
-            datasets = [GeoDataset(os.path.join(basepath, f))
+            datasets = [AGeoDataset(os.path.join(basepath, f))
                         for f in filelist]
         else:
-            datasets = [GeoDataset(f) for f in filelist]
+            datasets = [AGeoDataset(f) for f in filelist]
 
         # This is brute force for now, could swap to an RTree at some point.
         adjacency_dict = {}

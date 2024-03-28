@@ -36,6 +36,7 @@ release.
 ### Added
 - Ability to choose whether to compute overlaps for a network candidate graph
 - Integration tests for end-to-end of an equatorial CTX pair and a mid-latitude CTX trio.
+- AGeoDataset class that abstracts the plio GeoDataset class. The AGeoDataset includes sensor models on the GeoDataset object. The object automatically instantiates an autocnet surface model using either an EllipsoidDem or a GdalDem. ISIS sensor models use the DEM defined on the cube. CSM sensor models must have a DEM explicitly passed.
 
 ### Changed
 - CI on the library now uses a mocked sqlalchemy connection. All tests can now run locally without the need for a supplemental postgres container. This changed removed some non-optimal tests that were testing datbase triggers and database instantiation handled by SQLAlchemy.

@@ -5,7 +5,6 @@ at a given ground location (geocentric latitude and longitude).
 """
 
 import numpy as np
-from plio.io.io_gdal import GeoDataset
 
 class EllipsoidDem:
     """
@@ -92,7 +91,9 @@ class GdalDem(EllipsoidDem):
             dem_type = dem_types[0]
         if dem_type not in dem_types:
             raise ValueError(f'DEM type {dem_type} is not a valid option.')
-        self.dem = GeoDataset(dem)
+        # Here to avoid a circular import as the AGeoDataset obj instantiates a DEM.
+        from autocnet.io.geodataset import AGeoDataset
+        self.dem = AGeoDataset(dem)
         self.dem_type = dem_type
 
     def get_raster_value(self, lat, lon):

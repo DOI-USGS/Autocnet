@@ -8,14 +8,13 @@ import cv2
 import sys
 
 from .. import cpu_extractor
-from plio.io import io_gdal
 
-
+from autocnet.io.geodataset import AGeoDataset
 class TestFeatureExtractor(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.dataset = io_gdal.GeoDataset(get_path('AS15-M-0295_SML.png'))
+        cls.dataset = AGeoDataset(get_path('AS15-M-0295_SML.png'))
         cls.data_array = cls.dataset.read_array(dtype='uint8')
         cls.parameters = {"nfeatures": 10,
                           "nOctaveLayers": 3,

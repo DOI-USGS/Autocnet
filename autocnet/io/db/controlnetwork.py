@@ -167,7 +167,7 @@ def update_from_jigsaw(cnet, measures, session, pointid_func=None):
 # This is not a permanent placement for this function
 # TO DO: create a new module for parsing/cleaning points from a controlnetwork
 from scipy.stats import zscore
-from plio.io.io_gdal import GeoDataset
+from autocnet.io.geodataset import AGeoDataset
 from autocnet.io.db.model import Images
 import pvl
 def null_measure_ignore(point, size_x, size_y, valid_tol, verbose=False, ncg=None, **kwargs):
@@ -184,7 +184,7 @@ def null_measure_ignore(point, size_x, size_y, valid_tol, verbose=False, ncg=Non
                           'status': 'No change'}
             m_imageid = measure.imageid
             m_image = session.query(Images).filter(Images.id==m_imageid).one()
-            cube = GeoDataset(m_image.path)
+            cube = AGeoDataset(m_image.path)
 
             center_x = measure.sample
             center_y = measure.line

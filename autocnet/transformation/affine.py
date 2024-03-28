@@ -21,9 +21,9 @@ def estimate_affine_from_sensors(reference_image,
 
     Parameters
     ----------
-    reference_image:  plio.io.io_gdal.GeoDataset
+    reference_image: autocnet.io.geodataset.AGeoDataset
                 source image
-    moving_image: plio.io.io_gdal.GeoDataset
+    moving_image: autocnet.io.geodataset.AGeoDataset
                 destination image; gets matched to the source image
     bcenter_x:  int
                 sample location of source measure in reference_image
@@ -99,10 +99,10 @@ def estimate_local_affine(reference_roi, moving_roi):
 
     Parameters
     ----------
-    reference_image : plio.io.io_gdal.GeoDataset
+    reference_image : autocnet.io.geodataset.AGeoDataset
                       Image that is expected to be used as the reference during the matching process, 
                       points are laid onto here and projected onto moving image to compute an affine
-    moving_image : plio.io.io_gdal.GeoDataset
+    moving_image : autocnet.io.geodataset.AGeoDataset
                    Image that is expected to move around during the matching process, 
                    points are projected onto this image to compute an affine  
 
