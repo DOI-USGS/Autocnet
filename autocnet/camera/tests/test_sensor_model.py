@@ -1,6 +1,7 @@
-import numpy as np
 import pytest
+
 import contextlib
+import os
 import unittest
 from pathlib import Path
 
@@ -8,35 +9,44 @@ import numpy as np
 import numpy.testing as npt
 
 import autocnet.camera.sensor_model as sm
-from autocnet.spatial.surface import EllipsoidDem
-
-@pytest.fixture
-def ellipsoid():
-    return EllipsoidDem(semi_major=10, semi_minor=10)
-
+from autocnet.spatial.surface import GdalDem
 from autocnet.examples import get_path
 from autocnet.camera import sensor_model as sm
-from autocnet.spatial.surface import EllipsoidDem
+from autocnet.spatial.surface import EllipsoidDem, GdalDem
 
 @pytest.fixture
 def ctx_path():
     return get_path('G02_019154_1800_XN_00N133W.crop.cub')
 
 @pytest.fixture
-def dem():
-    return EllipsoidDem(3396190, 3396190)
+def remote_mola_height_dem():
+    path = '/vsicurl/https://asc-mars.s3.us-west-2.amazonaws.com/basemaps/Mars_MGS_MOLA_DEM_mosaic_global_463m.tif'
+    return path
 
 @pytest.fixture
-def ctx_isis_sensor(ctx_path, dem):
-    return sm.ISISSensor(ctx_path, dem)
+def isis_mola_radius_dem():
+    dem = None
+    isisdata = os.environ.get('ISISDATA', None)
+    if isisdata:
+        path = os.path.join(isisdata, 'base/dems/molaMarsPlanetaryRadius0005.cub')
+        dem = GdalDem(path, 3396190, 3396190, dem_type='radius')
+    return dem
 
 @pytest.fixture
-def ctx_csm_sensor(ctx_path, dem):
-    return sm.CSMSensor(ctx_path, dem)
+def ellipsoid():
+    return EllipsoidDem(semi_major=3396190, semi_minor=3396190)
 
 @pytest.fixture
-def base_sensor(dem):
-    return sm.BaseSensor(None,dem)
+def ctx_isis_sensor(ctx_path, isis_mola_radius_dem):
+    return sm.ISISSensor(ctx_path, isis_mola_radius_dem)
+
+@pytest.fixture
+def ctx_csm_sensor(ctx_path, isis_mola_radius_dem):
+    return sm.CSMSensor(ctx_path, isis_mola_radius_dem)
+
+@pytest.fixture
+def base_sensor(ellipsoid):
+    return sm.BaseSensor(None,ellipsoid)
 
 class TestBaseSensor():
 
@@ -103,14 +113,14 @@ class TestIsisSensor():
 
     def test_sampline2xyz(self, ctx_isis_sensor):
         x, y, z = ctx_isis_sensor.sampline2xyz(10.0, 10.0)
-        assert x == pytest.approx(-2327023.0983832, 6)
-        assert y == pytest.approx(-2475336.0552312, 6)
-        assert z == pytest.approx(-18838.904973497, 6)
+        assert x == pytest.approx(-2327023.0983832)
+        assert y == pytest.approx(-2475336.0552312)
+        assert z == pytest.approx(-18838.904973497)
 
     def test_lonlat2sampline(self, ctx_isis_sensor):
         samp, line = ctx_isis_sensor.lonlat2sampline(226.8, -0.25)
-        assert samp == pytest.approx(450.47864761698,4)
-        assert line == pytest.approx(638.5458457207,4)
+        assert samp == pytest.approx(450.47864761698)
+        assert line == pytest.approx(638.5458457207)
 
     def test_xyz2sampline(self, ctx_isis_sensor):
         x = -2327023.0983832
@@ -122,9 +132,10 @@ class TestIsisSensor():
 
     def test_lonlat2xyz(self, ctx_isis_sensor):
         x, y, z = ctx_isis_sensor.lonlat2xyz(226.76892358441, -0.31770729411217)
-        assert x == pytest.approx(-2327023.0983832, 6)
-        assert y == pytest.approx(-2475336.0552312, 6)
-        assert z == pytest.approx(-18838.904973497, 6)
+        assert x == pytest.approx(-2327023.0983832)
+        assert y == pytest.approx(-2475336.0552312)
+        assert z == pytest.approx(-18838.904973497)
+
 
 class TestISIS(unittest.TestCase):
 
@@ -240,16 +251,28 @@ class TestISIS(unittest.TestCase):
         npt.assert_allclose(np.array([goal_samp, 961.03569217]), samples)
         npt.assert_allclose(np.array([goal_line, 20.50009032]), lines)
 
-
 class TestCsmSensor():
     def test_sampline2lonlat(self, ctx_csm_sensor):
-        assert False
+        lon, lat = ctx_csm_sensor.sampline2lonlat(10.0, 10.0)
+        assert lon == 226.76892358441
+        assert lat == -0.31770729411217
 
     def test_sampline2xyz(self, ctx_csm_sensor):
-        assert False
+        x, y, z = ctx_csm_sensor.sampline2xyz(10.0, 10.0)
+        assert x == pytest.approx(-2327023.0983832)
+        assert y == pytest.approx(-2475336.0552312)
+        assert z == pytest.approx(-18838.904973497)
 
     def test_lonlat2sampline(self, ctx_csm_sensor):
-        assert False
+        samp, line = ctx_csm_sensor.lonlat2sampline(226.8, -0.25)
+        assert samp == pytest.approx(450.47864761698)
+        assert line == pytest.approx(638.5458457207)
 
     def test_xyz2sampline(self, ctx_csm_sensor):
-        assert False
+        x = -2327023.0983832
+        y = -2475336.0552312
+        z = -18838.904973497
+        samp, line = ctx_csm_sensor.xyz2sampline(x,y,z)
+        print(samp, line)
+        assert samp == pytest.approx(10.0,6)
+        assert line == pytest.approx(10.0,6)
