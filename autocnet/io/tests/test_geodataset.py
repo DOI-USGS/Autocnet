@@ -3,7 +3,7 @@ import pytest
 from autocnet.io.geodataset import AGeoDataset
 from autocnet.examples import get_path
 from autocnet.camera import sensor_model as sm
-from autocnet.spatial.surface import EllipsoidDem
+from knoten.surface import EllipsoidDem
 
 @pytest.fixture
 def ctx_path():

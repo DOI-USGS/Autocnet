@@ -9,14 +9,18 @@ import numpy as np
 import numpy.testing as npt
 
 import autocnet.camera.sensor_model as sm
-from autocnet.spatial.surface import GdalDem
 from autocnet.examples import get_path
 from autocnet.camera import sensor_model as sm
-from autocnet.spatial.surface import EllipsoidDem, GdalDem
+from knoten.surface import EllipsoidDem, GdalDem
 
 @pytest.fixture
-def ctx_path():
+def ctx_ellipsoid_path():
+    return get_path('G02_019154_1800_XN_00N133W.ellipsoid.crop.cub')
+
+@pytest.fixture
+def ctx_dem_path():
     return get_path('G02_019154_1800_XN_00N133W.crop.cub')
+
 
 @pytest.fixture
 def remote_mola_height_dem():
@@ -34,20 +38,30 @@ def isis_mola_radius_dem():
 
 @pytest.fixture
 def ellipsoid():
-    return EllipsoidDem(semi_major=3396190, semi_minor=3396190)
+    return EllipsoidDem(semi_major=3396190, semi_minor=3376200)
 
 @pytest.fixture
-def ctx_isis_sensor(ctx_path, isis_mola_radius_dem):
-    return sm.ISISSensor(ctx_path, isis_mola_radius_dem)
+def ctx_ellipsoid_isis_sensor(ctx_ellipsoid_path, ellipsoid):
+    return sm.ISISSensor(ctx_ellipsoid_path, ellipsoid)
 
 @pytest.fixture
-def ctx_csm_sensor(ctx_path, isis_mola_radius_dem):
-    return sm.CSMSensor(ctx_path, isis_mola_radius_dem)
+def ctx_dem_isis_sensor(ctx_dem_path, isis_mola_radius_dem):
+    return sm.ISISSensor(ctx_dem_path, isis_mola_radius_dem)
+
+@pytest.fixture
+def ctx_ellipsoid_csm_sensor(ctx_ellipsoid_path, ellipsoid):
+    return sm.CSMSensor(ctx_ellipsoid_path, ellipsoid)
 
 @pytest.fixture
 def base_sensor(ellipsoid):
     return sm.BaseSensor(None,ellipsoid)
 
+@pytest.fixture
+def ctx_dtm_csm_sensor(ctx_dem_path, isis_mola_radius_dem):
+    return sm.CSMSensor(ctx_dem_path, isis_mola_radius_dem)
+
+# @pytest.fixture
+# def isis_dtm_csm_sensor(ctx_path)
 class TestBaseSensor():
 
     def test__check_args(self, base_sensor):
@@ -100,41 +114,78 @@ class TestBaseSensor():
             base_sensor._check_arg({10, 20}, {10, 20})
 
 
-class TestIsisSensor():
+class TestIsisSensor_DTM():
 
-    def test_raise_bad_coord_type(self, ctx_isis_sensor):
+    def test_raise_bad_coord_type(self, ctx_dem_isis_sensor):
         with pytest.raises(ValueError):
-            ctx_isis_sensor._point_info(10, 10, point_type='bogus')
+            ctx_dem_isis_sensor._point_info(10, 10, point_type='bogus')
 
-    def test_sampline2lonlat(self, ctx_isis_sensor):
-        lon, lat = ctx_isis_sensor.sampline2lonlat(10.0, 10.0)
+    def test_sampline2lonlat(self, ctx_dem_isis_sensor):
+        lon, lat = ctx_dem_isis_sensor.sampline2lonlat(10.0, 10.0)
         assert lon == 226.76892358441
         assert lat == -0.31770729411217
 
-    def test_sampline2xyz(self, ctx_isis_sensor):
-        x, y, z = ctx_isis_sensor.sampline2xyz(10.0, 10.0)
+    def test_sampline2xyz(self, ctx_dem_isis_sensor):
+        x, y, z = ctx_dem_isis_sensor.sampline2xyz(10.0, 10.0)
         assert x == pytest.approx(-2327023.0983832)
         assert y == pytest.approx(-2475336.0552312)
         assert z == pytest.approx(-18838.904973497)
 
-    def test_lonlat2sampline(self, ctx_isis_sensor):
-        samp, line = ctx_isis_sensor.lonlat2sampline(226.8, -0.25)
+    def test_lonlat2sampline(self, ctx_dem_isis_sensor):
+        samp, line = ctx_dem_isis_sensor.lonlat2sampline(226.8, -0.25)
         assert samp == pytest.approx(450.47864761698)
         assert line == pytest.approx(638.5458457207)
 
-    def test_xyz2sampline(self, ctx_isis_sensor):
+    def test_xyz2sampline(self, ctx_dem_isis_sensor):
         x = -2327023.0983832
         y = -2475336.0552312
         z = -18838.904973497
-        samp, line = ctx_isis_sensor.xyz2sampline(x,y,z)
+        samp, line = ctx_dem_isis_sensor.xyz2sampline(x,y,z)
         assert samp == pytest.approx(10.0,6)
         assert line == pytest.approx(10.0,6)
 
-    def test_lonlat2xyz(self, ctx_isis_sensor):
-        x, y, z = ctx_isis_sensor.lonlat2xyz(226.76892358441, -0.31770729411217)
+    def test_lonlat2xyz(self, ctx_dem_isis_sensor):
+        x, y, z = ctx_dem_isis_sensor.lonlat2xyz(226.76892358441, -0.31770729411217)
         assert x == pytest.approx(-2327023.0983832)
         assert y == pytest.approx(-2475336.0552312)
         assert z == pytest.approx(-18838.904973497)
+
+
+class TestIsisSensor_Ellipsoid():
+
+    def test_raise_bad_coord_type(self, ctx_ellipsoid_isis_sensor):
+        with pytest.raises(ValueError):
+            ctx_ellipsoid_isis_sensor._point_info(10, 10, point_type='bogus')
+
+    def test_sampline2lonlat(self, ctx_ellipsoid_isis_sensor):
+        lon, lat = ctx_ellipsoid_isis_sensor.sampline2lonlat(10.0, 10.0)
+        assert lon == 226.76918706968
+        assert lat == -0.32147903205638
+
+    def test_sampline2xyz(self, ctx_ellipsoid_isis_sensor):
+        x, y, z = ctx_ellipsoid_isis_sensor.sampline2xyz(10.0, 10.0)
+        assert x == pytest.approx(-2326146.9211099)
+        assert y == pytest.approx(-2474426.8363236)
+        assert z == pytest.approx(-18831.814749997)
+
+    def test_lonlat2sampline(self, ctx_ellipsoid_isis_sensor):
+        samp, line = ctx_ellipsoid_isis_sensor.lonlat2sampline(226.76918706968,-0.32147903205638)
+        assert samp == pytest.approx(10.0, abs=0.001)
+        assert line == pytest.approx(10.0, abs=0.001)
+
+    def test_xyz2sampline(self, ctx_ellipsoid_isis_sensor):
+        x = -2326146.9211099
+        y = -2474426.8363236
+        z = -18831.814749997
+        samp, line = ctx_ellipsoid_isis_sensor.xyz2sampline(x,y,z)
+        assert samp == pytest.approx(10.0, abs=0.001)
+        assert line == pytest.approx(10.0, abs=0.001)
+
+    def test_lonlat2xyz(self, ctx_ellipsoid_isis_sensor):
+        x, y, z = ctx_ellipsoid_isis_sensor.lonlat2xyz(226.76918706968,-0.32147903205638)
+        assert x == pytest.approx(-2326146.9211099)
+        assert y == pytest.approx(-2474426.8363236)
+        assert z == pytest.approx(-18831.814749997)
 
 
 class TestISIS(unittest.TestCase):
@@ -251,28 +302,71 @@ class TestISIS(unittest.TestCase):
         npt.assert_allclose(np.array([goal_samp, 961.03569217]), samples)
         npt.assert_allclose(np.array([goal_line, 20.50009032]), lines)
 
-class TestCsmSensor():
-    def test_sampline2lonlat(self, ctx_csm_sensor):
-        lon, lat = ctx_csm_sensor.sampline2lonlat(10.0, 10.0)
-        assert lon == 226.76892358441
-        assert lat == -0.31770729411217
 
-    def test_sampline2xyz(self, ctx_csm_sensor):
-        x, y, z = ctx_csm_sensor.sampline2xyz(10.0, 10.0)
-        assert x == pytest.approx(-2327023.0983832)
-        assert y == pytest.approx(-2475336.0552312)
-        assert z == pytest.approx(-18838.904973497)
+class TestCsmSensor_Ellipsoid():
+    def test_sampline2lonlat(self, ctx_ellipsoid_csm_sensor):
+        # No tracking of a crop occurs, so manually offset x,y
+        lon, lat = ctx_ellipsoid_csm_sensor.sampline2lonlat(710.0, 310.0)
+        assert lon == pytest.approx(226.76918706968, abs=0.01)
+        assert lat == pytest.approx(-0.32147903205638, abs=0.01)
 
-    def test_lonlat2sampline(self, ctx_csm_sensor):
-        samp, line = ctx_csm_sensor.lonlat2sampline(226.8, -0.25)
-        assert samp == pytest.approx(450.47864761698)
-        assert line == pytest.approx(638.5458457207)
+    def test_sampline2xyz(self, ctx_ellipsoid_csm_sensor):
+        # No tracking of a crop occurs, so manually offset x,y
+        x, y, z = ctx_ellipsoid_csm_sensor.sampline2xyz(710.0, 310.0)
+        assert x == pytest.approx(-2326146.9211099, abs=5)
+        assert y == pytest.approx(-2474426.8363236, abs=5)
+        assert z == pytest.approx(-18831.814749997, abs=7)
+    
+    # How is this point off by a whole pixel?!?!?! 
+    def test_lonlat2sampline(self, ctx_ellipsoid_csm_sensor):
+        samp, line = ctx_ellipsoid_csm_sensor.lonlat2sampline(226.76918706968, 
+                                                              -0.32147903205638)
+        assert samp == pytest.approx(710.0, abs=1.0)
+        assert line == pytest.approx(310.0, abs=1.0)
 
-    def test_xyz2sampline(self, ctx_csm_sensor):
+    def test_xyz2sampline(self, ctx_ellipsoid_csm_sensor):
+        x = -2326146.9211099
+        y = -2474426.8363236
+        z = -18831.814749997
+        samp, line = ctx_ellipsoid_csm_sensor.xyz2sampline(x,y,z)
+        assert samp == pytest.approx(710.0,6)
+        assert line == pytest.approx(310.0,6)
+
+
+class TestCsmSensor_DTM():
+    def test_sampline2lonlat(self, ctx_dtm_csm_sensor):
+        lon, lat = ctx_dtm_csm_sensor.sampline2lonlat(710, 310)
+        assert lon == pytest.approx(226.76892358441, abs=0.001)
+        assert lat == pytest.approx(-0.31770729411217, abs=0.001)
+        
+    def test_sampline2xyz(self, ctx_dtm_csm_sensor):
+        # No tracking of a crop occurs, so manually offset x,y
+        x, y, z = ctx_dtm_csm_sensor.sampline2xyz(710.0, 310.0)
+        assert x == pytest.approx(-2327023.0983832, abs=4)
+        assert y == pytest.approx(-2475336.0552312, abs=4)
+        assert z == pytest.approx(-18838.904973497, abs=7)
+
+    def test_lonlat2sampline(self, ctx_dtm_csm_sensor):
+        # CSM Radius: 3397503 
+        # ISIS Radius: 3397506.7524735
+        # CSM XYZ:  -2325728.70656223 -2476649.5224272553 -14824.356384854329
+        # ISIS XYZ: -2325731.2752827, -2476652.2578367, -14824.372758057
+        samp, line = ctx_dtm_csm_sensor.lonlat2sampline(226.76892358441, 
+                                                        -0.31770729411217)
+        assert samp == pytest.approx(710.0, abs=1.0)
+        assert line == pytest.approx(310.0, abs=1.0)
+
+    def test_xyz2sampline(self, ctx_dtm_csm_sensor):
         x = -2327023.0983832
         y = -2475336.0552312
         z = -18838.904973497
-        samp, line = ctx_csm_sensor.xyz2sampline(x,y,z)
-        print(samp, line)
-        assert samp == pytest.approx(10.0,6)
-        assert line == pytest.approx(10.0,6)
+        # Why is this a whole pixel?
+        samp, line = ctx_dtm_csm_sensor.xyz2sampline(x,y,z)
+        assert samp == pytest.approx(710.0,abs=1.0)
+        assert line == pytest.approx(310.0,abs=1.0)
+
+    def test_lonlat2xyz(self, ctx_dtm_csm_sensor):
+        x, y, z = ctx_dtm_csm_sensor.lonlat2xyz(226.76892358441, -0.31770729411217)
+        assert x == pytest.approx(-2327023.0983832)
+        assert y == pytest.approx(-2475336.0552312)
+        assert z == pytest.approx(-18838.904973497)

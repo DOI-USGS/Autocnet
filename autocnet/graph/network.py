@@ -57,7 +57,7 @@ from autocnet.matcher import cross_instrument_matcher as cim
 from autocnet.vis.graph_view import plot_graph, cluster_plot
 from autocnet.control import control
 #from autocnet.spatial.isis import point_info
-from autocnet.spatial.surface import GdalDem, EllipsoidDem
+from knoten.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, og2oc
 
 # set up the logging file
@@ -2166,7 +2166,7 @@ class NetworkCandidateGraph(CandidateGraph):
         path : str
                Outpath to write the control network
 
-        dem : ~autocnet.spatial.surface.EllipsoidDem or ~autocnet.spatial.surface.GdalDem
+        dem : ~knoten.surface.EllipsoidDem or ~knoten.surface.GdalDem
               Digital Elevation Model (DEM) object described the target body
 
         flishpath : str

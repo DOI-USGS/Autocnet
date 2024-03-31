@@ -21,7 +21,9 @@ try:
 except Exception as exception:
     from autocnet.utils.utils import FailedImport
     isis = FailedImport(exception)
-from knoten.csm import create_csm
+
+from knoten.csm import create_csm, generate_ground_point, generate_image_coordinate
+from csmapi import csmapi
 
 # set up the logger file
 log = logging.getLogger(__name__)
@@ -30,8 +32,8 @@ class BaseSensor:
     def __init__(self, data_path, dem):
         self.data_path = data_path
         self.dem = dem
-        self.semi_major = dem.a
-        self.semi_minor = dem.b
+        self.semi_major = self.dem.a
+        self.semi_minor = self.dem.c
 
     def _check_arg(self, x, y, z=None):
         if isinstance(x, collections.abc.Sequence) and isinstance(y, collections.abc.Sequence) and (isinstance(z, collections.abc.Sequence) or z is None):
@@ -78,7 +80,13 @@ class BaseSensor:
             return x_coords, y_coords, z_coords
         else:
             return x_coords, y_coords
-
+        
+    def _flatten_results(self, x, results):
+        if isinstance(x, (collections.abc.Sequence, np.ndarray)):
+            return results
+        else:
+            return results[0]
+        
     @abc.abstractmethod
     def lonlat2xyz(self, lon, lat, height):
         return 
@@ -98,6 +106,7 @@ class BaseSensor:
     @abc.abstractmethod
     def sampline2lonlat(sample, line):
         return
+
 
 class ISISSensor(BaseSensor):
     """
@@ -226,12 +235,6 @@ class ISISSensor(BaseSensor):
 
         return self._flatten_results(x, results)
 
-    def _flatten_results(self, x, results):
-        if isinstance(x, (collections.abc.Sequence, np.ndarray)):
-            return results
-        else:
-            return results[0]
-
     def _get_value(self, obj):
         """Returns *obj*, unless *obj* is of type pvl.collections.Quantity, in
         which case, the .value component of the object is returned."""
@@ -241,7 +244,8 @@ class ISISSensor(BaseSensor):
             return obj
     
     def xyz2sampline(self, x, y, z):
-        lon, lat = xyz2oc(x, y, z, self.semi_major, self.semi_minor)
+        # No ocentric conversion here. That conversion is handled in lonlat2sampline
+        lon, lat = xyz2og(x, y, z, self.semi_major, self.semi_minor)
         return self.lonlat2sampline(lon, lat)
 
     def lonlat2sampline(self, lon, lat, allowoutside=False):
@@ -269,7 +273,6 @@ class ISISSensor(BaseSensor):
         # ISIS is expecting ocentric latitudes. Convert from ographic before passing.
         lonoc, latoc = og2oc(lon, lat, self.semi_major, self.semi_minor)
         res = self._point_info(lonoc, latoc, "ground", allowoutside=allowoutside)
-
         if isinstance(lon, (collections.abc.Sequence, np.ndarray)):
             samples, lines = np.asarray([[r["Sample"], r["Line"]] for r in res]).T
         else:
@@ -375,9 +378,10 @@ class ISISSensor(BaseSensor):
 
         return lons, lats   
 
-    def lonlat2xyz(self, lon, lat, height=0):
-        xyz = og2xyz(lon, lat, height, self.semi_major, self.semi_minor)
-        return xyz
+    def lonlat2xyz(self, lon, lat):
+        sample, line = self.lonlat2sampline(lon, lat)
+        return self.sampline2xyz(sample, line)
+
     
 class CSMSensor(BaseSensor):
     """
@@ -392,14 +396,12 @@ class CSMSensor(BaseSensor):
         self.dem = dem
 
     def xyz2sampline(self, x, y, z):
-        x_coords, y_coords, z_coords = self._check_args(x, y, z)
+        x_coords, y_coords, z_coords = self._check_arg(x, y, z)
         results = []
         for coord in zip(x_coords, y_coords, z_coords):
-            ecef = csmapi.EcefCoord(coord[0], coord[1], coord[2])
-            imagept = self.sensor.groundToImage(ecef)
-            results+=[imagept.sample, imagept.line]
-
-        return self._flatten_results(results)
+            imagept = generate_image_coordinate(coord, self.sensor)
+            results+=[imagept.samp, imagept.line]
+        return self._flatten_results(x_coords, results)
 
     def lonlat2sampline(self, lon, lat):
         """
@@ -423,13 +425,15 @@ class CSMSensor(BaseSensor):
         line: int
             lint of point
         """
-        semi_major = self.dem.a
-        semi_minor = self.dem.b
-
-        x_coords, y_coords = self._check_args(lat, lon)
-        heights = [self.get.get_height(i[0], i[1]) for i in zip(x_coords, y_coords)]
-        x,y,z = og2xyz(lon, lat, heights, semi_major, semi_minor)
-        return self.xyz2linesamp(x,y,z)
+        x_coords, y_coords = self._check_arg(lon, lat)
+        results = []
+        for coord in zip(x_coords, y_coords):
+            # get_height needs lat, lon ordering
+            height = self.dem.get_height(coord[1], coord[0])
+            x,y,z = og2xyz(lon, lat, height, self.semi_major, self.semi_minor)
+            results += [x,y,z]
+        results = self._flatten_results(lat, results)
+        return self.xyz2sampline(x,y,z)
     
     def sampline2xyz(self, sample, line):
         """
@@ -459,18 +463,27 @@ class CSMSensor(BaseSensor):
         x,y,z : int(s)
             x,y,z coordinates of the point
         """
-        semi_major = self.dem.a
-        semi_minor = self.dem.b
-        
-        image_coord = csmapi.ImageCoord(sample, line)
-        pcoord = self.sensor.imageToGround(image_coord)
-        return pcoord.x, pcoord.y, pcoord.z
+        sample, line = self._check_arg(sample, line)
+        results = []
+        # CSMAPI using line/sample ordering. Swap here.
+        for coord in zip(line, sample):
+            # self.dem is an autocnet surface model dem that has a GeoDataset attribute
+            bcbf = generate_ground_point(self.dem, coord, self.sensor)
+            results += [bcbf.x, bcbf.y, bcbf.z]
+
+        return self._flatten_results(sample, results)
     
     def sampline2lonlat(self, sample, line):
         x,y,z = self.sampline2xyz(sample, line)
-        lon, lat = xyz2og(x, y, z,self.semi_major, self.semi_minor)
+        lon, lat = xyz2og(x, y, z, self.semi_major, self.semi_minor)
         return lon, lat
     
+    def lonlat2xyz(self, lon, lat):
+        sample, line = self.lonlat2sampline(lon, lat)
+        print(sample, line)
+        return self.sampline2xyz(sample, line)
+    
+
 def create_sensor(sensor_type, cam_path, dem=None):
     sensor_type = sensor_type.lower()
     sensor_classes = {

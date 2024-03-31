@@ -5,7 +5,7 @@ from plio.io.io_gdal import GeoDataset
 import pvl
 
 from autocnet.camera.sensor_model import create_sensor
-from autocnet.spatial.surface import EllipsoidDem, GdalDem
+from knoten.surface import EllipsoidDem, GdalDem
 
 class AGeoDataset(GeoDataset):
     def __init__(self, filename, sensortype='isis', dem=None):

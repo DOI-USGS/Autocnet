@@ -4,7 +4,7 @@ import logging
 import os
 
 import sqlalchemy
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, String, Integer, Float, ForeignKey, Boolean, event, DateTime                         
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import relationship, backref
@@ -23,7 +23,6 @@ from shapely.geometry import Point
 
 from autocnet.transformation.spatial import reproject, og2oc
 from autocnet.utils.serializers import JsonEncoder
-from autocnet.io import isis
 
 log = logging.getLogger(__name__)
 

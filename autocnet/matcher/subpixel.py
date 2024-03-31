@@ -10,7 +10,7 @@ import logging
 
 import numpy as np
 
-from scipy.ndimage.measurements import center_of_mass
+from scipy.ndimage import center_of_mass
 from skimage import transform as tf
 from skimage import registration
 from skimage import filters
