@@ -82,8 +82,14 @@ class BaseSensor:
             return x_coords, y_coords
         
     def _flatten_results(self, x, results):
-        if isinstance(x, (collections.abc.Sequence, np.ndarray)):
+        if isinstance(x, collections.abc.Sequence):
+            # Maintain the return type, if a sequence is passed,
+            # return a sequence.
+            if isinstance(results, np.ndarray):
+                return results.tolist()
             return results
+        elif isinstance(x, np.ndarray):
+            return np.asarray(results)
         else:
             return results[0]
         
@@ -397,13 +403,15 @@ class CSMSensor(BaseSensor):
 
     def xyz2sampline(self, x, y, z):
         x_coords, y_coords, z_coords = self._check_arg(x, y, z)
-        results = []
-        for coord in zip(x_coords, y_coords, z_coords):
+        results = np.empty((len(x_coords),2))
+        for i, coord in enumerate(zip(x_coords, y_coords, z_coords)):
             imagept = generate_image_coordinate(coord, self.sensor)
-            results+=[imagept.samp, imagept.line]
-        return self._flatten_results(x_coords, results)
+            results[i,0] = imagept.samp
+            results[i,1] = imagept.line
+        return (self._flatten_results(x, results[:,0]),
+                self._flatten_results(x, results[:,1]))
 
-    def lonlat2sampline(self, lon, lat):
+    def lonlat2sampline(self, lon, lat, **kwargs):
         """
         Calculate the sample and line for an csm camera sensor
 
@@ -426,14 +434,15 @@ class CSMSensor(BaseSensor):
             lint of point
         """
         x_coords, y_coords = self._check_arg(lon, lat)
-        results = []
+        heights = []
         for coord in zip(x_coords, y_coords):
             # get_height needs lat, lon ordering
-            height = self.dem.get_height(coord[1], coord[0])
-            x,y,z = og2xyz(lon, lat, height, self.semi_major, self.semi_minor)
-            results += [x,y,z]
-        results = self._flatten_results(lat, results)
-        return self.xyz2sampline(x,y,z)
+            heights.append(self.dem.get_height(coord[1], coord[0]))
+        x,y,z = og2xyz(x_coords, y_coords, heights, self.semi_major, self.semi_minor)
+        
+        return self.xyz2sampline(self._flatten_results(lon, x),
+                                 self._flatten_results(lon, y),
+                                 self._flatten_results(lon, z))
     
     def sampline2xyz(self, sample, line):
         """
@@ -463,24 +472,28 @@ class CSMSensor(BaseSensor):
         x,y,z : int(s)
             x,y,z coordinates of the point
         """
-        sample, line = self._check_arg(sample, line)
-        results = []
+        csample, cline = self._check_arg(sample, line)
+        results = np.empty((len(csample),3))
         # CSMAPI using line/sample ordering. Swap here.
-        for coord in zip(line, sample):
+        for i, coord in enumerate(zip(cline, csample)):
             # self.dem is an autocnet surface model dem that has a GeoDataset attribute
             bcbf = generate_ground_point(self.dem, coord, self.sensor)
-            results += [bcbf.x, bcbf.y, bcbf.z]
-
-        return self._flatten_results(sample, results)
+            results[i,0] = bcbf.x
+            results[i,1] = bcbf.y
+            results[i,2] = bcbf.z
+        return (self._flatten_results(sample, results[:,0]),
+                self._flatten_results(sample, results[:,1]),
+                self._flatten_results(sample, results[:,2]))
     
-    def sampline2lonlat(self, sample, line):
+    def sampline2lonlat(self, sample, line, **kwargs):
+        # sampline2xyz handles the CSM iteration, just pass the array through
         x,y,z = self.sampline2xyz(sample, line)
-        lon, lat = xyz2og(x, y, z, self.semi_major, self.semi_minor)
-        return lon, lat
+        lons, lats = xyz2og(x, y, z, self.semi_major, self.semi_minor)
+        return lons, lats
     
     def lonlat2xyz(self, lon, lat):
+        # All size checking and response type code is handled in self.lonlat2sampline
         sample, line = self.lonlat2sampline(lon, lat)
-        print(sample, line)
         return self.sampline2xyz(sample, line)
     
 

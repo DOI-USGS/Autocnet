@@ -32,9 +32,6 @@ class TestNode(object):
     def geo_node(self):
         img = get_path('AS15-M-0297_crop.cub')
         return Node(image_name='AS15-M-0297_crop.cub', image_path=img)
-
-    def test_get_camera(self, node):
-        assert node.camera == None
     
     def test_create(self):
         assert isinstance(Node.create(None, 1), Node)

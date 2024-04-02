@@ -16,14 +16,16 @@ def g02():
     return {'id':0,
             'name':'G02_019154_1800_XN_00N133W.crop.cub',
             'path':get_path('G02_019154_1800_XN_00N133W.crop.cub'),
-            'serial':'MRO/CTX/0967420440:133'}
+            'serial':'MRO/CTX/0967420440:133',
+            'cam_type': 'csm'}
 
 @pytest.fixture
 def n06():
     return {'id':1,
             'name':'N06_064753_1800_XN_00S133W.crop.cub',
             'path':get_path('N06_064753_1800_XN_00S133W.crop.cub'),
-            'serial':'MRO/CTX/1274405748:172'}
+            'serial':'MRO/CTX/1274405748:172',
+            'cam_type':'csm'}
 
 @pytest.fixture
 def g02_image(g02):
@@ -133,12 +135,11 @@ def test_ctx_pair_to_df(session,
     assert measures_to_set_false == []
 
     m0 = measures_to_update[0]
-    print(m0)
-    assert m0['sample'] == 364.76756113601755
-    assert m0['line'] == 525.3550626650527
-    assert m0['template_metric'] == 0.625694990158081
+    assert m0['sample'] == 364.6853301321431
+    assert m0['line'] == 525.3395556759572
+    assert m0['template_metric'] == 0.6238831281661987
     assert m0['ignore'] == False
-    assert m0['template_shift'] == 238.62787986417288
+    assert m0['template_shift'] == 238.67623291833308
 
     with mock.patch('pandas.read_sql') as db_response:
         db_cnet = pd.DataFrame([
@@ -154,5 +155,5 @@ def test_ctx_pair_to_df(session,
     df.rename(columns={'pointtype':'pointType',
                         'measuretype':'measureType'},
                         inplace=True)
-    to_isis(df, 'tests/artifacts/ctx_pair_to_df.cnet', targetname='Mars')
-    write_filelist([g02_image.path, n06_image.path], 'tests/artifacts/ctx_pair_to_df.lis')
+    to_isis(df, 'tests/artifacts/ctx_csm_pair_to_df.cnet', targetname='Mars')
+    write_filelist([g02_image.path, n06_image.path], 'tests/artifacts/ctx_csm_pair_to_df.lis')

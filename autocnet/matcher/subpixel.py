@@ -367,7 +367,10 @@ def subpixel_register_point(pointid,
         nodes = {}
         for measure in measures:
             res = session.query(Images).filter(Images.id == measure.imageid).one()
-            nodes[measure.imageid] = NetworkNode(node_id=measure.imageid, image_path=res.path)
+            nodes[measure.imageid] = NetworkNode(node_id=measure.imageid, 
+                                                 image_path=res.path, 
+                                                 dem=res.dem,
+                                                 dem_type=res.dem_type)
         session.expunge_all()
 
     resultlog = []
@@ -888,8 +891,11 @@ def subpixel_register_point_smart(point,
     nodes = {}
     for measure in measures:
         res = session.query(Images).filter(Images.id == measure.imageid).one()
-        nn = NetworkNode(node_id=measure.imageid, image_path=res.path)
-        #nn.parent = ncg
+        nn = NetworkNode(node_id=measure.imageid, 
+                         image_path=res.path,
+                         cam_type=res.cam_type,
+                         dem=res.dem,
+                         dem_type=res.dem_type)
         nodes[measure.imageid] = nn
         session.expunge_all()
 
@@ -1356,7 +1362,9 @@ def smart_register_point(point,
     if not isinstance(point, Points):
         point = session.query(Points).filter(Points.id == point).one()
 
+    print('Initial')
     measure_results = subpixel_register_point_smart(point, session, parameters=parameters, **shared_kwargs)
+    print('Decider')
     measures_to_update, measures_to_set_false = decider(measure_results)
     log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
     # Validate that the new position has consensus

@@ -8,12 +8,13 @@ from autocnet.camera.sensor_model import create_sensor
 from knoten.surface import EllipsoidDem, GdalDem
 
 class AGeoDataset(GeoDataset):
-    def __init__(self, filename, sensortype='isis', dem=None):
+    def __init__(self, filename, sensortype='isis', dem=None, dem_type='radius'):
         super().__init__(filename)
         if sensortype not in ['csm', 'isis']:
             raise ValueError('Argument sensortype must be either "csm" or "isis".')
         self.sensortype = sensortype
         self.dem = dem
+        self.dem_type = dem_type
 
     def _parse_radii_from_isd(self, isd):
         with open(isd, 'r') as stream:
@@ -35,7 +36,10 @@ class AGeoDataset(GeoDataset):
             dem = EllipsoidDem(semi_major=semimajor, semi_minor=semiminor)
         else:
             # Create a GdalDem
-            dem = GdalDem(self.dem, semi_major=semimajor, semi_minor=semiminor)
+            dem = GdalDem(self.dem, 
+                          semi_major=semimajor, 
+                          semi_minor=semiminor,
+                          dem_type=self.dem_type)
         self.dem = dem
     
     def _parse_radii_from_label(self, label):
@@ -57,7 +61,10 @@ class AGeoDataset(GeoDataset):
             # Create a GdalDem
             dempath = self._parse_dem_from_label(label)
             dempath = dempath.replace('$base', os.path.join(os.environ['ISISDATA'], 'base'))
-            dem = GdalDem(dempath, semi_major=semimajor, semi_minor=semiminor, dem_type='radius')
+            dem = GdalDem(dempath, 
+                          semi_major=semimajor, 
+                          semi_minor=semiminor, 
+                          dem_type='radius')
         else:
             dem = EllipsoidDem(semimajor, semiminor)
         

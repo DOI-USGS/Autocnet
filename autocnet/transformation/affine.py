@@ -65,10 +65,11 @@ def estimate_affine_from_sensors(reference_image,
     
     x_coords = [base_startx, base_startx, base_stopx, base_stopx, bcenter_x]
     y_coords = [base_starty, base_stopy, base_stopy, base_starty, bcenter_y]
-
     # Dispatch to the sensor to get the a priori pixel location in the input image
     lons, lats = reference_image.sensormodel.sampline2lonlat(x_coords, y_coords, allowoutside=True)
+    print(lons, lats)
     xs, ys = moving_image.sensormodel.lonlat2sampline(lons, lats, allowoutside=True)
+    print(xs, ys)
     log.debug(f'Lon/Lats for affine estimate are: {list(zip(lons, lats))}')
     log.debug(f'Image X / Image Y for affine estimate are: {list(zip(xs, ys))}')
 
@@ -116,6 +117,8 @@ def estimate_local_affine(reference_roi, moving_roi):
     size_x = 60 # reference_roi.size_x + roi_buffer
     size_y = 60 # reference_roi.size_y + roi_buffer
     
+    print('REF: ', reference_roi.x, reference_roi.y)
+
     affine_transform = estimate_affine_from_sensors(reference_roi.data, 
                                                     moving_roi.data, 
                                                     reference_roi.x, 

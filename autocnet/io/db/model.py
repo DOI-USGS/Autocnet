@@ -311,6 +311,8 @@ class Images(BaseMixin, Base):
     _geom = Column("geom", Geometry('MultiPolygon', srid=latitudinal_srid, dimension=2, spatial_index=True))
     footprint_bodyfixed = Column(Geometry('MULTIPOLYGON', dimension=2))
     cam_type = Column(String)
+    dem = Column(String)
+    dem_type = Column(String)
     #footprint_bodyfixed = Column(Geometry('POLYGON',dimension=3))
 
     # Relationships

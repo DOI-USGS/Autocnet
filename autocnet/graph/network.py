@@ -56,7 +56,6 @@ from autocnet.matcher import subpixel
 from autocnet.matcher import cross_instrument_matcher as cim
 from autocnet.vis.graph_view import plot_graph, cluster_plot
 from autocnet.control import control
-#from autocnet.spatial.isis import point_info
 from knoten.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, og2oc
 
@@ -106,7 +105,7 @@ class CandidateGraph(nx.Graph):
         'keypoint_index' : int
     }
 
-    def __init__(self, *args, basepath=None, node_id_map=None, overlaps=False, **kwargs):
+    def __init__(self, *args, basepath=None, node_id_map=None, overlaps=False, cam_type='isis', **kwargs):
         super(CandidateGraph, self).__init__(*args, **kwargs)
 
         self.graph['creationdate'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -132,7 +131,7 @@ class CandidateGraph(nx.Graph):
                 node_id = self.graph['node_counter']
                 self.graph['node_counter'] += 1
             n['data'] = self.node_factory(
-                image_name=i, image_path=image_path, node_id=node_id)
+                image_name=i, image_path=image_path, node_id=node_id, cam_type=cam_type)
 
             self.graph['node_name_map'][i] = node_id
 
@@ -1597,12 +1596,6 @@ class NetworkCandidateGraph(CandidateGraph):
         if self.async_watchers == True:
             self._setup_asynchronous_workers()
 
-        # Setup the DEM
-        # I dislike having the DEM on the NCG, but in the short term it
-        # is the best solution I think. I don't want to pass the DEM around
-        # for the sensor calls.
-        self._setup_dem()
-
     @contextmanager
     def session_scope(self):
      """
@@ -1618,17 +1611,6 @@ class NetworkCandidateGraph(CandidateGraph):
      finally:
          session.close()
 
-    def _setup_dem(self):
-        spatial = self.config['spatial']
-        semi_major = spatial.get('semimajor_rad')
-        semi_minor = spatial.get('semiminor_rad')
-        dem_type = spatial.get('dem_type')
-        dem = spatial.get('dem', False)
-        if dem:
-            self.dem = GdalDem(dem, semi_major, semi_minor, dem_type)
-        else:
-            self.dem = EllipsoidDem(semi_major, semi_minor)
-
     @property
     def Session(self):
         return self._Session
@@ -1638,7 +1620,6 @@ class NetworkCandidateGraph(CandidateGraph):
         self._Session = Session
 
     def _setup_database(self):
-        db = self.config['database']
         # A non-linear timeout if the DB is spinning up or loaded with many connections.
         sleeptime = 2
         retries = 0
@@ -2480,7 +2461,7 @@ class NetworkCandidateGraph(CandidateGraph):
         if overlaps:
             self._execute_sql(sql.compute_overlaps_sql)
 
-    def from_database(self, query_string=sql.select_pub_image):
+    def from_database(self, query_string=sql.select_pub_image, cam_type='isis'):
         """
         This is a constructor that takes the results from an arbitrary query string,
         uses those as a subquery into a standard polygon overlap query and
@@ -2528,7 +2509,7 @@ class NetworkCandidateGraph(CandidateGraph):
                     adjacency[spath].append(dpath)
 
         # Add nodes that do not overlap any images
-        self.__init__(adjacency, node_id_map=adjacency_lookup)
+        self.__init__(adjacency, node_id_map=adjacency_lookup, cam_type=cam_type)
 
         # Setup the edges
         self._setup_edges()

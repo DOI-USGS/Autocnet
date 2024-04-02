@@ -65,22 +65,21 @@ class Node(dict, MutableMapping):
                   ISIS compatible serial number
     """
 
-    def __init__(self, image_name=None, image_path=None, node_id=None):
+    def __init__(self, 
+                 image_name=None, 
+                 image_path=None, 
+                 node_id=None, 
+                 cam_type='isis', 
+                 dem=None,
+                 dem_type=None):
         self['image_name'] = image_name
         self['image_path'] = image_path
         self['node_id'] = node_id
         self['hash'] = image_name
+        self['cam_type'] = cam_type
+        self['dem'] = dem
+        self['dem_type'] = 'radius' if dem_type is None else dem_type 
         self.masks = pd.DataFrame()
-
-    @property
-    def camera(self):
-        if not hasattr(self, '_camera'):
-            self._camera = None
-        return self._camera
-
-    @camera.setter
-    def camera(self, camera):
-        self._camera = camera
 
     @property
     def descriptors(self):
@@ -120,8 +119,11 @@ class Node(dict, MutableMapping):
         Number Keypoints: {}
         Available Masks : {}
         Type: {}
+        Sensor Model Type: {}
+        DEM: {}
         """.format(self['node_id'], self['image_name'], self['image_path'],
-                   self.nkeypoints, self.masks, self.__class__)
+                   self.nkeypoints, self.masks, self.__class__,
+                   self['cam_type'], self['dem'])
 
     def __hash__(self): #pragma: no cover
         return hash(self['node_id'])
@@ -166,7 +168,10 @@ class Node(dict, MutableMapping):
     @property
     def geodata(self):
         if not hasattr(self, '_geodata'):
-            self._geodata = AGeoDataset(self['image_path'])
+            self._geodata = AGeoDataset(self['image_path'], 
+                                        sensortype = self['cam_type'],
+                                        dem=self['dem'],
+                                        dem_type=self['dem_type'])
         return self._geodata
 
     @property

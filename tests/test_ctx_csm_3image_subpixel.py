@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import pytest
 import mock
@@ -12,25 +13,40 @@ from autocnet.examples import get_path
 from shapely import Point,to_wkb
 
 @pytest.fixture
-def g17():
+def isis_mola_radius_dem():
+    isisdata = os.environ.get('ISISDATA', None)
+    path = os.path.join(isisdata, 'base/dems/molaMarsPlanetaryRadius0005.cub')
+    return path
+
+@pytest.fixture
+def g17(isis_mola_radius_dem):
     return {'id':0,
             'name':'G17_024823_2204_XI_40N109W.crop.cub',
             'path':get_path('G17_024823_2204_XI_40N109W.crop.cub'),
-            'serial':'MRO/CTX/1005587208:239'}
+            'serial':'MRO/CTX/1005587208:239',
+            'cam_type':'csm',
+            'dem':isis_mola_radius_dem,
+            'dem_type':'radius'}
 
 @pytest.fixture
-def n11():
+def n11(isis_mola_radius_dem):
     return {'id':1,
             'name':'N11_066770_2192_XN_39N109W.crop.cub',
             'path':get_path('N11_066770_2192_XN_39N109W.crop.cub'),
-            'serial':'MRO/CTX/1287982533:042'}
+            'serial':'MRO/CTX/1287982533:042',
+            'cam_type':'csm',
+            'dem':isis_mola_radius_dem,
+            'dem_type':'radius'}
 
 @pytest.fixture
-def p10():
+def p10(isis_mola_radius_dem):
     return {'id':2,
             'name':'P10_005031_2197_XI_39N109W.crop.cub',
             'path':get_path('P10_005031_2197_XI_39N109W.crop.cub'),
-            'serial':'MRO/CTX/0872335765:217'}
+            'serial':'MRO/CTX/0872335765:217',
+            'cam_type':'csm',
+            'dem':isis_mola_radius_dem,
+            'dem_type':'radius'}
 
 @pytest.fixture
 def g17_image(g17):
@@ -135,26 +151,30 @@ def test_ctx_pair_to_df(session,
     shared_kwargs = {'cost_func':lambda x,y:y,
                      'chooser':'smart_subpixel_registration'}
     for point in points:
+
+        # Somewhere in subpixel, need to add the offsets back to samp/line based
+        # on which image is being used. Every samp/line, patch time.
+
         measures_to_update, measures_to_set_false = smart_register_point(point, 
                                                                          session,
                                                                          parameters=parameters,
                                                                          shared_kwargs=shared_kwargs)
 
         assert measures_to_set_false == []
-        print(measures_to_update)
-        m0 = measures_to_update[0]
-        assert m0['sample'] == 528.0021463577573
-        assert m0['line'] == 210.86510060247355
-        assert m0['template_metric'] == 0.9077728986740112
-        assert m0['ignore'] == False
-        assert m0['template_shift'] == 445.1360742332809
 
+        m0 = measures_to_update[0]
+        assert m0['sample'] == 528.0616518160688
+        assert m0['line'] == 210.8722056871887
+        assert m0['template_metric'] == 0.8538808822631836
+        assert m0['ignore'] == False
+        assert m0['template_shift'] == 445.17368002294427
+        
         m1 = measures_to_update[1]
-        assert m1['sample'] == 358.1645048040594
-        assert m1['line'] == 230.28604784345214
-        assert m1['template_metric'] == 0.842411458492279
+        assert m1['sample'] == 357.3392609551714
+        assert m1['line'] == 230.29507805238129
+        assert m1['template_metric'] == 0.6922665238380432
         assert m1['ignore'] == False
-        assert m1['template_shift'] == 176.11837868797858
+        assert m1['template_shift'] == 175.5325037366171
 
         dfs = []
         with mock.patch('pandas.read_sql') as db_response:
@@ -174,5 +194,6 @@ def test_ctx_pair_to_df(session,
     df.rename(columns={'pointtype':'pointType',
                         'measuretype':'measureType'},
                         inplace=True)
-    to_isis(df, 'tests/artifacts/ctx_trio_to_df.cnet', targetname='Mars')
-    write_filelist([g17_image.path, n11_image.path, p10_image.path], 'tests/artifacts/ctx_trio_to_df.lis')
+    to_isis(df, 'tests/artifacts/ctx_csm_trio_to_df.cnet', targetname='Mars')
+    write_filelist([g17_image.path, n11_image.path, p10_image.path], 'tests/artifacts/ctx_csm_trio_to_df.lis')
+    assert False
