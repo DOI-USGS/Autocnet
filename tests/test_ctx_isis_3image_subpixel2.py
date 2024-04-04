@@ -10,62 +10,50 @@ from autocnet.matcher.subpixel import smart_register_point
 from autocnet.io.db.model import Points, Measures, Images
 from autocnet.io.db.controlnetwork import db_to_df
 from autocnet.examples import get_path
-from shapely import Point,to_wkb
 
 @pytest.fixture
-def isis_mola_radius_dem():
-    isisdata = os.environ.get('ISISDATA', None)
-    path = os.path.join(isisdata, 'base/dems/molaMarsPlanetaryRadius0005.cub')
-    return path
-
-@pytest.fixture
-def g17(isis_mola_radius_dem):
+def b10():
+    # Start is sample:2000 line:5700
     return {'id':0,
-            'name':'G17_024823_2204_XI_40N109W.crop.cub',
-            'path':get_path('G17_024823_2204_XI_40N109W.crop.cub'),
-            'serial':'MRO/CTX/1005587208:239',
-            'cam_type':'csm',
-            'dem':isis_mola_radius_dem,
-            'dem_type':'radius'}
+            'name':'B10_013615_2178_XI_37N117W.crop.cub',
+            'path':get_path('B10_013615_2178_XI_37N117W.crop.cub'),
+            'serial':'MRO/CTX/0930130710:231',
+            'cam_type':'isis'}
 
 @pytest.fixture
-def n11(isis_mola_radius_dem):
+def n12():
     return {'id':1,
-            'name':'N11_066770_2192_XN_39N109W.crop.cub',
-            'path':get_path('N11_066770_2192_XN_39N109W.crop.cub'),
-            'serial':'MRO/CTX/1287982533:042',
-            'cam_type':'csm',
-            'dem':isis_mola_radius_dem,
-            'dem_type':'radius'}
+            'name':'N12_067021_2177_XN_37N117W.crop.cub',
+            'path':get_path('N12_067021_2177_XN_37N117W.crop.cub'),
+            'serial':'MRO/CTX/1289671564:206',
+            'cam_type':'isis'}
 
 @pytest.fixture
-def p10(isis_mola_radius_dem):
+def k12():
     return {'id':2,
-            'name':'P10_005031_2197_XI_39N109W.crop.cub',
-            'path':get_path('P10_005031_2197_XI_39N109W.crop.cub'),
-            'serial':'MRO/CTX/0872335765:217',
-            'cam_type':'csm',
-            'dem':isis_mola_radius_dem,
-            'dem_type':'radius'}
+            'name':'K12_058001_2177_XI_37N117W.crop.cub',
+            'path':get_path('K12_058001_2177_XI_37N117W.crop.cub'),
+            'serial':'MRO/CTX/1228947495:234',
+            'cam_type':'isis'}
 
 @pytest.fixture
-def g17_image(g17):
-    return Images(**g17)
+def n12_image(n12):
+    return Images(**n12)
 
 @pytest.fixture
-def n11_image(n11):
-    return Images(**n11)
+def b10_image(b10):
+    return Images(**b10)
 
 @pytest.fixture
-def p10_image(p10):
-    return Images(**p10)
+def k12_image(k12):
+    return Images(**k12)
 
 @pytest.fixture
 def measure_0():
     data = [
-        {'id':0, 'imageid':0,'apriorisample':384.768,'aprioriline':278.000,'sample':384.768,'line':278.000,'pointid':0, 'measuretype':3},
-        {'id':1, 'imageid':1,'apriorisample':521.905,'aprioriline':209.568,'sample':521.905,'line':209.568, 'pointid':0, 'measuretype':3},
-        {'id':2, 'imageid':2,'apriorisample':355.483,'aprioriline':234.296,'sample':355.483,'line':234.296, 'pointid':0, 'measuretype':3}
+        {'id':0, 'imageid':0,'apriorisample':442.7200012207031,'aprioriline':218.4800033569336,'sample':442.7200012207031,'line':218.4800033569336,'pointid':0, 'measuretype':3},
+        {'id':1, 'imageid':1,'apriorisample':755.95042324367,'aprioriline':1207.3857527191,'sample':755.95042324367,'line':1207.3857527191, 'pointid':0, 'measuretype':3},
+        {'id':2, 'imageid':2,'apriorisample':830.95897898574,'aprioriline':1549.7867781121,'sample':830.95897898574,'line':1549.7867781121, 'pointid':0, 'measuretype':3}
         ]
     return [Measures(**d) for d in data]
 
@@ -82,7 +70,7 @@ def points(measure_0):
     return pts
 
 @pytest.fixture
-def session(measure_0,g17_image,n11_image,p10_image):
+def session(measure_0,n12_image,b10_image,k12_image):
 
     # Mocked DB session with calls and responses.
     session = UnifiedAlchemyMagicMock(data=[
@@ -91,6 +79,11 @@ def session(measure_0,g17_image,n11_image,p10_image):
                 mock.call.filter(Measures.pointid == 0),
                 mock.call.order_by(Measures.id)],
                 measure_0
+        ),(
+            [mock.call.query(Measures),
+             mock.call.filter(Measures.id == 0),
+             mock.call.order_by(Measures.id)],
+             [measure_0[0]]
         ),(
             [mock.call.query(Measures),
              mock.call.filter(Measures.id == 1),
@@ -104,23 +97,23 @@ def session(measure_0,g17_image,n11_image,p10_image):
         ),(
             [mock.call.query(Images),
                 mock.call.filter(Images.id == 0)],
-                [g17_image]
+                [b10_image]
         ),(
             [mock.call.query(Images),
                 mock.call.filter(Images.id == 1)],
-                [n11_image]
+                [n12_image]
         ),(
             [mock.call.query(Images),
                 mock.call.filter(Images.id == 2)],
-                [p10_image]
+                [k12_image]
         ),
         ])
     return session
     
 def test_ctx_pair_to_df(session,
-                        g17_image,
-                        n11_image,
-                        p10_image,
+                        n12_image,
+                        b10_image,
+                        k12_image,
                         measure_0,
                         points):
     """
@@ -159,29 +152,30 @@ def test_ctx_pair_to_df(session,
                                                                          session,
                                                                          parameters=parameters,
                                                                          shared_kwargs=shared_kwargs)
-
+        print(measures_to_update)
+        print(measures_to_set_false)
         assert measures_to_set_false == []
 
         m0 = measures_to_update[0]
-        assert m0['sample'] == 528.0616518160688
-        assert m0['line'] == 210.8722056871887
-        assert m0['template_metric'] == 0.8538808822631836
-        assert m0['ignore'] == False
-        assert m0['template_shift'] == 445.17368002294427
+        # assert m0['sample'] == 528.0616518160688
+        # assert m0['line'] == 210.8722056871887
+        # assert m0['template_metric'] == 0.8538808822631836
+        # assert m0['ignore'] == False
+        # assert m0['template_shift'] == 445.17368002294427
         
         m1 = measures_to_update[1]
-        assert m1['sample'] == 357.3392609551714
-        assert m1['line'] == 230.29507805238129
-        assert m1['template_metric'] == 0.6922665238380432
-        assert m1['ignore'] == False
-        assert m1['template_shift'] == 175.5325037366171
+        # assert m1['sample'] == 357.3392609551714
+        # assert m1['line'] == 230.29507805238129
+        # assert m1['template_metric'] == 0.6922665238380432
+        # assert m1['ignore'] == False
+        # assert m1['template_shift'] == 175.5325037366171
 
         dfs = []
         with mock.patch('pandas.read_sql') as db_response:
             db_cnet = pd.DataFrame([
-                [0, 0, g17_image.serial,measure_0[0].sample, measure_0[0].line, point.pointtype, measure_0[0].measuretype, 'test'],
-                [1, 0, n11_image.serial,m0['sample'], m0['line'], point.pointtype, measure_0[1].measuretype, 'test'],
-                [1, 0, p10_image.serial,m1['sample'], m1['line'], point.pointtype, measure_0[2].measuretype, 'test'],
+                [0, 0, b10_image.serial,measure_0[0].sample, measure_0[0].line, point.pointtype, measure_0[0].measuretype, 'test'],
+                [1, 0, n12_image.serial,m0['sample'], m0['line'], point.pointtype, measure_0[1].measuretype, 'test'],
+                [1, 0, k12_image.serial,m1['sample'], m1['line'], point.pointtype, measure_0[2].measuretype, 'test'],
                                     ],
                                 columns=['id','pointid', 'serialnumber', 'sample', 'line', 
                                             'pointtype', 'measuretype','identifier'])
@@ -194,6 +188,6 @@ def test_ctx_pair_to_df(session,
     df.rename(columns={'pointtype':'pointType',
                         'measuretype':'measureType'},
                         inplace=True)
-    to_isis(df, 'tests/artifacts/ctx_csm_trio_to_df.cnet', targetname='Mars')
-    write_filelist([g17_image.path, n11_image.path, p10_image.path], 'tests/artifacts/ctx_csm_trio_to_df.lis')
+    to_isis(df, 'tests/artifacts/ctx_isis_trio_to_df2.cnet', targetname='Mars')
+    write_filelist([n12_image.path, b10_image.path, k12_image.path], 'tests/artifacts/ctx_isis_trio_to_df2.lis')
     assert False

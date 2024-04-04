@@ -882,7 +882,6 @@ def subpixel_register_point_smart(point,
     # match to the source node.
     source = measures[reference_index]
     reference_index_id = source.imageid
-    
     log.info(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
     log.info(f'Measure reference index is: {reference_index}')
 
@@ -1041,7 +1040,7 @@ def subpixel_register_point_smart(point,
                 new_x, new_y = updated_affine([measure.apriorisample, measure.aprioriline])[0]
                 
                 dist = np.linalg.norm([measure.aprioriline-new_x, 
-                                      measure.apriorisample-new_y])
+                                       measure.apriorisample-new_y])
                 cost = cost_func(dist, metric)
 
                 m = {'id': measure.id,
@@ -1362,9 +1361,7 @@ def smart_register_point(point,
     if not isinstance(point, Points):
         point = session.query(Points).filter(Points.id == point).one()
 
-    print('Initial')
     measure_results = subpixel_register_point_smart(point, session, parameters=parameters, **shared_kwargs)
-    print('Decider')
     measures_to_update, measures_to_set_false = decider(measure_results)
     log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
     # Validate that the new position has consensus

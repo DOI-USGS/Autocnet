@@ -273,6 +273,7 @@ class Roi():
         # series of checks to make sure all pixels inside image limits
         raster_xsize, raster_ysize = self.data.raster_size
         if min_x < 0 or min_y < 0 or min_x+x_read_length > raster_xsize or min_y+y_read_length > raster_ysize:
+            print('FAILURE: ', self.data.file_name, min_x, min_y, x_read_length, y_read_length)
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
         pixels = [min_x, min_y, x_read_length, y_read_length]
