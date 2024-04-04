@@ -368,7 +368,6 @@ class ISISSensor(BaseSensor):
 
         """
         res = self._point_info(sample, line, "image", allowoutside=allowoutside)
-
         if isinstance(sample, (collections.abc.Sequence, np.ndarray)):
             lon_list = list()
             lat_list = list()
@@ -381,7 +380,6 @@ class ISISSensor(BaseSensor):
         else:
             lons = self._get_value(res[lontype])
             lats = self._get_value(res[lattype])
-
         return lons, lats   
 
     def lonlat2xyz(self, lon, lat):
