@@ -305,10 +305,6 @@ def add_point_to_overlap_network(valid,
     lat = valid[1]
     lon = valid[0]
 
-    semi_major=ncg.config['spatial']['semimajor_rad']
-    semi_minor=ncg.config['spatial']['semiminor_rad']
-    height=ncg.dem.get_height(lat, lon)
-
     # Find the intresting sampleline and what image it is in
     reference_index, interesting_sampline = interesting_func(nodes, lon, lat, size=interesting_func_kwargs['size'])
 
