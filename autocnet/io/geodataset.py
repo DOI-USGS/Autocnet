@@ -16,6 +16,23 @@ class AGeoDataset(GeoDataset):
         self.dem = dem
         self.dem_type = dem_type
 
+    def _parse_radii_from_csm(self, input):
+        with open(input, 'r') as stream:
+            line = stream.readline()
+        if line.startswith('{'):
+            return self._parse_radii_from_isd(self, input)
+        else:
+            return self._parse_radii_from_state(self, input)
+
+    def _parse_radii_from_state(self, state):
+        with open(state, 'r') as stream:
+            stream.readline()
+            state = json.load(stream)
+
+        semimajor = state['m_majorAxis']
+        semiminor = state['m_minorAxis']
+        return semimajor, semiminor
+
     def _parse_radii_from_isd(self, isd):
         with open(isd, 'r') as stream:
             isd = json.load(stream)
@@ -75,7 +92,7 @@ class AGeoDataset(GeoDataset):
         if not hasattr(self, '_sensormodel'):
             if self.sensortype == 'csm':
                 cam_path = self.file_name.replace('.cub', '.json')
-                self._make_dem_from_isd(cam_path)
+                self._make_dem_from_csm(cam_path)
             else:
                 cam_path = self.file_name
                 self._make_dem_from_isis()
