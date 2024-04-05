@@ -5,16 +5,13 @@ import warnings
 import shapely
 import json
 from subprocess import CalledProcessError
-import csmapi
 
 from autocnet.cg import cg as compgeom
 from autocnet.graph.node import NetworkNode
 from autocnet.io.db.model import Images, Measures, Overlay, Points, JsonEncoder
-from autocnet.spatial import sensor
 from autocnet.transformation import roi
 from autocnet.matcher.cpu_extractor import extract_most_interesting
 from autocnet.matcher.validation import is_valid_lroc_image
-from autocnet.transformation.spatial import reproject, og2oc, oc2og, oc2xyz, xyz2oc
 
 # set up the logger file
 log = logging.getLogger(__name__)
@@ -60,7 +57,7 @@ def place_points_in_overlaps(size_threshold=0.0007,
                                 point_type=point_type,
                                 ncg=ncg)
 
-def find_interesting_point(nodes, lon, lat, current_sensor, size=71, **kwargs):
+def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
     """
     Find an interesting point close the given lon, lat given a list data structure that contains
     the image_path and the geodata for the image.
@@ -151,7 +148,6 @@ def find_interesting_point(nodes, lon, lat, current_sensor, size=71, **kwargs):
 
 def place_points_in_overlap(overlap,
                             identifier="place_points_in_overlaps",
-                            cam_type="isis",
                             interesting_func=find_interesting_point,
                             interesting_func_kwargs={"size":71},
                             distribute_points_kwargs={},
@@ -220,9 +216,6 @@ def place_points_in_overlap(overlap,
     t1 = time.time()
     if not ncg.Session:
         raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
-    
-    # Determine what sensor type to use
-    current_sensor = sensor.create_sensor(cam_type)
 
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
@@ -240,13 +233,11 @@ def place_points_in_overlap(overlap,
         for id in overlap.intersections:
             res = session.query(Images).filter(Images.id == id).one()
             nn = NetworkNode(node_id=id, image_path=res.path)
-            nn.parent = ncg
             nodes.append(nn)
     
     for valid in candidate_points:
         add_point_to_overlap_network(valid,
                                     nodes,
-                                    current_sensor,
                                     geom,
                                     identifier=identifier,
                                     interesting_func=interesting_func,
@@ -260,7 +251,6 @@ def place_points_in_overlap(overlap,
 
 def add_point_to_overlap_network(valid,
                                 nodes,
-                                current_sensor,
                                 geom,
                                 identifier="place_points_in_overlap",
                                 interesting_func=find_interesting_point,
@@ -319,17 +309,8 @@ def add_point_to_overlap_network(valid,
     semi_minor=ncg.config['spatial']['semiminor_rad']
     height=ncg.dem.get_height(lat, lon)
 
-    # Add additional_kargs for CSM model
-    csm_kwargs = {
-        'semi_major': semi_major,
-        'semi_minor': semi_minor,
-        'height': height,
-        'ncg': ncg,
-        'needs_projection': True,
-    }
-
     # Find the intresting sampleline and what image it is in
-    reference_index, interesting_sampline = interesting_func(nodes, lon, lat, current_sensor, size=interesting_func_kwargs['size'], **csm_kwargs)
+    reference_index, interesting_sampline = interesting_func(nodes, lon, lat, size=interesting_func_kwargs['size'])
 
     if not interesting_sampline:
         return
@@ -340,20 +321,10 @@ def add_point_to_overlap_network(valid,
     # The io.db.Point class handles all xyz to lat/lon and ographic/ocentric conversions in it's 
     # adjusted property setter.
     reference_node = nodes[reference_index]
-    x,y,z = current_sensor.linesamp2xyz(reference_node, interesting_sampline.x, interesting_sampline.y, **csm_kwargs)
-
-    # If the updated point is outside of the overlap, then revert back to the
-    # original point and hope the matcher can handle it when sub-pixel registering
-    updated_lon, updated_lat  = xyz2oc(x, y, z, semi_major, semi_minor)
-    if not geom.contains(shapely.geometry.Point(updated_lon, updated_lat)):
-        x,y,z = oc2xyz(lon, lat, height, semi_major, semi_minor)
-        updated_lon, updated_lat = xyz2oc(x, y, z, semi_major, semi_minor)
-    
-    # Create the point object for insertion into the database
-    point_geom = shapely.geometry.Point(x, y, z)
+    x,y,z = reference_node.sensormodel.linesamp2xyz(interesting_sampline.x, interesting_sampline.y)
     
     # Create the new point
-    point = Points.create_point_with_reference_measure(point_geom, 
+    point = Points.create_point_with_reference_measure(shapely.geometry.Point(x, y, z), 
                                                        reference_node, 
                                                        interesting_sampline,
                                                        choosername=identifier,
@@ -368,7 +339,7 @@ def add_point_to_overlap_network(valid,
     # TODO: Take this projection out of the CSM model and work it into the point
     kwargs['needs_projection']=False
     # Iterate through all other, non-reference images in the overlap and attempt to add a measure.
-    point.add_measures_to_point(nodes, current_sensor, choosername=identifier, **csm_kwargs)
+    point.add_measures_to_point(nodes, choosername=identifier)
 
     # Insert the point into the database asynchronously (via redis) or synchronously via the ncg
     if use_cache:
