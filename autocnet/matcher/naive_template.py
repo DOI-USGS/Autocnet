@@ -4,7 +4,7 @@ from math import floor
 import cv2
 import numpy as np
 
-from scipy.ndimage.measurements import center_of_mass
+from scipy.ndimage import center_of_mass
 from skimage.transform import rescale
 from skimage.util import img_as_float32
 

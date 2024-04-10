@@ -114,8 +114,13 @@ def reproject(record, semi_major, semi_minor, source_proj, dest_proj, **kwargs):
     y, x, z = transg.transform(record[0], record[1], record[2])
     return y, x, z
 
-# TODO: Take this projection out of the CSM model and work it into the point
-def oc2xyz(lon, lat, semi_major, semi_minor, height):
+def og2xyz(lon, lat, height, semi_major, semi_minor):
+    x, y, z = reproject([lon, lat, height],
+                    semi_major, semi_minor,
+                    'latlon', 'geocent')
+    return x, y, z
+
+def oc2xyz(lon, lat, height, semi_major, semi_minor):
     """
     Project from ocentric to graphic
 
@@ -144,7 +149,11 @@ def oc2xyz(lon, lat, semi_major, semi_minor, height):
                         'latlon', 'geocent')
     return x,y,z
 
-# TODO: Take this projection out of the CSM model and work it into the point
+def xyz2og(x,y,z, semi_major, semi_minor):
+    lon_og, lat_og, _ = reproject([x, y, z], semi_major, semi_minor, 
+                                                'geocent', 'latlon')
+    return lon_og, lat_og
+
 def xyz2oc(x, y, z, semi_major, semi_minor):
     """
     Project from graphic to ocentric
@@ -174,7 +183,6 @@ def xyz2oc(x, y, z, semi_major, semi_minor):
     updated_lat: int
         latitude of the point after conversion
     """
-    lon_og, lat_og, _ = reproject([x, y, z], semi_major, semi_minor, 
-                                                  'geocent', 'latlon')
+    lon_og, lat_og, =xyz2og(x, y, z, semi_major, semi_minor)
     updated_lon, updated_lat = og2oc(lon_og, lat_og, semi_major, semi_minor)
     return updated_lon, updated_lat

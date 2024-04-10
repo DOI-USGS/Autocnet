@@ -4,7 +4,7 @@ import logging
 import os
 
 import sqlalchemy
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, String, Integer, Float, ForeignKey, Boolean, event, DateTime                         
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import relationship, backref
@@ -23,7 +23,6 @@ from shapely.geometry import Point
 
 from autocnet.transformation.spatial import reproject, og2oc
 from autocnet.utils.serializers import JsonEncoder
-from autocnet.spatial import isis
 
 log = logging.getLogger(__name__)
 
@@ -312,6 +311,8 @@ class Images(BaseMixin, Base):
     _geom = Column("geom", Geometry('MultiPolygon', srid=latitudinal_srid, dimension=2, spatial_index=True))
     footprint_bodyfixed = Column(Geometry('MULTIPOLYGON', dimension=2))
     cam_type = Column(String)
+    dem = Column(String)
+    dem_type = Column(String)
     #footprint_bodyfixed = Column(Geometry('POLYGON',dimension=3))
 
     # Relationships
@@ -564,7 +565,7 @@ class Points(Base, BaseMixin):
                 apriori=point_geom,
                 adjusted=point_geom,
                 pointtype=point_type, # Would be 3 or 4 for ground
-                cam_type='isis',
+                cam_type=reference_node['cam_type'],
                 reference_index=0)
         
         # Create the measure for the reference image and add it to the point
@@ -578,7 +579,7 @@ class Points(Base, BaseMixin):
                                         choosername=choosername))
         return point 
 
-    def add_measures_to_point(self, candidates, sensor, choosername='autocnet', **kwargs):
+    def add_measures_to_point(self, candidates, choosername='autocnet', **kwargs):
         """
         Attempt to add 1+ measures to a point from a list of candidate nodes. The
         function steps over each node and attempts to use the node's sensor model
@@ -597,11 +598,10 @@ class Points(Base, BaseMixin):
             if not os.path.exists(node['image_path']):
                 log.info(f'Unable to find input image {node["image_path"]}')
                 continue
-            try:
-                # TODO: Take this projection out of the CSM model and work it into the point
-                sample, line = sensor.calculate_sample_line(node, self.geom.x, self.geom.y, **kwargs)
-            except:
-                log.info(f"{node['image_path']} failed ground_to_image. Likely due to being processed incorrectly or is just a bad image that failed campt.")
+            #try:
+            sample, line = node.geodata.sensormodel.xyz2sampline(self.apriori.x, self.apriori.y, self.apriori.z)
+            #except:
+            #    log.info(f"{node['image_path']} failed ground_to_image. Likely due to being processed incorrectly or is just a bad image that failed campt.")
 
             if sample == None or line == None:
                 log.info(f'interesting point ({self.geom.x},{self.geom.y}) does not project to image {node["image_path"]}')

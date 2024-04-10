@@ -1,9 +1,5 @@
-from math import floor
-from autocnet.transformation.roi import Roi
 import numpy as np
 
-from scipy.ndimage.measurements import center_of_mass
-import skimage.transform as tf
 
 import logging 
 # setup logging file

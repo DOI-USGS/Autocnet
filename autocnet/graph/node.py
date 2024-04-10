@@ -10,18 +10,17 @@ from csmapi import csmapi
 import numpy as np
 import pandas as pd
 
-from plio.io.io_gdal import GeoDataset
 from plio.io.isis_serial_number import generate_serial_number
 from skimage.transform import resize
 import shapely
-from knoten.csm import generate_latlon_footprint, generate_vrt, create_camera, generate_boundary
+from knoten.csm import generate_latlon_footprint, generate_boundary
 
 from autocnet.matcher import cpu_extractor as fe
 from autocnet.matcher import cpu_outlier_detector as od
 from autocnet.cg import cg
 from autocnet.io.db.model import Images, Keypoints, Matches, Cameras,  Base, Overlay, Edges, Costs, Points, Measures
-from autocnet.io.db.connection import Parent
 from autocnet.io import keypoints as io_keypoints
+from autocnet.io.geodataset import AGeoDataset
 from autocnet.vis.graph_view import plot_node
 from autocnet.utils import utils
 
@@ -66,22 +65,21 @@ class Node(dict, MutableMapping):
                   ISIS compatible serial number
     """
 
-    def __init__(self, image_name=None, image_path=None, node_id=None):
+    def __init__(self, 
+                 image_name=None, 
+                 image_path=None, 
+                 node_id=None, 
+                 cam_type='isis', 
+                 dem=None,
+                 dem_type=None):
         self['image_name'] = image_name
         self['image_path'] = image_path
         self['node_id'] = node_id
         self['hash'] = image_name
+        self['cam_type'] = cam_type
+        self['dem'] = dem
+        self['dem_type'] = 'radius' if dem_type is None else dem_type 
         self.masks = pd.DataFrame()
-
-    @property
-    def camera(self):
-        if not hasattr(self, '_camera'):
-            self._camera = None
-        return self._camera
-
-    @camera.setter
-    def camera(self, camera):
-        self._camera = camera
 
     @property
     def descriptors(self):
@@ -118,11 +116,12 @@ class Node(dict, MutableMapping):
         NodeID: {}
         Image Name: {}
         Image PATH: {}
-        Number Keypoints: {}
-        Available Masks : {}
         Type: {}
+        Sensor Model Type: {}
+        DEM: {}
         """.format(self['node_id'], self['image_name'], self['image_path'],
-                   self.nkeypoints, self.masks, self.__class__)
+                   self.__class__,
+                   self['cam_type'], self['dem'])
 
     def __hash__(self): #pragma: no cover
         return hash(self['node_id'])
@@ -167,7 +166,10 @@ class Node(dict, MutableMapping):
     @property
     def geodata(self):
         if not hasattr(self, '_geodata'):
-            self._geodata = GeoDataset(self['image_path'])
+            self._geodata = AGeoDataset(self['image_path'], 
+                                        sensortype = self['cam_type'],
+                                        dem=self['dem'],
+                                        dem_type=self['dem_type'])
         return self._geodata
 
     @property
@@ -626,55 +628,6 @@ class NetworkNode(Node):
         res = self._from_db(Keypoints)
         return res.nkeypoints if res is not None else 0
 
-    def create_camera(self, url):
-        """
-        Creates a CSM sensor for the node and serializes the state
-        to the DB,
-
-        Parameters
-        ----------
-        url : str
-              The URI to a service that can create an ISD to instantiate
-              a sensor.
-        """
-        raise NotImplementedError
-
-        # TODO: This should pass the straight metadata and not mess with mundging it.
-        label = pvl.dumps(self.geodata.metadata).decode()
-        response = requests.post(url, json={'label':label})
-        response = response.json()
-        model_name = response.get('name_model', None)
-        if model_name is None:
-            return
-        isdpath = os.path.splitext(self['image_path'])[0] + '.json'
-        try:
-            with open(isdpath, 'w') as f:
-                json.dump(response, f)
-        except Exception as e:
-           log.warning('Failed to write JSON ISD for image {}.\n{}'.format(self['image_path'], e))
-        isd = csmapi.Isd(self['image_path'])
-        plugin = csmapi.Plugin.findPlugin('UsgsAstroPluginCSM')
-        self._camera = plugin.constructModelFromISD(isd, model_name)
-        serialized_camera = self._camera.getModelState()
-
-        cam = Cameras(camera=serialized_camera, image_id=self['node_id'])
-        return cam
-
-    @property
-    def camera(self):
-        """
-        Get the camera object from the database.
-        """
-        # TODO: This should use knoten once it is stable.
-        import csmapi
-        if not getattr(self, '_camera', None):
-            res = self._from_db(Cameras)
-            plugin = csmapi.Plugin.findPlugin('UsgsAstroPluginCSM')
-            if res is not None:
-                self._camera = plugin.constructModelFromState(res.camera)
-        return self._camera
-
-    
     def footprint_from_database(self):
         with self.parent.session_scope() as session:
             res = session.query(Images).filter(Images.id == self['node_id']).first()
@@ -690,36 +643,6 @@ class NetworkNode(Node):
         if isinstance(footprint_latlon, shapely.geometry.Polygon):
             footprint_latlon = shapely.geometry.MultiPolygon(list(footprint_latlon))
         cam_type = 'isis'
-        return footprint_latlon, cam_type
-
-    def footprint_from_csm(self):
-        boundary = generate_boundary(self.geodata.raster_size[::-1])  # yx to xy
-        footprint_latlon = generate_latlon_footprint(self.camera,
-                                                        boundary,
-                                                        dem=parent.dem)
-        footprint_latlon.FlattenTo2D()
-        cam_type = 'csm'
-        return footprint_latlon, cam_type
-
-    def generate_footprint(self, exist_check=True):        
-        footprint_latlon = cam_type = None
-
-        if exist_check:
-            footprint_latlon, cam_type = self.footprint_from_database()
-
-        # not in database, create footprint
-        if footprint_latlon is None and cam_type is None:
-            if utils.find_in_dict(self.geodata.metadata, "Polygon"):
-                # get ISIS footprint if possible
-                t1 = time.time()
-                footprint_latlon, cam_type = self.footprint_from_isis()
-                t2 = time.time()
-            else:
-                # Get CSM footprint
-                t1 = time.time()
-                footprint_latlon, cam_type = self.footprint_from_csm()
-                t2 = time.time()
-       
         return footprint_latlon, cam_type
 
     @property

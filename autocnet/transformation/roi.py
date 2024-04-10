@@ -1,10 +1,11 @@
 from math import floor
 import numpy as np
-from plio.io.io_gdal import GeoDataset
 import scipy.ndimage as ndimage
 
 from skimage import transform as tf
 from skimage.util import img_as_float32
+
+from autocnet.io.geodataset import AGeoDataset
 
 class Roi():
     """
@@ -56,8 +57,8 @@ class Roi():
              identity matrix results in no transformation.
     """
     def __init__(self, data, x, y, size_x=200, size_y=200, ndv=None, ndv_threshold=0.5, buffer=5, affine=tf.AffineTransform()):
-        if not isinstance(data, GeoDataset):
-            raise TypeError('Error: data object must be a plio GeoDataset')
+        if not isinstance(data, AGeoDataset):
+            raise TypeError('Error: data object must be an autocnet AGeoDataset')
         self.data = data
         self.x = x
         self.y = y
@@ -272,6 +273,7 @@ class Roi():
         # series of checks to make sure all pixels inside image limits
         raster_xsize, raster_ysize = self.data.raster_size
         if min_x < 0 or min_y < 0 or min_x+x_read_length > raster_xsize or min_y+y_read_length > raster_ysize:
+            print('FAILURE: ', self.data.file_name, min_x, min_y, x_read_length, y_read_length)
             raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
 
         pixels = [min_x, min_y, x_read_length, y_read_length]

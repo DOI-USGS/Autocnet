@@ -10,9 +10,10 @@ import tempfile
 
 import numpy as np
 
-from plio.io.io_gdal import GeoDataset, array_to_raster
+from plio.io.io_gdal import array_to_raster
 
 from autocnet.examples import get_path
+from autocnet.io.geodataset import AGeoDataset
 import autocnet.matcher.subpixel as sp
 from autocnet.transformation import roi
 
@@ -36,14 +37,14 @@ def iris_pair():
     array_to_raster(image, roi_raster1.name)
     array_to_raster(rts_image, roi_raster2.name)
 
-    roi1 = roi.Roi(GeoDataset(roi_raster1.name), x=705, y=705, size_x=50, size_y=50)
-    roi2 = roi.Roi(GeoDataset(roi_raster2.name), x=705, y=705, size_x=50, size_y=50)
+    roi1 = roi.Roi(AGeoDataset(roi_raster1.name), x=705, y=705, size_x=50, size_y=50)
+    roi2 = roi.Roi(AGeoDataset(roi_raster2.name), x=705, y=705, size_x=50, size_y=50)
     return roi1, roi2
 
 @pytest.fixture
 def apollo_subsets():
-    roi1 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(1).png')), x=173, y=150, size_x=50, size_y=50)
-    roi2 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(2).png')), x=145, y=285, size_x=50, size_y=50)
+    roi1 = roi.Roi(AGeoDataset(get_path('AS15-M-0295_SML(1).png')), x=173, y=150, size_x=50, size_y=50)
+    roi2 = roi.Roi(AGeoDataset(get_path('AS15-M-0295_SML(2).png')), x=145, y=285, size_x=50, size_y=50)
     roi1.clip()
     roi2.clip()
     return roi1, roi2
