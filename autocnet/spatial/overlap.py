@@ -582,7 +582,8 @@ def place_points_in_image(image,
         if len(point.measures) >= 2:
             points.append(point)
     log.info(f'Able to place {len(points)} points.')
-    Points.bulkadd(points, ncg.Session)
+    with ncg.session_scope() as session:
+        Points.bulkadd(points, session)
 
 def add_measures_to_point(pointid, cam_type='isis', ncg=None, Session=None):
     if not ncg.Session:

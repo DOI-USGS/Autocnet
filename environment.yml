@@ -18,11 +18,12 @@ dependencies:
   - conda-forge::knoten
   - networkx>=2,<3
   - numpy
-  - opencv
-  - conda-forge::plio>=1.3
+  - libopencv *=headless*
+  - opencv 
+  - py-opencv
+  - conda-forge::plio>=1.5.4
   - pandas
   - pyyaml
-  - plio>=1.5.4
   - plurmy
   - psycopg2
   - pvl>=1.0,<2
@@ -36,6 +37,6 @@ dependencies:
   - sqlalchemy
   - sqlalchemy-utils
   - redis-py<5
-  - conda-forge::usgscsm>=1.7.0
+  - conda-forge::usgscsm
   - vlfeat
   - protobuf

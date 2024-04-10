@@ -5,17 +5,13 @@ import os
 
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import (Column, String, Integer, Float, \
-                        ForeignKey, Boolean, LargeBinary, \
-                        UniqueConstraint, event, DateTime
-                        )
+from sqlalchemy import Column, String, Integer, Float, ForeignKey, Boolean, event, DateTime                         
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy_utils import database_exists, create_database
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm.attributes import QueryableAttribute
-from sqlalchemy import text
 from sqlalchemy.sql import func
 
 from geoalchemy2 import Geometry
@@ -44,7 +40,6 @@ class BaseMixin(object):
         
         default.extend(['id', 'modified_at', 'created_at'])
 
-        
         if not _path:
             _path = self.__tablename__.lower()
 
@@ -158,8 +153,7 @@ class BaseMixin(object):
         return obj
 
     @staticmethod
-    def bulkadd(iterable, Session):
-        session = Session()
+    def bulkadd(iterable, session):
         session.add_all(iterable)
         session.commit()
         session.close()   

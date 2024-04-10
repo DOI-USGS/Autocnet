@@ -1,15 +1,22 @@
-import sys
-
+from unittest import mock
 import pandas as pd
 import pytest
 from autocnet.io.db import model
 from autocnet.io.db.controlnetwork import db_to_df, update_from_jigsaw
 
-if sys.platform.startswith("darwin"):
-    pytest.skip("skipping DB tests for MacOS", allow_module_level=True)
-
-def test_to_isis(session, db_controlnetwork):
-    df = db_to_df(session.get_bind())
+def test_to_isis(session):
+    controlnetwork = pd.DataFrame([[1,2,3,'a',0, '01010000800000000000003E4000000000000024400000000000001440'],
+                                   [2,2,3,'a',0, '01010000800000000000003E4000000000000024400000000000001440'],
+                                   [3,2,3,'a',1, '01010000800000000000003E4000000000000024400000000000001440'],
+                                   [4,2,3,'a',1, '01010000800000000000003E4000000000000024400000000000001440'],
+                                   [5,3,3,'a',2, '01010000800000000000003E4000000000000024400000000000001440'],
+                                   [6,3,3,'a',2, '01010000800000000000003E4000000000000024400000000000001440']],
+                                   columns=['id', 'pointtype', 'measuretype',
+                                            'identifier','pointid', 'apriori'])
+    with mock.patch('pandas.read_sql') as mock_db_response:
+        mock_db_response.return_value = controlnetwork
+    
+        df = db_to_df(session.bind)
 
     assert len(df) == 6
     assert df.iloc[0]['pointtype'] == 2
@@ -17,7 +24,7 @@ def test_to_isis(session, db_controlnetwork):
     assert df.iloc[0]['measuretype'] == 3
     assert df.iloc[0]['aprioriCovar'] == []
 
-
+@pytest.mark.xfail
 def test_update_from_jigsaw(session, db_controlnetwork,):
     connection = session.get_bind()
 

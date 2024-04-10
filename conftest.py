@@ -6,6 +6,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
+from mock_alchemy.mocking import UnifiedAlchemyMagicMock
 from sqlalchemy import inspect, text
 
 from autocnet.control import control
@@ -21,6 +22,10 @@ def queue():
     queue = fakeredis.FakeStrictRedis()
     return queue
 
+@pytest.fixture
+def session():
+    session = UnifiedAlchemyMagicMock()
+    return session
 
 @pytest.fixture(scope='session')
 def candidategraph(node_a, node_b, node_c):
@@ -103,27 +108,10 @@ def default_configuration():
 @pytest.fixture()
 def ncg(default_configuration, request):
     ncg = NetworkCandidateGraph()
-    ncg.config_from_dict(default_configuration)
+    ncg.session = UnifiedAlchemyMagicMock()
+    #ncg.config_from_dict(default_configuration)
 
-    def cleanup():
-        with ncg.session_scope() as session:
-            session.rollback()  # Necessary because some tests intentionally fail
-            engine = ncg.Session().get_bind()
-            inspector = inspect(engine)
-            for t in reversed(inspector.get_table_names()):
-                # Skip the srid table
-                if t != 'spatial_ref_sys':
-                    res = session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
-                # Reset the autoincrementing
-                if t in ['Images', 'Cameras', 'Matches', 'Measures']:
-                    session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
-            session.commit()
-            # Ensure that this is the only connection to the DB
-            num_con = session.execute(text('SELECT sum(numbackends) FROM pg_stat_database;')).scalar()
-            assert num_con == 1
-            session.close()
-
-    request.addfinalizer(cleanup)
+    
 
     return ncg
 
@@ -222,46 +210,45 @@ def controlnetwork():
 
 
 
+# @pytest.fixture
+# def session(tables, request, ncg):
+#     session = ncg.Session()
+
+#     def cleanup():
+#         session.rollback()  # Necessary because some tests intentionally fail
+#         for t in reversed(tables):
+#             # Skip the srid table
+#             if t != 'spatial_ref_sys':
+#                 session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
+#             # Reset the autoincrementing
+#             if t in ['Images', 'Cameras', 'Matches', 'Measures']:
+#                 session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
+#         session.commit()
+
+#     request.addfinalizer(cleanup)
+
+#     return session
+
 @pytest.fixture
-def session(tables, request, ncg):
-    session = ncg.Session()
+def db_controlnetwork(session):
+    # Create the images
+    i1 = {'id':0, 'serial':'foo'}
+    i2 = {'id':1, 'serial':'bar'}
+    for i in [i1, i2]:
+        model.Images.create(session, **i)
 
-    def cleanup():
-        session.rollback()  # Necessary because some tests intentionally fail
-        for t in reversed(tables):
-            # Skip the srid table
-            if t != 'spatial_ref_sys':
-                session.execute(text(f'TRUNCATE TABLE {t} CASCADE'))
-            # Reset the autoincrementing
-            if t in ['Images', 'Cameras', 'Matches', 'Measures']:
-                session.execute(text(f'ALTER SEQUENCE {t}_id_seq RESTART WITH 1'))
-        session.commit()
-
-    request.addfinalizer(cleanup)
-
-    return session
-
-@pytest.fixture
-def db_controlnetwork(ncg):
-    with ncg.session_scope() as session:
-        # Create the images
-        i1 = {'id':0, 'serial':'foo'}
-        i2 = {'id':1, 'serial':'bar'}
-        for i in [i1, i2]:
-            model.Images.create(session, **i)
-
-        for i, j in enumerate([0,2,4]):
-            ptype = 2
-            if j == 4:
-                ptype=3  # Ground
-            model.Points.create(session,
-                                id=i,
-                                _pointtype=ptype,
-                                measures=[model.Measures(id=k+j,
-                                                        imageid=k,
-                                                        serial=f'Random{k}:123',
-                                                        _measuretype=3,
-                                                        sample=k,
-                                                        line=k,
-                                                        aprioriline=k,
-                                                        apriorisample=k) for k in range(2)])
+    for i, j in enumerate([0,2,4]):
+        ptype = 2
+        if j == 4:
+            ptype=3  # Ground
+        model.Points.create(session,
+                            id=i,
+                            _pointtype=ptype,
+                            measures=[model.Measures(id=k+j,
+                                                    imageid=k,
+                                                    serial=f'Random{k}:123',
+                                                    _measuretype=3,
+                                                    sample=k,
+                                                    line=k,
+                                                    aprioriline=k,
+                                                    apriorisample=k) for k in range(2)])

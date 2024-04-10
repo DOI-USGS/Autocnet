@@ -40,12 +40,12 @@ def complex_message():
                       'kwargs' : {"k1" : "foo", "k2" : "bar"},
                       'func':'autocnet.place_points'}, cls=JsonEncoder)
 
-def test_manage_simple_messages(args, queue, simple_message, mocker, capfd, ncg):
+def test_manage_simple_messages(args, queue, simple_message, mocker, capfd, session):
     queue.rpush(args['processing_queue'], simple_message)
 
     response_msg = {'success':True, 
                     'results':'Things were good.', 
-                    'kwargs' : {'Session' : ncg.Session}}
+                    'kwargs' : {'Session' : session}}
     mocker.patch('autocnet.graph.cluster_submit.process', return_value=response_msg)
     mocker.patch.dict(os.environ, {"SLURM_JOB_ID": "1000"}) 
 
@@ -54,10 +54,10 @@ def test_manage_simple_messages(args, queue, simple_message, mocker, capfd, ncg)
     # Check that the messages are finalizing
     assert queue.llen(args['working_queue']) == 0
 
-def test_manage_complex_messages(args, queue, complex_message, mocker, capfd, ncg):
+def test_manage_complex_messages(args, queue, complex_message, mocker, capfd, session):
     queue.rpush(args['processing_queue'], complex_message)
 
-    response_msg = {'success':True, 'results':'Things were good.', 'kwargs' : {'Session' : ncg.Session}}
+    response_msg = {'success':True, 'results':'Things were good.', 'kwargs' : {'Session' : session}}
     mocker.patch('autocnet.graph.cluster_submit.process', return_value=response_msg)
     mocker.patch.dict(os.environ, {"SLURM_JOB_ID": "1000"}) 
  
