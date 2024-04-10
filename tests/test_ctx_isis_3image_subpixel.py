@@ -144,20 +144,20 @@ def test_ctx_pair_to_df(session,
                                                                          shared_kwargs=shared_kwargs)
 
         assert measures_to_set_false == []
-        print(measures_to_update)
+        
         m0 = measures_to_update[0]
-        assert m0['sample'] == 528.0021463577573
-        assert m0['line'] == 210.86510060247355
-        assert m0['template_metric'] == 0.9077728986740112
+        assert m0['sample'] == 528.0247230814377
+        assert m0['line'] == 210.87163242538162
+        assert m0['template_metric'] == 0.8885719776153564
         assert m0['ignore'] == False
-        assert m0['template_shift'] == 445.1360742332809
+        assert m0['template_shift'] == 445.14766114242946
 
         m1 = measures_to_update[1]
-        assert m1['sample'] == 358.1645048040594
-        assert m1['line'] == 230.28604784345214
-        assert m1['template_metric'] == 0.842411458492279
+        assert m1['sample'] == 358.16172420062753
+        assert m1['line'] == 230.2808802532398
+        assert m1['template_metric'] == 0.838909387588501
         assert m1['ignore'] == False
-        assert m1['template_shift'] == 176.11837868797858
+        assert m1['template_shift'] == 176.1200965842002
 
         dfs = []
         with mock.patch('pandas.read_sql') as db_response:

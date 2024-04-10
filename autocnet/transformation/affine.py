@@ -9,6 +9,27 @@ from autocnet.io.geodataset import AGeoDataset
 
 log = logging.getLogger(__name__)
 
+def check_for_excessive_shear(transformation):
+    """
+    This function checks a skimage projective transform for excessive
+    shearing of the data.
+
+    In a projective transformation the final row encodes and adjustment to 
+    the vertical/horizontal lines to infinity. The first element u encodes
+    a hinging of the along the horizontal and the second element v encodes
+    a hinging along the vertical line. As the values approach 0.001 and -0.001
+    the amount of shear related distortion (hinging along the horizontal/vertical)
+    becomes high enough that matching is problematic as the amount of data
+    needed in the templates becomes quite high.
+    """
+    m = transformation.params
+    u = m[2][0]
+    v = m[2][1]
+
+    if abs(u) >= 0.001 or abs(v) >= 0.001:
+        return True
+    return False
+
 def estimate_affine_from_sensors(reference_image,
                                 moving_image,
                                 bcenter_x,
@@ -136,6 +157,8 @@ def estimate_local_affine(reference_roi, moving_roi):
     # tf_rotate = tf.AffineTransform(rotation=affine_transform.rotation, 
     #                                shear=affine_transform.shear,
     #                                scale=affine_transform.scale)
+    # Remove the translation from the transformation. Translation is added below to ensure the
+    # transform is centered on the ROI.
     matrix = affine_transform.params
     matrix[0][-1] = 0
     matrix[1][-1] = 0
@@ -154,4 +177,6 @@ def estimate_local_affine(reference_roi, moving_roi):
     # this is 'shift to the center', apply the rotation, shift back
     # to the origin.
     trans = tf_shift_inv + affine_transform + tf_shift
+    if check_for_excessive_shear(trans):
+        raise Exception(f'Shear Warning: It is highly unlikely that these images will not match, due to differing view geometries.')
     return trans

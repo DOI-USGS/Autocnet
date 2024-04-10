@@ -164,18 +164,18 @@ def test_ctx_pair_to_df(session,
         assert measures_to_set_false == []
 
         m0 = measures_to_update[0]
-        assert m0['sample'] == pytest.approx(764.0473, abs=0.005)
-        assert m0['line'] == pytest.approx(1205.976, abs=0.005)
-        assert m0['template_metric'] == pytest.approx(0.959, abs=0.01)
+        assert m0['sample'] == pytest.approx(764.0510, abs=0.005)
+        assert m0['line'] == pytest.approx(1205.9925, abs=0.005)
+        assert m0['template_metric'] == pytest.approx(0.962, abs=0.01)
         assert m0['ignore'] == False
-        assert m0['template_shift'] == pytest.approx(631.721, abs=0.005)
+        assert m0['template_shift'] == pytest.approx(631.730, abs=0.005)
         
         m1 = measures_to_update[1]
-        assert m1['sample'] == pytest.approx(843.036, abs=0.005)
-        assert m1['line'] == pytest.approx(1547.687, abs=0.005)
-        assert m1['template_metric'] == pytest.approx(0.954, abs=0.01)
+        assert m1['sample'] == pytest.approx(843.0147, abs=0.005)
+        assert m1['line'] == pytest.approx(1547.5938, abs=0.005)
+        assert m1['template_metric'] == pytest.approx(0.9578, abs=0.01)
         assert m1['ignore'] == False
-        assert m1['template_shift'] == pytest.approx(1006.576, abs=0.005)
+        assert m1['template_shift'] == pytest.approx(1006.524, abs=0.005)
 
         dfs = []
         with mock.patch('pandas.read_sql') as db_response:

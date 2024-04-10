@@ -46,11 +46,14 @@ def test_create_point_with_reference_measure(session):
     point_geom = shapely.Point(0,0,1)
     reference_node = MagicMock()
     reference_node.isis_serial = 'serialnum'
-    d = {'node_id':1}
+
+    d = {'node_id':1, 'cam_type':'csm'}
     reference_node.__getitem__.side_effect = d.__getitem__
     sampleline = shapely.Point(1,1)
 
-    point = Points.create_point_with_reference_measure(point_geom, reference_node, sampleline)
+    point = Points.create_point_with_reference_measure(point_geom, 
+                                                       reference_node, 
+                                                       sampleline)
 
     assert len(point.measures) == 1
     assert point.geom.x == 0
