@@ -20,9 +20,9 @@ class AGeoDataset(GeoDataset):
         with open(input, 'r') as stream:
             line = stream.readline()
         if line.startswith('{'):
-            return self._parse_radii_from_isd(self, input)
+            return self._parse_radii_from_isd(input)
         else:
-            return self._parse_radii_from_state(self, input)
+            return self._parse_radii_from_state(input)
 
     def _parse_radii_from_state(self, state):
         with open(state, 'r') as stream:
@@ -45,9 +45,9 @@ class AGeoDataset(GeoDataset):
         semiminor = radii['semiminor'] * multiplier
         return semimajor, semiminor
     
-    def _make_dem_from_isd(self, isd):
+    def _make_dem_from_csm(self, isd):
         # Read the semi-major / semi-minor from the ISD
-        semimajor, semiminor = self._parse_radii_from_isd(isd)
+        semimajor, semiminor = self._parse_radii_from_csm(isd)
         if self.dem is None:
             # Create an EllipsoidDem
             dem = EllipsoidDem(semi_major=semimajor, semi_minor=semiminor)

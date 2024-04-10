@@ -565,7 +565,7 @@ class Points(Base, BaseMixin):
                 apriori=point_geom,
                 adjusted=point_geom,
                 pointtype=point_type, # Would be 3 or 4 for ground
-                cam_type='isis',
+                cam_type=reference_node['cam_type'],
                 reference_index=0)
         
         # Create the measure for the reference image and add it to the point

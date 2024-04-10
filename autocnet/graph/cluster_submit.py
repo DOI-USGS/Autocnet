@@ -1,25 +1,20 @@
 #!/usr/bin/env python
 
 import argparse
-import copy
 import os
 import json
-import sys
 import logging
-
-from io import StringIO
-from contextlib import redirect_stdout
+import sys
 
 from redis import StrictRedis
 
 from autocnet.graph.network import NetworkCandidateGraph
 from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
-from autocnet.io.db.model import Points, Measures, Overlay
 from autocnet.utils.utils import import_func
-from autocnet.utils.serializers import JsonEncoder, object_hook
-from autocnet.io.db.model import JobsHistory
+from autocnet.utils.serializers import object_hook
 
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 log = logging.getLogger(__name__)
 
 def parse_args():  # pragma: no cover
@@ -102,7 +97,7 @@ def process(msg):
         # For now, pass all the potential config items through
         # most funcs will simply discard the unnecessary ones.
         msg['kwargs']['ncg'] = ncg
-        msg['kwargs']['Session'] = ncg.Session
+        msg['kwargs']['session'] = ncg.Session
 
     # Now run the function.
     res = func(*msg['args'], **msg['kwargs'])

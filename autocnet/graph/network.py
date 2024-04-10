@@ -105,7 +105,7 @@ class CandidateGraph(nx.Graph):
         'keypoint_index' : int
     }
 
-    def __init__(self, *args, basepath=None, node_id_map=None, overlaps=False, cam_type='isis', **kwargs):
+    def __init__(self, *args, basepath=None, node_id_map=None, overlaps=False, **kwargs):
         super(CandidateGraph, self).__init__(*args, **kwargs)
 
         self.graph['creationdate'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -131,7 +131,7 @@ class CandidateGraph(nx.Graph):
                 node_id = self.graph['node_counter']
                 self.graph['node_counter'] += 1
             n['data'] = self.node_factory(
-                image_name=i, image_path=image_path, node_id=node_id, cam_type=cam_type)
+                image_name=i, image_path=image_path, node_id=node_id)
 
             self.graph['node_name_map'][i] = node_id
 
@@ -1638,6 +1638,14 @@ class NetworkCandidateGraph(CandidateGraph):
                 retries += 1
                 sleep(retries ** sleeptime)
 
+    # def _setup_nodes(self):
+    #     with self.session_scope() as session:
+    #         res = session.query(Images.path, Images.cam_type, Images.dem, Images.dem_type).all()
+    #         for r in res:
+    #             self.nodes[r[0]]['cam_type'] = r[1]
+    #             self.nodes[r[0]]['dem'] = r[2]
+    #             self.nodes[r[0]]['dem_type'] = r[3]
+
     def _setup_edges(self):
         with self.session_scope() as session:
             res = session.query(Edges).all()
@@ -2089,14 +2097,10 @@ class NetworkCandidateGraph(CandidateGraph):
         if just_stage:
             return command
 
-        if queue == None:
-            queue = self.config['cluster']['queue']
-
         submitter = Slurm(command,
                      job_name=jobname,
                      mem_per_cpu=self.config['cluster']['processing_memory'],
                      time=walltime,
-                     partition=queue,
                      ntasks=ntasks,
                      output=log_dir+f'/autocnet.{function}-%j')
 
@@ -2461,7 +2465,7 @@ class NetworkCandidateGraph(CandidateGraph):
         if overlaps:
             self._execute_sql(sql.compute_overlaps_sql)
 
-    def from_database(self, query_string=sql.select_pub_image, cam_type='isis'):
+    def from_database(self, query_string=sql.select_pub_image):
         """
         This is a constructor that takes the results from an arbitrary query string,
         uses those as a subquery into a standard polygon overlap query and
@@ -2509,7 +2513,7 @@ class NetworkCandidateGraph(CandidateGraph):
                     adjacency[spath].append(dpath)
 
         # Add nodes that do not overlap any images
-        self.__init__(adjacency, node_id_map=adjacency_lookup, cam_type=cam_type)
+        self.__init__(adjacency, node_id_map=adjacency_lookup)
 
         # Setup the edges
         self._setup_edges()
@@ -2877,7 +2881,6 @@ class NetworkCandidateGraph(CandidateGraph):
                      job_name='cross_instrument_matcher',
                      mem_per_cpu=config['cluster']['processing_memory'],
                      time=walltime,
-                     partition=config['cluster']['queue'],
                      output=config['cluster']['cluster_log_dir']+'/autocnet.cim-%j')
         job_counter = len(groups.items())
         submitter.submit(array='1-{}'.format(job_counter))

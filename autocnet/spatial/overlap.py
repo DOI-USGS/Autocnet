@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import time
 import logging
 import warnings
@@ -99,12 +100,12 @@ def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
     if not nodes:
         log.info("Tried to itterate through a node that does not exist, skipping")
         return None, None
-    # Itterate through the images to find an interesting point
+    # Iterate through the images to find an interesting point
     for reference_index, node in enumerate(nodes):
         log.debug(f'Trying image: {node["image_path"].split("/")[-1]}')
         # reference_index is the index into the list of measures for the image that is not shifted and is set at the
         # reference against which all other images are registered.
-        try_sample, try_line = node.sensormodel.lonlat2sampline(lon, lat)
+        try_sample, try_line = node.geodata.sensormodel.lonlat2sampline(lon, lat)
 
         # If sample/line are None, point is not in image
         if try_sample == None or try_line == None:
@@ -153,6 +154,7 @@ def place_points_in_overlap(overlap,
                             distribute_points_kwargs={},
                             point_type=2,
                             ncg=None,
+                            session=None,
                             use_cache=False,
                             ratio_size=0.1,
                             **kwargs):
@@ -214,147 +216,74 @@ def place_points_in_overlap(overlap,
 
     """
     t1 = time.time()
-    if not ncg.Session:
-        raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
-
+    if not isinstance(overlap, Overlay):
+        with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
+            overlap = session.query(Overlay).filter(Overlay.id == overlap).one()
+            session.expunge_all()
+    
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
     candidate_points = compgeom.distribute_points_in_geom(geom, ratio_size=ratio_size, **distribute_points_kwargs, **kwargs)
     if not candidate_points.any():
         warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
-    
     log.info(f'Have {len(candidate_points)} potential points to place in overlap {overlap.id}.')
     
-    # Instantiate the nodes in the NCG. This is done because we assume that the ncg passed is empty
-    # and part of a cluster submission.
+    # If an NCG is passed, instantiate a session off the NCG, else just pass the session through
     nodes = []
-    with ncg.session_scope() as session:
+    with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         for id in overlap.intersections:
             res = session.query(Images).filter(Images.id == id).one()
-            nn = NetworkNode(node_id=id, image_path=res.path)
+            nn = NetworkNode(node_id=id, 
+                             image_path=res.path, 
+                             cam_type=res.cam_type,
+                             dem=res.dem,
+                             dem_type=res.dem_type)
             nodes.append(nn)
-    
+    points_to_commit = []
     for valid in candidate_points:
-        add_point_to_overlap_network(valid,
-                                    nodes,
-                                    geom,
-                                    identifier=identifier,
-                                    interesting_func=interesting_func,
-                                    interesting_func_kwargs=interesting_func_kwargs,
-                                    point_type=point_type,
-                                    ncg=ncg,
-                                    use_cache=use_cache,
-                                    **kwargs)
+        log.debug(f'Valid point: {valid}')
+        lat = valid[1]
+        lon = valid[0]
+
+        # Find the intresting sampleline and what image it is in
+        reference_index, interesting_sampline = interesting_func(nodes, lon, lat, size=interesting_func_kwargs['size'])
+        if not interesting_sampline:
+            continue
+
+        log.info(f'Found an interesting feature in {nodes[reference_index]["image_path"]} at {interesting_sampline.x}, {interesting_sampline.y}.')
+        # Get the updated X,Y,Z location of the point and reproject to get the updates lon, lat.
+        # The io.db.Point class handles all xyz to lat/lon and ographic/ocentric conversions in it's 
+        # adjusted property setter.
+        reference_node = nodes[reference_index]
+        x,y,z = reference_node.geodata.sensormodel.sampline2xyz(interesting_sampline.x, interesting_sampline.y)
+        
+        # Create the new point
+        point = Points.create_point_with_reference_measure(shapely.geometry.Point(x, y, z), 
+                                                            reference_node, 
+                                                            interesting_sampline,
+                                                            choosername=identifier,
+                                                            point_type=point_type) 
+        log.debug(f'Created point: {point}.')
+
+        # Iterate through all other, non-reference images in the overlap and attempt to add a measure.
+        point.add_measures_to_point([n for i, n in enumerate(nodes) if i != reference_index], 
+                                    choosername=identifier)
+        # Insert the point into the database asynchronously (via redis) or synchronously via the ncg
+        if use_cache:
+            msgs = json.dumps(point.to_dict(_hide=[]), cls=JsonEncoder)
+            ncg.push_insertion_message(ncg.point_insert_queue,
+                                    ncg.point_insert_counter,
+                                    msgs)
+        else:
+            if len(point.measures) >= 2:
+                points_to_commit.append(point)
+    if points_to_commit:
+        with ncg.session_scope() if ncg else nullcontext(session) as session:
+            session.add_all(points_to_commit)
+            session.commit()
     t2 = time.time()
     log.info(f'Placed {len(candidate_points)} in {t2-t1} seconds.')
-
-def add_point_to_overlap_network(valid,
-                                nodes,
-                                geom,
-                                identifier="place_points_in_overlap",
-                                interesting_func=find_interesting_point,
-                                interesting_func_kwargs={"size":71},
-                                point_type=2,
-                                ncg=None, 
-                                use_cache=False,
-                                **kwargs):
-    """
-    Place points into an centroid geometry by back-projecting using sensor models.
-    The DEM specified in the config file will be used to calculate point elevations.
-
-    Parameters
-    ----------
-    valid : list
-        point coordinates in the form (x1,y1)
-    
-    nodes: list
-        list of node objects (the images)
-    
-    current_sensor: string
-        current_sensor that is being used, either isis or csm
-
-    geom: obj
-        overlap geom to be used
-
-    interesting_func : callable
-        A function that takes a list of nodes, a longitude, a latitude, and arbitrary
-        kwargs and returns a tuple with a reference index (integer) and a shapely Point object
-
-    interesting_func_kwargs : dict
-                              With keyword arguments required by the passed interesting_func
-
-    point_type: int
-        The type of point being placed. Default is pointtype=2, corresponding to
-        free points.
-
-    ncg: obj
-        An autocnet.graph.network NetworkCandidateGraph instance representing the network
-        to apply this function to
-
-    use_cache : bool
-        If False (default) this func opens a database session and writes points
-        and measures directly to the respective tables. If True, this method writes
-        messages to the point_insert (defined in ncg.config) redis queue for
-        asynchronous (higher performance) inserts.
-    """
-    
-    t1 = time.time()
-
-    log.debug(f'Valid point: {valid}')
-    lat = valid[1]
-    lon = valid[0]
-
-    semi_major=ncg.config['spatial']['semimajor_rad']
-    semi_minor=ncg.config['spatial']['semiminor_rad']
-    height=ncg.dem.get_height(lat, lon)
-
-    # Find the intresting sampleline and what image it is in
-    reference_index, interesting_sampline = interesting_func(nodes, lon, lat, size=interesting_func_kwargs['size'])
-
-    if not interesting_sampline:
-        return
-
-    log.info(f'Found an interesting feature in {nodes[reference_index]["image_path"]} at {interesting_sampline.x}, {interesting_sampline.y}.')
-
-    # Get the updated X,Y,Z location of the point and reproject to get the updates lon, lat.
-    # The io.db.Point class handles all xyz to lat/lon and ographic/ocentric conversions in it's 
-    # adjusted property setter.
-    reference_node = nodes[reference_index]
-    x,y,z = reference_node.sensormodel.linesamp2xyz(interesting_sampline.x, interesting_sampline.y)
-    
-    # Create the new point
-    point = Points.create_point_with_reference_measure(shapely.geometry.Point(x, y, z), 
-                                                       reference_node, 
-                                                       interesting_sampline,
-                                                       choosername=identifier,
-                                                       point_type=point_type) 
-    log.debug(f'Created point: {point}.')
-
-    # Remove the reference_indexed measure from the list of candidates.
-    # It has been added by the create_point_with_reference_measure function.
-    del nodes[reference_index]
-
-    # Dont need projections
-    # TODO: Take this projection out of the CSM model and work it into the point
-    kwargs['needs_projection']=False
-    # Iterate through all other, non-reference images in the overlap and attempt to add a measure.
-    point.add_measures_to_point(nodes, choosername=identifier)
-
-    # Insert the point into the database asynchronously (via redis) or synchronously via the ncg
-    if use_cache:
-        msgs = json.dumps(point.to_dict(_hide=[]), cls=JsonEncoder)
-        ncg.push_insertion_message(ncg.point_insert_queue,
-                                   ncg.point_insert_counter,
-                                   msgs)
-    else:
-        with ncg.session_scope() as session:
-            if len(point.measures) >= 2:
-                session.add(point)
-    t2 = time.time()
-    log.info(f'Total processing time was {t2-t1} seconds.')
-
-    return
 
 def place_points_in_image(image,
                           identifier="autocnet",
@@ -407,10 +336,6 @@ def place_points_in_image(image,
         lat = v[1]
         point_geometry = f'SRID=104971;POINT({v[0]} {v[1]})'
 
-        # Calculate the height, the distance (in meters) above or
-        # below the aeroid (meters above or below the BCBF spheroid).
-        height = ncg.dem.get_height(lat, lon)
-
         with ncg.session_scope() as session:
             intersecting_images = session.query(Images.id, Images.path).filter(Images.geom.ST_Intersects(point_geometry)).all()
             node_res= [i for i in intersecting_images]
@@ -419,7 +344,6 @@ def place_points_in_image(image,
             for nid, image_path  in node_res:
                 # Setup the node objects that are covered by the geom
                 nn = NetworkNode(node_id=nid, image_path=image_path)
-                nn.parent = ncg
                 nodes.append(nn)
 
         # Need to get the first node and then convert from lat/lon to image space
