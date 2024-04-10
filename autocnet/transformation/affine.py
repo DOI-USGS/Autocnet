@@ -78,13 +78,14 @@ def estimate_affine_from_sensors(reference_image,
         if xs[i] is not None and ys[i] is not None:
             dst_gcps.append((xs[i], ys[i]))
             base_gcps.append((base_x, base_y))
-            
+
     if len(dst_gcps) < 3:
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_gcps)} points, but need at least 3.')
 
     log.debug(f'Number of GCPs for affine estimation: {len(dst_gcps)}')
 
-    affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
+    affine = tf.estimate_transform('projective', np.array([*base_gcps]), np.array([*dst_gcps]))
+    #affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
     log.debug(f'Computed afffine: {affine}')
     t2 = time.time()
     log.debug(f'Estimation of local affine took {t2-t1} seconds.')
@@ -112,8 +113,8 @@ def estimate_local_affine(reference_roi, moving_roi):
     """
     # get initial affine
     roi_buffer = reference_roi.buffer
-    size_x = 60 # reference_roi.size_x + roi_buffer
-    size_y = 60 # reference_roi.size_y + roi_buffer
+    size_x = 60  # reference_roi.size_x + roi_buffer
+    size_y = 60  # reference_roi.size_y + roi_buffer
     
     affine_transform = estimate_affine_from_sensors(reference_roi.data, 
                                                     moving_roi.data, 
@@ -122,19 +123,23 @@ def estimate_local_affine(reference_roi, moving_roi):
                                                     size_x=size_x, 
                                                     size_y=size_y)
 
-    log.debug(f'Affine shear: {affine_transform.shear}')
-    if abs(affine_transform.shear) > 1e-2:
-        # Matching LROC NAC high slew images to nadir images demonstrated that affine transformations
-        # with high shear match poorly. The search templates also have reflection (ROI object, x/y_read_length)
-        # because a high shear affine requires  alot of data to be read in. 
-        # TODO: Consider handling this differently in the future should nadir to high slew image matching be required.
-        raise Exception(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match, so skipping.')
+    #log.debug(f'Affine shear: {affine_transform.shear}')
+    # if abs(affine_transform.shear) > 1e-2:
+    #     # Matching LROC NAC high slew images to nadir images demonstrated that affine transformations
+    #     # with high shear match poorly. The search templates also have reflection (ROI object, x/y_read_length)
+    #     # because a high shear affine requires  alot of data to be read in. 
+    #     # TODO: Consider handling this differently in the future should nadir to high slew image matching be required.
+    #     raise Exception(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match, so skipping.')
     # The above coordinate transformation to get the center of the ROI handles translation. 
     # So, we only need to rotate/shear/scale the ROI. Omitting scale, which should be 1 (?) results
     # in an affine transoformation that does not match the full image affine
-    tf_rotate = tf.AffineTransform(rotation=affine_transform.rotation, 
-                                   shear=affine_transform.shear,
-                                   scale=affine_transform.scale)
+    # tf_rotate = tf.AffineTransform(rotation=affine_transform.rotation, 
+    #                                shear=affine_transform.shear,
+    #                                scale=affine_transform.scale)
+    matrix = affine_transform.params
+    matrix[0][-1] = 0
+    matrix[1][-1] = 0
+    affine_transform = tf.AffineTransform(matrix)
 
     # This rotates about the center of the image
     shift_x, shift_y = moving_roi.clip_center
@@ -148,5 +153,5 @@ def estimate_local_affine(reference_roi, moving_roi):
     # Define the full chain multiplying the transformations (read right to left),
     # this is 'shift to the center', apply the rotation, shift back
     # to the origin.
-    trans = tf_shift_inv + tf_rotate + tf_shift
+    trans = tf_shift_inv + affine_transform + tf_shift
     return trans
