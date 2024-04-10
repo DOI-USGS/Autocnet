@@ -35,6 +35,10 @@ release.
 ## [Unreleased]
 ### Added
 - Ability to choose whether to compute overlaps for a network candidate graph
+- Integration tests for end-to-end of an equatorial CTX pair and a mid-latitude CTX trio.
+
+### Changed
+- CI on the library now uses a mocked sqlalchemy connection. All tests can now run locally without the need for a supplemental postgres container. This changed removed some non-optimal tests that were testing datbase triggers and database instantiation handled by SQLAlchemy.
 
 ### Fixed
 - Errors when importing sensor model in `overlap.py`

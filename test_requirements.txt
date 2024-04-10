@@ -1,5 +1,8 @@
 coveralls
 fakeredis
+mock
+mock-alchemy
 pytest
 pytest-cov
 pytest-mock
+pytest-xdist

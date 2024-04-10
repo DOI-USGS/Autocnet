@@ -26,9 +26,8 @@ from plio.io.io_gdal import GeoDataset
 import pvl
 
 import PIL
-from PIL import Image
 
-from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg
+from autocnet.matcher.naive_template import pattern_match
 from autocnet.matcher.mutual_information import mutual_information
 from autocnet.spatial import isis
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
@@ -220,7 +219,6 @@ def subpixel_template(reference_roi,
                                                  -(moving_roi.y - new_y)))
     
     return new_affine, metrics, corrmap
-
 
 def iterative_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), reduction=11, convergence_threshold=0.1, max_dist=50, **kwargs):
     """
@@ -830,12 +828,12 @@ def fourier_mellen(ref_image, moving_image, affine=tf.AffineTransform(), verbose
 
     return subpixel_affine, error, diffphase
 
-def subpixel_register_point_smart(pointid,
-                            cost_func=lambda x,y: 1/x**2 * y,
-                            ncg=None,
-                            parameters=[],
-                            chooser='subpixel_register_point_smart',
-                            verbose=False):
+def subpixel_register_point_smart(point,
+                                  session,
+                                  cost_func=lambda x,y: 1/x**2 * y,
+                                  parameters=[],
+                                  chooser='subpixel_register_point_smart',
+                                  verbose=False):
 
     """
     Given some point, subpixel register all of the measures in the point to the
@@ -867,36 +865,35 @@ def subpixel_register_point_smart(pointid,
     """
 
 
-    if not ncg.Session:
-        raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
+    # if not ncg.Session:
+    #     raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
 
-    if isinstance(pointid, Points):
-        pointid = pointid.id
+    if not isinstance(point, Points):
+        point = session.query(Points).filter(Points.id == point).one()
+    pointid = point.id
 
-    with ncg.session_scope() as session:
-        # Order by is important here because the measures get ids in sequential order when initially placed
-        # and the reference_index is positionally linked to the ordered vector of measures.
-        measures = session.query(Measures).filter(Measures.pointid == pointid).order_by(Measures.id).all()
-        point = session.query(Points).filter(Points.id == pointid).one()
-        reference_index = point.reference_index
+    #with ncg.session_scope() as session:
+    # Order by is important here because the measures get ids in sequential order when initially placed
+    # and the reference_index is positionally linked to the ordered vector of measures.
+    measures = session.query(Measures).filter(Measures.pointid == pointid).order_by(Measures.id).all()
+    reference_index = point.reference_index
 
-        # Get the reference measure to instantiate the source node. All other measures will
-        # match to the source node.
-        source = measures[reference_index]
-        reference_index_id = source.imageid
+    # Get the reference measure to instantiate the source node. All other measures will
+    # match to the source node.
+    source = measures[reference_index]
+    reference_index_id = source.imageid
+    
+    log.info(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
+    log.info(f'Measure reference index is: {reference_index}')
 
-        log.info(f'Using measure {source.id} on image {source.imageid}/{source.serial} as the reference.')
-        log.info(f'Measure reference index is: {reference_index}')
-
-        # Build a node cache so that this is an encapsulated database call. Then nodes
-        # can be pulled from the lookup sans database.
-        nodes = {}
-        for measure in measures:
-            res = session.query(Images).filter(Images.id == measure.imageid).one()
-            nn = NetworkNode(node_id=measure.imageid, image_path=res.path)
-            nn.parent = ncg
-            nodes[measure.imageid] = nn
-
+    # Build a node cache so that this is an encapsulated database call. Then nodes
+    # can be pulled from the lookup sans database.
+    nodes = {}
+    for measure in measures:
+        res = session.query(Images).filter(Images.id == measure.imageid).one()
+        nn = NetworkNode(node_id=measure.imageid, image_path=res.path)
+        #nn.parent = ncg
+        nodes[measure.imageid] = nn
         session.expunge_all()
 
     log.info(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
@@ -1180,6 +1177,7 @@ def decider(measures, tol=0.5):
     return measures_to_update, measures_to_set_false
 
 def validate_candidate_measure(measure_to_register,
+                               session,
                                ncg=None,
                                parameters=[],
                                **kwargs):
@@ -1219,97 +1217,100 @@ def validate_candidate_measure(measure_to_register,
             Of reprojection distances for each parameter set.
     """
 
-    if not ncg.Session:
-        raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
-
     measure_to_register_id = measure_to_register['id']
 
-    with ncg.session_scope() as session:
-        # Get the measure to be registered
-        measure = session.query(Measures).filter(Measures.id == measure_to_register_id).order_by(Measures.id).one()
-        # Get the references measure
-        point = measure.point
-        reference_index = point.reference_index
-        reference_measure = point.measures[reference_index]
+    # Get the measure to be registered
+    measure = session.query(Measures).filter(Measures.id == measure_to_register_id).order_by(Measures.id).one()
+
+    # Get the references measure
+    point = measure.point
+    reference_index = point.reference_index
+    reference_measure = point.measures[reference_index]
 
 
-        # Match the reference measure to the measure_to_register - this is the inverse of the first match attempt
-        # Source is the image that we are seeking to validate, destination is the reference measure.
-        # This is the inverse of other functions as this is a validator.
+    # Match the reference measure to the measure_to_register - this is the inverse of the first match attempt
+    # Source is the image that we are seeking to validate, destination is the reference measure.
+    # This is the inverse of other functions as this is a validator.
 
-        source_imageid = measure.imageid
-        source_image = session.query(Images).filter(Images.id == source_imageid).one()
-        source_node = NetworkNode(node_id=source_imageid, image_path=source_image.path)
-        source_node.parent = ncg
+    source_imageid = measure.imageid
+    source_image = session.query(Images).filter(Images.id == source_imageid).one()
+    source_node = NetworkNode(node_id=source_imageid, image_path=source_image.path)
+    source_node.parent = ncg
 
-        destination_imageid = reference_measure.imageid
-        destination_image = session.query(Images).filter(Images.id == destination_imageid).one()
-        destination_node = NetworkNode(node_id=destination_imageid, image_path=destination_image.path)
-        destination_node.parent = ncg
+    destination_imageid = reference_measure.imageid
+    destination_image = session.query(Images).filter(Images.id == destination_imageid).one()
+    destination_node = NetworkNode(node_id=destination_imageid, image_path=destination_image.path)
+    destination_node.parent = ncg
 
-        sample = measure_to_register['sample']
-        line = measure_to_register['line']
+    sample = measure_to_register['sample']
+    line = measure_to_register['line']
 
-        log.info(f'Validating measure: {measure_to_register_id} on image: {source_imageid}')
+    log.info(f'Validating measure: {measure_to_register_id} on image: {source_imageid}')
+
+    reference_roi = roi.Roi(source_node.geodata, 
+                            sample, 
+                            line, 
+                            size_x=parameters[0]['match_kwargs']['image_size'][0],
+                            size_y=parameters[0]['match_kwargs']['image_size'][1], 
+                            buffer=10)
+    moving_roi = roi.Roi(destination_node.geodata, 
+                            reference_measure.sample, 
+                            reference_measure.line, 
+                            size_x=parameters[0]['match_kwargs']['template_size'][0],
+                            size_y=parameters[0]['match_kwargs']['template_size'][1],
+                            buffer=10)
+
+    try:
+        baseline_affine = estimate_local_affine(reference_roi, moving_roi)
+    except:
+        log.error('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
+        return [np.inf] * len(parameters)
+    
+
+    dists = []
+    for i, parameter in enumerate(parameters):
+        match_kwargs = parameter['match_kwargs']
 
         reference_roi = roi.Roi(source_node.geodata, 
                                 sample, 
                                 line, 
-                                size_x=parameters[0]['match_kwargs']['image_size'][0],
-                                size_y=parameters[0]['match_kwargs']['image_size'][1], 
+                                size_x=match_kwargs['image_size'][0],
+                                size_y=match_kwargs['image_size'][1], 
                                 buffer=10)
         moving_roi = roi.Roi(destination_node.geodata, 
                                 reference_measure.sample, 
                                 reference_measure.line, 
-                                size_x=parameters[0]['match_kwargs']['template_size'][0],
-                                size_y=parameters[0]['match_kwargs']['template_size'][1],
+                                size_x=match_kwargs['template_size'][0],
+                                size_y=match_kwargs['template_size'][1],
                                 buffer=10)
 
+        # Handle the exception where the clip can raise an index error if it is outside the image
         try:
-            baseline_affine = estimate_local_affine(reference_roi, moving_roi)
+            updated_affine, maxcorr, _ = subpixel_template(reference_roi,
+                                                        moving_roi,
+                                                        affine=baseline_affine)
         except:
-            log.error('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
-            return [np.inf] * len(parameters)
+            updated_affine = None
+
+        if updated_affine is None:
+            continue
         
+        new_x, new_y = updated_affine([reference_measure.sample, 
+                                    reference_measure.line])[0]
+        
+        dist = np.sqrt((new_y - reference_measure.line) ** 2 +\
+                    (new_x - reference_measure.sample) ** 2)
+        log.info(f'Validating using parameter set {i}. Reprojection distance: {dist}. Metric: {maxcorr}')
+        dists.append(dist)
+    return dists
 
-        dists = []
-        for i, parameter in enumerate(parameters):
-            match_kwargs = parameter['match_kwargs']
-
-            reference_roi = roi.Roi(source_node.geodata, 
-                                    sample, 
-                                    line, 
-                                    size_x=match_kwargs['image_size'][0],
-                                    size_y=match_kwargs['image_size'][1], 
-                                    buffer=10)
-            moving_roi = roi.Roi(destination_node.geodata, 
-                                    reference_measure.sample, 
-                                    reference_measure.line, 
-                                    size_x=match_kwargs['template_size'][0],
-                                    size_y=match_kwargs['template_size'][1],
-                                    buffer=10)
-
-            # Handle the exception where the clip can raise an index error if it is outside the image
-            try:
-                updated_affine, maxcorr, _ = subpixel_template(reference_roi,
-                                                            moving_roi,
-                                                            affine=baseline_affine)
-            except:
-                updated_affine = None
-
-            if updated_affine is None:
-                continue
-            
-            new_x, new_y = updated_affine([reference_measure.sample, 
-                                           reference_measure.line])[0]
-            
-            dist = np.sqrt((new_y - reference_measure.line) ** 2 +\
-                           (new_x - reference_measure.sample) ** 2)
-            log.info(f'Validating using parameter set {i}. Reprojection distance: {dist}. Metric: {maxcorr}')
-            dists.append(dist)
-        return dists
-
-def smart_register_point(pointid, parameters=[], shared_kwargs={}, valid_reprojection_distance=1.1, ncg=None, Session=None):
+def smart_register_point(point, 
+                         session,
+                         parameters=[], 
+                         shared_kwargs={}, 
+                         valid_reprojection_distance=1.1, 
+                         ncg=None, 
+                         Session=None):
     """
     The entry func for the smart subpixel registration code. This is the user
     side API func for subpixel registering a point using the smart matcher.
@@ -1355,15 +1356,15 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, valid_reproje
                             building approach
 
     """
-    if isinstance(pointid, Points):
-        pointid = pointid.id
-    measure_results = subpixel_register_point_smart(pointid, ncg=ncg, parameters=parameters, **shared_kwargs)
-    measures_to_update, measures_to_set_false = decider(measure_results)
+    if not isinstance(point, Points):
+        point = session.query(Points).filter(Points.id == point).one()
 
+    measure_results = subpixel_register_point_smart(point, session, parameters=parameters, **shared_kwargs)
+    measures_to_update, measures_to_set_false = decider(measure_results)
     log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
     # Validate that the new position has consensus
     for measure in measures_to_update:
-        reprojection_distances = validate_candidate_measure(measure, parameters=parameters, ncg=ncg, **shared_kwargs)
+        reprojection_distances = validate_candidate_measure(measure, session, parameters=parameters, ncg=ncg, **shared_kwargs)
         if np.sum(np.array(reprojection_distances) < valid_reprojection_distance) < 2:
             log.info(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")
             measures_to_set_false.append(measure['id'])
@@ -1371,36 +1372,33 @@ def smart_register_point(pointid, parameters=[], shared_kwargs={}, valid_reproje
     for measure in measures_to_update:
         measure['_id'] = measure.pop('id', None)
 
+
     # Update the measures that passed registration
-    with ncg.engine.connect() as conn:
-        if measures_to_update:
-            stmt = Measures.__table__.update().\
-                                    where(Measures.__table__.c.id == bindparam('_id')).\
-                                    values({'weight':bindparam('weight'),
-                                            'measureIgnore':bindparam('ignore'),
-                                            'templateMetric':bindparam('template_metric'),
-                                            'templateShift':bindparam('template_shift'),
-                                            'line': bindparam('line'),
-                                            'sample':bindparam('sample'),
-                                            'ChooserName':bindparam('choosername')})
-            resp = conn.execute(
-                stmt, measures_to_update
-            )
-        if measures_to_set_false:
-            measures_to_set_false = [{'_id':i} for i in measures_to_set_false]
-            # Set ignore=True measures that failed
-            stmt = Measures.__table__.update().\
-                                    where(Measures.__table__.c.id == bindparam('_id')).\
-                                    values({'measureIgnore':True,
-                                            'ChooserName':shared_kwargs['chooser']})
-            resp = conn.execute(
-                stmt, measures_to_set_false
-            )
+    if measures_to_update:
+        stmt = Measures.__table__.update().\
+                                where(Measures.__table__.c.id == bindparam('_id')).\
+                                values({'weight':bindparam('weight'),
+                                        'measureIgnore':bindparam('ignore'),
+                                        'templateMetric':bindparam('template_metric'),
+                                        'templateShift':bindparam('template_shift'),
+                                        'line': bindparam('line'),
+                                        'sample':bindparam('sample'),
+                                        'ChooserName':bindparam('choosername')})
+        session.execute(stmt, measures_to_update)
+
+    if measures_to_set_false:
+        measures_to_set_false = [{'_id':i} for i in measures_to_set_false]
+        # Set ignore=True measures that failed
+        stmt = Measures.__table__.update().\
+                                where(Measures.__table__.c.id == bindparam('_id')).\
+                                values({'measureIgnore':True,
+                                        'ChooserName':shared_kwargs['chooser']})
+        session.execute(stmt, measures_to_set_false)
+
     log.info(f'Updated measures: {json.dumps(measures_to_update, indent=2, cls=JsonEncoder)}')
     log.info(f'Ignoring measures: {measures_to_set_false}')
 
     return measures_to_update, measures_to_set_false
-
 
 def mutual_information_match(moving_roi,
                              reference_roi, 

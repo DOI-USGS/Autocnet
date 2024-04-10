@@ -1,12 +1,7 @@
 import math
-import os
-import sys
-import unittest
-from unittest.mock import patch, MagicMock, Mock, PropertyMock
-import logging
+from unittest.mock import patch, Mock
 
 from skimage import transform as tf
-from skimage.util import img_as_float
 from skimage import color
 from skimage import data
 
@@ -14,7 +9,6 @@ import pytest
 import tempfile
 
 import numpy as np
-from imageio import imread
 
 from plio.io.io_gdal import GeoDataset, array_to_raster
 
@@ -46,6 +40,13 @@ def iris_pair():
     roi2 = roi.Roi(GeoDataset(roi_raster2.name), x=705, y=705, size_x=50, size_y=50)
     return roi1, roi2
 
+@pytest.fixture
+def apollo_subsets():
+    roi1 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(1).png')), x=173, y=150, size_x=50, size_y=50)
+    roi2 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(2).png')), x=145, y=285, size_x=50, size_y=50)
+    roi1.clip()
+    roi2.clip()
+    return roi1, roi2
 def clip_side_effect(arr, clip=False):
     if not clip:
         return arr
@@ -58,13 +59,12 @@ def clip_side_effect(arr, clip=False):
         y = int(y)
         return arr[y-10:y+11, x-10:x+11]
 
-@pytest.fixture
-def apollo_subsets():
-    roi1 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(1).png')), x=173, y=150, size_x=50, size_y=50)
-    roi2 = roi.Roi(GeoDataset(get_path('AS15-M-0295_SML(2).png')), x=145, y=285, size_x=50, size_y=50)
-    roi1.clip()
-    roi2.clip()
-    return roi1, roi2
+@pytest.mark.parametrize("data, expected", [
+    ((21,21), (10, 10)),
+    ((20,20), (10,10))
+])
+def test_check_image_size(data, expected):
+    assert sp.check_image_size(data) == expected
 
 def test_subpixel_template(apollo_subsets):
     a = apollo_subsets[0]
@@ -146,13 +146,6 @@ def test_iterative_phase(apollo_subsets, convergence_threshold, expected):
     if expected[2] is not None:
         # for i in range(len(strength)):
         assert pytest.approx(metrics,6) == expected[2]
-
-@pytest.mark.parametrize("data, expected", [
-    ((21,21), (10, 10)),
-    ((20,20), (10,10))
-])
-def test_check_image_size(data, expected):
-    assert sp.check_image_size(data) == expected
 
 @pytest.mark.xfail
 @pytest.mark.parametrize("x, y, x1, y1, image_size, template_size, expected",[

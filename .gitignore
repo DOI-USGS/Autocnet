@@ -1,3 +1,7 @@
+# ISIS / Testing
+print.prt
+tests/artifacts/*
+
 # OS X
 .DS_Store
 ._.DS_Store

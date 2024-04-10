@@ -1,12 +1,12 @@
-name: Pull-Request-CI
+name: CI
 
 on:
   pull_request:
     branches:
-      - dev
+      - main
   push:
     branches:
-      - dev
+      - main
 
 env:
   isis-root: /usr/share/miniconda/envs/isis/
@@ -20,29 +20,11 @@ jobs:
       fail-fast: false
       matrix:
        os: [ubuntu-latest]
-       python-version: ["3.7"]
-    services:
-      postgres:
-        image: postgis/postgis:10-2.5
-        env:
-          POSTGRES_PASSWORD: NotTheDefault
-          POSTGRES_DB: postgres
-        ports:
-          - 35432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5   
+       python-version: ["3.7", "3.8", "3.9", "3.10"]
     defaults:
       run:
         shell: bash -l {0}
     steps:
-      - name: ISIS Conda Env
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          python-version: 3.6
-          activate-environment: isis
-          channels: usgs-astrogeology, conda-forge
-      - name: Install ISIS
-        run: |
-          conda install -q -y -c usgs-astrogeology isis
       - name: Setup test-resources/
         run: |
           mkdir $GITHUB_WORKSPACE/test-resources/
@@ -51,36 +33,36 @@ jobs:
         run: |
           curl "${{ env.hirise-pds-url }}/PSP_010502_2090_RED5_0.IMG" -o $GITHUB_WORKSPACE/test-resources/PSP_010502_2090_RED5_0.img
           curl "${{ env.hirise-pds-url }}/PSP_010502_2090_RED5_1.IMG" -o $GITHUB_WORKSPACE/test-resources/PSP_010502_2090_RED5_1.img
-      - name: Exit isis env
-        run: conda deactivate
       - name: Checkout Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 
       - name: Cache conda
         uses: actions/cache@v2
         env:
           # Increase this value to reset cache if etc/example-environment.yml has not changed
-          CACHE_NUMBER: 0
+          CACHE_NUMBER: 1
         with:
           path: ~/conda_pkgs_dir
           key:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
             hashFiles('environment.yml') }}
       - name: Setup ENV
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@3b0f2504dd76ef23b6d31f291f4913fb60ab5ff3
         with:
-          miniconda-version: "latest"
-          mamba-version: "*"
-          use-mamba: true
-          channels: conda-forge
-          channel-priority: strict
-          activate-environment: autocnet
-          environment-file: environment.yml
-          use-only-tar-bz2: true
+          miniforge-version: latest  
+          use-mamba: true  
+          channels: conda-forge  
+          activate-environment: autocnet 
+          environment-file: environment.yml  
+          auto-activate-base: false  
+          auto-update-conda: false  
           python-version: ${{ matrix.python-version }}
       - name: config ISIS vars
         run: |
           conda env config vars set ISISROOT=${{ env.isis-root }}
           conda env config vars set ISISDATA=$GITHUB_WORKSPACE/${{ env.isis-data }}
+      - name: Install dev requirements
+        run: |
+          pip install -r test_requirements.txt
       - name: Check build environment
         run: |
           conda list
@@ -89,7 +71,7 @@ jobs:
           python setup.py install
       - name: Test Python Package
         run: |
-           pytest --cov-report=xml
+           pytest -n 4
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
         with:
