@@ -12,14 +12,12 @@ from unittest.mock import patch, PropertyMock, MagicMock
 import geopandas as gpd
 import numpy as np
 from osgeo import ogr
-from plio.io import io_gdal
 
 from autocnet.examples import get_path
 
 from .. import network
 from .. import edge
 from .. import node
-import warnings
 
 sys.path.insert(0, os.path.abspath('..'))
 
@@ -300,7 +298,7 @@ def test_fromlist():
     good_poly = ogr.CreateGeometryFromWkt('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))')
     bad_poly = ogr.CreateGeometryFromWkt('POLYGON ((9999 10, 40 40, 20 40, 10 20, 30 10))')
 
-    with patch('plio.io.io_gdal.GeoDataset.footprint', new_callable=PropertyMock) as patch_fp:
+    with patch('autocnet.io.geodataset.AGeoDataset.footprint', new_callable=PropertyMock) as patch_fp:
         patch_fp.return_value = good_poly
         n = network.CandidateGraph.from_filelist(mock_list, get_path('Apollo15'))
         assert n.number_of_nodes() == 6

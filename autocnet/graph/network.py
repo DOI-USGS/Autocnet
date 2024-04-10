@@ -32,7 +32,6 @@ import shapely.ops
 from plio.io.io_controlnetwork import to_isis, from_isis
 from plio.io import io_hdf, io_json
 from plio.utils import utils as io_utils
-from plio.io.io_gdal import GeoDataset
 from plio.io.isis_serial_number import generate_serial_number
 from plio.io import io_controlnetwork as cnet
 
@@ -40,7 +39,6 @@ from .. import sql
 
 from plurmy import Slurm
 
-import autocnet
 from autocnet.config_parser import parse_config
 from autocnet.cg import cg
 from autocnet.graph.asynchronous_funcs import watch_insert_queue, watch_update_queue
@@ -52,13 +50,13 @@ from autocnet.io.db import controlnetwork as io_controlnetwork
 from autocnet.io.db.model import (Images, Keypoints, Matches, Cameras, Points,
                                   Base, Overlay, Edges, Costs, Measures, CandidateGroundPoints,
                                   JsonEncoder, try_db_creation)
-from autocnet.io.db.connection import new_connection, Parent
+from autocnet.io.db.connection import new_connection
+from autocnet.io.geodataset import AGeoDataset
 from autocnet.matcher import subpixel
 from autocnet.matcher import cross_instrument_matcher as cim
 from autocnet.vis.graph_view import plot_graph, cluster_plot
 from autocnet.control import control
-from autocnet.spatial.isis import point_info
-from autocnet.spatial.surface import GdalDem, EllipsoidDem
+from knoten.surface import GdalDem, EllipsoidDem
 from autocnet.transformation.spatial import reproject, og2oc
 
 # set up the logging file
@@ -229,10 +227,10 @@ class CandidateGraph(nx.Graph):
             filelist = io_utils.file_to_list(filelist)
         # TODO: Reject unsupported file formats + work with more file formats
         if basepath:
-            datasets = [GeoDataset(os.path.join(basepath, f))
+            datasets = [AGeoDataset(os.path.join(basepath, f))
                         for f in filelist]
         else:
-            datasets = [GeoDataset(f) for f in filelist]
+            datasets = [AGeoDataset(f) for f in filelist]
 
         # This is brute force for now, could swap to an RTree at some point.
         adjacency_dict = {}
@@ -1598,12 +1596,6 @@ class NetworkCandidateGraph(CandidateGraph):
         if self.async_watchers == True:
             self._setup_asynchronous_workers()
 
-        # Setup the DEM
-        # I dislike having the DEM on the NCG, but in the short term it
-        # is the best solution I think. I don't want to pass the DEM around
-        # for the sensor calls.
-        self._setup_dem()
-
     @contextmanager
     def session_scope(self):
      """
@@ -1619,17 +1611,6 @@ class NetworkCandidateGraph(CandidateGraph):
      finally:
          session.close()
 
-    def _setup_dem(self):
-        spatial = self.config['spatial']
-        semi_major = spatial.get('semimajor_rad')
-        semi_minor = spatial.get('semiminor_rad')
-        dem_type = spatial.get('dem_type')
-        dem = spatial.get('dem', False)
-        if dem:
-            self.dem = GdalDem(dem, semi_major, semi_minor, dem_type)
-        else:
-            self.dem = EllipsoidDem(semi_major, semi_minor)
-
     @property
     def Session(self):
         return self._Session
@@ -1639,7 +1620,6 @@ class NetworkCandidateGraph(CandidateGraph):
         self._Session = Session
 
     def _setup_database(self):
-        db = self.config['database']
         # A non-linear timeout if the DB is spinning up or loaded with many connections.
         sleeptime = 2
         retries = 0
@@ -1657,6 +1637,14 @@ class NetworkCandidateGraph(CandidateGraph):
             except:
                 retries += 1
                 sleep(retries ** sleeptime)
+
+    # def _setup_nodes(self):
+    #     with self.session_scope() as session:
+    #         res = session.query(Images.path, Images.cam_type, Images.dem, Images.dem_type).all()
+    #         for r in res:
+    #             self.nodes[r[0]]['cam_type'] = r[1]
+    #             self.nodes[r[0]]['dem'] = r[2]
+    #             self.nodes[r[0]]['dem_type'] = r[3]
 
     def _setup_edges(self):
         with self.session_scope() as session:
@@ -2109,14 +2097,10 @@ class NetworkCandidateGraph(CandidateGraph):
         if just_stage:
             return command
 
-        if queue == None:
-            queue = self.config['cluster']['queue']
-
         submitter = Slurm(command,
                      job_name=jobname,
                      mem_per_cpu=self.config['cluster']['processing_memory'],
                      time=walltime,
-                     partition=queue,
                      ntasks=ntasks,
                      output=log_dir+f'/autocnet.{function}-%j')
 
@@ -2167,7 +2151,7 @@ class NetworkCandidateGraph(CandidateGraph):
         path : str
                Outpath to write the control network
 
-        dem : ~autocnet.spatial.surface.EllipsoidDem or ~autocnet.spatial.surface.GdalDem
+        dem : ~knoten.surface.EllipsoidDem or ~knoten.surface.GdalDem
               Digital Elevation Model (DEM) object described the target body
 
         flishpath : str
@@ -2897,7 +2881,6 @@ class NetworkCandidateGraph(CandidateGraph):
                      job_name='cross_instrument_matcher',
                      mem_per_cpu=config['cluster']['processing_memory'],
                      time=walltime,
-                     partition=config['cluster']['queue'],
                      output=config['cluster']['cluster_log_dir']+'/autocnet.cim-%j')
         job_counter = len(groups.items())
         submitter.submit(array='1-{}'.format(job_counter))

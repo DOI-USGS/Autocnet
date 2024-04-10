@@ -20,7 +20,7 @@ def compute_covariance(df, dem, latsigma, lonsigma, radsigma):
     df : pd.DataFrame
          with columns pointtype, adjustedY, and adjustedX
     
-    dem : ~autocnet.spatial.surface.EllipsoidDem or ~autocnet.spatial.surface.GdalDem
+    dem : knoten.surface.EllipsoidDem or ~autocnet.knoten.surface.GdalDem
           Digital Elevation Model (DEM) object described the target body
 
     latsigma : int/float

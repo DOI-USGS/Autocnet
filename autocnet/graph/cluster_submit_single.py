@@ -78,7 +78,7 @@ def process(msg):
         # For now, pass all the potential config items through
         # most funcs will simply discard the unnecessary ones.
         msg['kwargs']['ncg'] = ncg
-        msg['kwargs']['Session'] = ncg.Session
+        msg['kwargs']['session'] = ncg.Session
 
     # Now run the function.
     res = func(*msg['args'], **msg['kwargs'])

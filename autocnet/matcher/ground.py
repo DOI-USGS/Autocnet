@@ -1,22 +1,21 @@
 import os
 import logging
+import math
 
 import numpy as np
 import pandas as pd
-from plio.io.io_gdal import GeoDataset
+from autocnet.io.geodataset import AGeoDataset
 import pvl
 from shapely.geometry import Point
 from geoalchemy2.functions import ST_DWithin
 
 from autocnet.io.db.model import Points, Measures, Images, CandidateGroundPoints
-from autocnet.spatial.isis import isis2np_types
+from autocnet.io.isis import isis2np_types
 from autocnet.graph.node import NetworkNode
 from autocnet.matcher.subpixel import check_geom_func, check_match_func, geom_match_simple
 from autocnet.matcher.cpu_extractor import extract_most_interesting
 
-from autocnet.utils.utils import bytescale
 
-from autocnet.spatial import isis
 from autocnet.transformation.spatial import reproject, oc2og
 from autocnet.io.db.model import Images
 from autocnet.transformation import roi
@@ -31,7 +30,7 @@ def propagate_ground_point(point,
                            threshold=0.01,
                            ncg=None,
                            preprocess=None,
-                           Session=None):
+                           dem=None):
     log.info(f'Attempting to propagate point {point.id}.')
 
     match_func = check_match_func(match_func)
@@ -45,7 +44,7 @@ def propagate_ground_point(point,
     sx = point.sample
     pointid = point.id
 
-    base_image = GeoDataset(path)
+    base_image = AGeoDataset(path)
 
     lon = point.geom.x
     lat = point.geom.y
@@ -56,9 +55,7 @@ def propagate_ground_point(point,
     best_match = None
     for _, image in images.iterrows():
         # When grounding to THEMIS the df has a PATH to the QUAD
-        dest_image = GeoDataset(image["path"])
-        #if os.path.basename(m['path']) == os.path.basename(image['path']):
-        #    continue
+        dest_image = AGeoDataset(image["path"])
         try:
             log.info(f'prop point: base_image: {base_image}')
             log.info(f'prop point: dest_image: {dest_image}')
@@ -88,36 +85,22 @@ def propagate_ground_point(point,
     if best_match is None:
         log.warning('Unable to propagate this ground point into any images.')
         return
-    
-    dem = ncg.dem
-    config = ncg.config
-
-    height = dem.get_height(lat, lon)
-
-    semi_major = config['spatial']['semimajor_rad']
-    semi_minor = config['spatial']['semiminor_rad']
-    # The CSM conversion makes the LLA/ECEF conversion explicit
-    # reprojection takes ographic lat
-    lon_oc = lon
-    lat_oc = lat
-
-    lon_og, lat_og = oc2og(lon_oc, lat_oc, semi_major, semi_minor)
-    x, y, z = reproject([lon_og, lat_og, height],
-                         semi_major, semi_minor,
-                         'latlon', 'geocent')
+    if dem is None:
+        height = 0
+    else:
+        dem = AGeoDataset(dem)
+        height = dem.latlon_to_pixel(lat, lon)
+    x,y,z = base_image.sensormodel.lonlat2xyz(lon, lat, height)
+    point_geom = Point(x,y,z)
 
     row = best_match
     sample  = float(row[0])
     line = float(row[1])
 
-    # Create the point
-    # Question - do we need to get the z from the ground source?
-    point_geom = Point(x,y,z)
-    cam_type = 'isis'
     point = Points(apriori=point_geom,
                    adjusted=point_geom,
                    pointtype=3, # Would be 3 or 4 for ground
-                   cam_type=cam_type,
+                   cam_type=base_image.sensortype,
                    reference_index=0)
 
     # Add the measure that was the best match.
@@ -133,17 +116,8 @@ def propagate_ground_point(point,
                                    choosername='propagate_ground_point'))
 
     for _, image in images.iterrows():
-        if cam_type == "csm":
-            # BROKEN
-            image_coord = node.camera.groundToImage(gnd)
-            sample, line = image_coord.samp, image_coord.line
-        if cam_type == "isis":
-            try:
-                sample, line = isis.ground_to_image(image["path"], lon_oc, lat_oc)
-            except ValueError as e:
-                if 'Requested position does not project in camera model' in e.stderr:
-                    log.exception(f'interesting point ({lon_oc},{lat_oc}) does not project to image {images["image_path"]}')
-                    continue
+        node_geodata = AGeoDataset(image['path'])
+        sample, line = node_geodata.sensormodel.lonlat2sampline(lon, lat)
 
         if image['id'] == best_match[7]:
             continue  # The measures was already added above, simply update the apriori line/sample
@@ -187,15 +161,13 @@ def find_most_interesting_ground(apriori_lon_lat,
     if not ncg.Session:
         raise BrokenPipeError('This func requires a database session from a NetworkCandidateGraph.')
 
-    if not isinstance(ground_mosaic, GeoDataset):
-        ground_mosaic = GeoDataset(ground_mosaic)
+    if not isinstance(ground_mosaic, AGeoDataset):
+        ground_mosaic = AGeoDataset(ground_mosaic)
 
     p = Point(*apriori_lon_lat)
 
     # Convert the apriori lon, lat into line,sample in the image
-    linessamples = isis.point_info(ground_mosaic.file_name, p.x, p.y, 'ground')
-    line = linessamples.get('Line')
-    sample = linessamples.get('Sample')
+    sample, line = ground_mosaic.sensormodel.lonlat2sampline(p.x, p.y)
 
     try:
         base_dtype = isis2np_types[pvl.load(ground_mosaic.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
@@ -212,15 +184,13 @@ def find_most_interesting_ground(apriori_lon_lat,
         log.warning('No interesting feature found. This is likely caused by either large contiguous no data areas in the base or a mismatch in the base_dtype.')
         return
 
-    left_x = floor(image.x) - image.size_x
-    top_y = floor(image.y) - image.size_y
+    left_x = math.floor(image.x) - image.size_x
+    top_y = math.floor(image.y) - image.size_y
     newsample = left_x + interesting.x
     newline = top_y + interesting.y
 
-    # @LAK - this needs eyeballs to confirm correct oc/og
-    newpoint = isis.point_info(ground_mosaic.file_name, newsample, newline, 'image')
-    p = Point(newpoint.get('PositiveEast360Longitude'),
-              newpoint.get('PlanetocentricLatitude'))
+    newlon, newlat = ground_mosaic.sensormodel.sampline2lonlat(newsample, newline)
+    p = Point(newlon, newlat)
 
     with ncg.session_scope() as session:
         # Check to see if the point already exists
@@ -267,7 +237,7 @@ def find_ground_reference(point,
         raise FileNotFoundError(f'Unable to find {baseimage} to register the data to.')
 
     # Get the base image and the roi extracted that the image data will register to
-    baseimage = GeoDataset(baseimage)
+    baseimage = AGeoDataset(baseimage)
 
     # Select the images that the point is in.
     cost = -1

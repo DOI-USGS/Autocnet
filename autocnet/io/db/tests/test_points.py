@@ -3,7 +3,6 @@ import pytest
 
 import shapely
 from autocnet.io.db.model import Points
-from autocnet.spatial import sensor
 
 
 @pytest.mark.parametrize("data", [
@@ -47,11 +46,14 @@ def test_create_point_with_reference_measure(session):
     point_geom = shapely.Point(0,0,1)
     reference_node = MagicMock()
     reference_node.isis_serial = 'serialnum'
-    d = {'node_id':1}
+
+    d = {'node_id':1, 'cam_type':'csm'}
     reference_node.__getitem__.side_effect = d.__getitem__
     sampleline = shapely.Point(1,1)
 
-    point = Points.create_point_with_reference_measure(point_geom, reference_node, sampleline)
+    point = Points.create_point_with_reference_measure(point_geom, 
+                                                       reference_node, 
+                                                       sampleline)
 
     assert len(point.measures) == 1
     assert point.geom.x == 0
@@ -62,18 +64,16 @@ def test_create_point_with_reference_measure(session):
 
 def test_add_measures_to_point(session):
     point = Points()
-    point.adjusted = shapely.Point(0,0,0)
-    test_sensor = sensor.create_sensor('isis')
+    point.apriori = point.adjusted = shapely.Point(0,0,0)
     
     node = MagicMock()
     node.isis_serial = 'serial'
     node.__getitem__.side_effect = {'node_id':0, 'image_path':'/'}.__getitem__
 
-    reference_nodes = [node, node, node, node]
+    node.geodata.sensormodel.xyz2sampline.return_value = (0.5, 0.5)
+    reference_nodes = [node] * 4
 
-    with patch('autocnet.spatial.isis.ground_to_image') as mocked_call:
-        mocked_call.return_value = (0.5, 0.5)
-        point.add_measures_to_point(reference_nodes, test_sensor)
+    point.add_measures_to_point(reference_nodes)
 
     assert len(point.measures) == 4
     assert point.measures[0].line == 0.5

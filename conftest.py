@@ -1,21 +1,19 @@
 import os
-from unittest.mock import Mock, MagicMock, PropertyMock
+from unittest.mock import Mock, MagicMock
 
 import fakeredis
-import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
 from mock_alchemy.mocking import UnifiedAlchemyMagicMock
 from sqlalchemy import inspect, text
 
-from autocnet.control import control
 from autocnet.graph.network import CandidateGraph, NetworkCandidateGraph
-from autocnet.graph import edge, node
+from autocnet.graph import edge
 from autocnet.graph.node import Node
 from autocnet.io.db import model
 
-from plio.io.io_gdal import GeoDataset
+from autocnet.io.geodataset import AGeoDataset
 
 @pytest.fixture
 def queue():
@@ -144,7 +142,7 @@ def node_c(geodata_c):
 def geodata_a():
     arr = np.ones((100,100))
     arr[5,5] = -3.40282266e+38
-    a = Mock(spec=GeoDataset, raster_size=[10,10], no_data_value=-3.40282266e+38)
+    a = Mock(spec=AGeoDataset, raster_size=[10,10], no_data_value=-3.40282266e+38)
     a.pixel_to_latlon = MagicMock(side_effect=lambda x, y: (x, y))    
     a.read_array = MagicMock(return_value=arr)
     return a
@@ -152,7 +150,7 @@ def geodata_a():
 @pytest.fixture(scope='session')
 def geodata_b():
     arr = np.ones((100,100))
-    b = Mock(spec=GeoDataset, raster_size=[10,10])
+    b = Mock(spec=AGeoDataset, raster_size=[10,10])
     b.pixel_to_latlon = MagicMock(side_effect=lambda x, y: (x, y))
     b.read_array = MagicMock(return_value=arr)
     return b
@@ -160,7 +158,7 @@ def geodata_b():
 @pytest.fixture(scope='session')
 def geodata_c():
     c = Mock(spec=Node)
-    c = Mock(spec=GeoDataset)
+    c = Mock(spec=AGeoDataset)
     c.pixel_to_latlon = MagicMock(side_effect=lambda x, y: (x, y))
     return c
 

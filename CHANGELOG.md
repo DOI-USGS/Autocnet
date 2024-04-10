@@ -35,9 +35,13 @@ release.
 ## [Unreleased]
 ### Added
 - Ability to choose whether to compute overlaps for a network candidate graph
-- Integration tests for end-to-end of an equatorial CTX pair and a mid-latitude CTX trio.
+- Integration tests for end-to-end of an equatorial CTX pair and a mid-latitude CTX trio. These write out ISIS control networks that can be visually inspected in `qnet` in case changes exceed the test tolerances.
+- AGeoDataset class that abstracts the plio GeoDataset class. The AGeoDataset includes sensor models on the GeoDataset object. The object automatically instantiates an autocnet surface model using either an EllipsoidDem or a GdalDem. ISIS sensor models use the DEM defined on the cube. CSM sensor models must have a DEM explicitly passed.
+- Full abstraction of the sensor model. The underlying sensor model can now be either USGSCSM or ISIS. The Network* objects track which sensor type was used, which DEM was used, if any, and whether the DEM is in radius or height.
+- Multiple cropped ISIS cubes and associated CSM sensor models for testing. These cubes account for the offset issue that the `ale` `isd_generate` script has with generating CSM ISDs from cropped observations.
 
 ### Changed
+- Affine transformations are now using projective transformations. The affine transformation out of skimage was **not** properly tracking reflection of the input data. The projective transformation does. This necessitated a change to how shear is being checked as the shearing components of the transformation are now encoded into [2][0] and [2][1] in the 3x3 matrix. This also means that the transformations are accounting for scale differences.
 - CI on the library now uses a mocked sqlalchemy connection. All tests can now run locally without the need for a supplemental postgres container. This changed removed some non-optimal tests that were testing datbase triggers and database instantiation handled by SQLAlchemy.
 
 ### Fixed

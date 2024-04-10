@@ -1,12 +1,10 @@
 import numpy as np
 import pytest
 
-import unittest
 from unittest.mock import patch, Mock
 
-from plio.io.io_gdal import GeoDataset
-
 from autocnet.transformation.roi import Roi
+from autocnet.io.geodataset import AGeoDataset
 
 @pytest.fixture
 def array_with_nodata():
@@ -79,11 +77,11 @@ def test_array_extent_computation(x, y, size_arr, size_roi, buffer, expected, ge
     (50, 50, 10, 10,  5,  5, (100, 100), (20, 20), (15, 15 ))
 ])
 def test_subpixel_using_roi(x, y, x1, y1, xs, ys, size_arr, size_roi, expected):
-    source = Mock(GeoDataset)
+    source = Mock(AGeoDataset)
     source_array = np.arange(size_arr[0]*size_arr[1]).reshape(size_arr)
     source.read_array.return_value = source_array
 
-    destination = Mock(GeoDataset)
+    destination = Mock(AGeoDataset)
     destination_array = np.arange(size_arr[0]*size_arr[1]).reshape(size_arr)
     destination.read_array.return_value = destination_array
 

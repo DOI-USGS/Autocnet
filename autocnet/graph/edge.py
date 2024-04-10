@@ -26,8 +26,8 @@ from autocnet.io.db.model import Images, Keypoints, Matches,\
                                  Cameras, Base, Overlay, Edges,\
                                  Costs, Measures, Points, Measures
 from autocnet.io.db.wrappers import DbDataFrame
+from autocnet.io.geodataset import AGeoDataset
 
-from plio.io.io_gdal import GeoDataset
 from csmapi import csmapi
 
 # set up the logging file
@@ -727,7 +727,7 @@ class Edge(dict, MutableMapping):
         Estimate a source and destination minimum bounding rectangle, in
         pixel space.
         """
-        if not isinstance(self.source.geodata, GeoDataset):
+        if not isinstance(self.source.geodata, AGeoDataset):
             smbr = None
             dmbr = None
         else:

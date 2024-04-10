@@ -5,9 +5,30 @@ from plio.io.io_gdal import GeoDataset
 from skimage import transform as tf
 
 from autocnet.transformation.roi import Roi
-from autocnet.spatial import isis
+from autocnet.io.geodataset import AGeoDataset
 
 log = logging.getLogger(__name__)
+
+def check_for_excessive_shear(transformation):
+    """
+    This function checks a skimage projective transform for excessive
+    shearing of the data.
+
+    In a projective transformation the final row encodes and adjustment to 
+    the vertical/horizontal lines to infinity. The first element u encodes
+    a hinging of the along the horizontal and the second element v encodes
+    a hinging along the vertical line. As the values approach 0.001 and -0.001
+    the amount of shear related distortion (hinging along the horizontal/vertical)
+    becomes high enough that matching is problematic as the amount of data
+    needed in the templates becomes quite high.
+    """
+    m = transformation.params
+    u = m[2][0]
+    v = m[2][1]
+
+    if abs(u) >= 0.001 or abs(v) >= 0.001:
+        return True
+    return False
 
 def estimate_affine_from_sensors(reference_image,
                                 moving_image,
@@ -21,9 +42,9 @@ def estimate_affine_from_sensors(reference_image,
 
     Parameters
     ----------
-    reference_image:  plio.io.io_gdal.GeoDataset
+    reference_image: autocnet.io.geodataset.AGeoDataset
                 source image
-    moving_image: plio.io.io_gdal.GeoDataset
+    moving_image: autocnet.io.geodataset.AGeoDataset
                 destination image; gets matched to the source image
     bcenter_x:  int
                 sample location of source measure in reference_image
@@ -41,9 +62,9 @@ def estimate_affine_from_sensors(reference_image,
 
     """
     t1 = time.time()
-    if not isinstance(moving_image, GeoDataset):
+    if not isinstance(moving_image,AGeoDataset):
         raise Exception(f"Input cube must be a geodataset obj, but is type {type(moving_image)}.")
-    if not isinstance(reference_image, GeoDataset):
+    if not isinstance(reference_image, AGeoDataset):
         raise Exception(f"Match cube must be a geodataset obj, but is type {type(reference_image)}.")
 
     base_startx = int(bcenter_x - size_x)
@@ -65,10 +86,9 @@ def estimate_affine_from_sensors(reference_image,
     
     x_coords = [base_startx, base_startx, base_stopx, base_stopx, bcenter_x]
     y_coords = [base_starty, base_stopy, base_stopy, base_starty, bcenter_y]
-
     # Dispatch to the sensor to get the a priori pixel location in the input image
-    lons, lats = isis.image_to_ground(reference_image.file_name, x_coords, y_coords, allowoutside=True)
-    xs, ys = isis.ground_to_image(moving_image.file_name, lons, lats, allowoutside=True)
+    lons, lats = reference_image.sensormodel.sampline2lonlat(x_coords, y_coords, allowoutside=True)
+    xs, ys = moving_image.sensormodel.lonlat2sampline(lons, lats, allowoutside=True)
     log.debug(f'Lon/Lats for affine estimate are: {list(zip(lons, lats))}')
     log.debug(f'Image X / Image Y for affine estimate are: {list(zip(xs, ys))}')
 
@@ -79,13 +99,14 @@ def estimate_affine_from_sensors(reference_image,
         if xs[i] is not None and ys[i] is not None:
             dst_gcps.append((xs[i], ys[i]))
             base_gcps.append((base_x, base_y))
-            
+
     if len(dst_gcps) < 3:
-        raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_corners)} points, but need at least 3.')
+        raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_gcps)} points, but need at least 3.')
 
     log.debug(f'Number of GCPs for affine estimation: {len(dst_gcps)}')
 
-    affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
+    affine = tf.estimate_transform('projective', np.array([*base_gcps]), np.array([*dst_gcps]))
+    #affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
     log.debug(f'Computed afffine: {affine}')
     t2 = time.time()
     log.debug(f'Estimation of local affine took {t2-t1} seconds.')
@@ -99,10 +120,10 @@ def estimate_local_affine(reference_roi, moving_roi):
 
     Parameters
     ----------
-    reference_image : plio.io.io_gdal.GeoDataset
+    reference_image : autocnet.io.geodataset.AGeoDataset
                       Image that is expected to be used as the reference during the matching process, 
                       points are laid onto here and projected onto moving image to compute an affine
-    moving_image : plio.io.io_gdal.GeoDataset
+    moving_image : autocnet.io.geodataset.AGeoDataset
                    Image that is expected to move around during the matching process, 
                    points are projected onto this image to compute an affine  
 
@@ -113,8 +134,8 @@ def estimate_local_affine(reference_roi, moving_roi):
     """
     # get initial affine
     roi_buffer = reference_roi.buffer
-    size_x = 60 # reference_roi.size_x + roi_buffer
-    size_y = 60 # reference_roi.size_y + roi_buffer
+    size_x = 60  # reference_roi.size_x + roi_buffer
+    size_y = 60  # reference_roi.size_y + roi_buffer
     
     affine_transform = estimate_affine_from_sensors(reference_roi.data, 
                                                     moving_roi.data, 
@@ -123,19 +144,25 @@ def estimate_local_affine(reference_roi, moving_roi):
                                                     size_x=size_x, 
                                                     size_y=size_y)
 
-    log.debug(f'Affine shear: {affine_transform.shear}')
-    if abs(affine_transform.shear) > 1e-2:
-        # Matching LROC NAC high slew images to nadir images demonstrated that affine transformations
-        # with high shear match poorly. The search templates also have reflection (ROI object, x/y_read_length)
-        # because a high shear affine requires  alot of data to be read in. 
-        # TODO: Consider handling this differently in the future should nadir to high slew image matching be required.
-        raise Exception(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match, so skipping.')
+    #log.debug(f'Affine shear: {affine_transform.shear}')
+    # if abs(affine_transform.shear) > 1e-2:
+    #     # Matching LROC NAC high slew images to nadir images demonstrated that affine transformations
+    #     # with high shear match poorly. The search templates also have reflection (ROI object, x/y_read_length)
+    #     # because a high shear affine requires  alot of data to be read in. 
+    #     # TODO: Consider handling this differently in the future should nadir to high slew image matching be required.
+    #     raise Exception(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match, so skipping.')
     # The above coordinate transformation to get the center of the ROI handles translation. 
     # So, we only need to rotate/shear/scale the ROI. Omitting scale, which should be 1 (?) results
     # in an affine transoformation that does not match the full image affine
-    tf_rotate = tf.AffineTransform(rotation=affine_transform.rotation, 
-                                   shear=affine_transform.shear,
-                                   scale=affine_transform.scale)
+    # tf_rotate = tf.AffineTransform(rotation=affine_transform.rotation, 
+    #                                shear=affine_transform.shear,
+    #                                scale=affine_transform.scale)
+    # Remove the translation from the transformation. Translation is added below to ensure the
+    # transform is centered on the ROI.
+    matrix = affine_transform.params
+    matrix[0][-1] = 0
+    matrix[1][-1] = 0
+    affine_transform = tf.AffineTransform(matrix)
 
     # This rotates about the center of the image
     shift_x, shift_y = moving_roi.clip_center
@@ -149,5 +176,7 @@ def estimate_local_affine(reference_roi, moving_roi):
     # Define the full chain multiplying the transformations (read right to left),
     # this is 'shift to the center', apply the rotation, shift back
     # to the origin.
-    trans = tf_shift_inv + tf_rotate + tf_shift
+    trans = tf_shift_inv + affine_transform + tf_shift
+    if check_for_excessive_shear(trans):
+        raise Exception(f'Shear Warning: It is highly unlikely that these images will not match, due to differing view geometries.')
     return trans

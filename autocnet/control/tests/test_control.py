@@ -5,7 +5,7 @@ from shapely.geometry import Polygon
 
 import pytest
 from autocnet.control import control
-from autocnet.spatial.surface import EllipsoidDem
+from knoten.surface import EllipsoidDem
 
 def test_identify_potential_overlaps(controlnetwork, candidategraph):
     res = control.identify_potential_overlaps(candidategraph,
