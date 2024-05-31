@@ -58,6 +58,10 @@ class AGeoDataset(GeoDataset):
                           semi_minor=semiminor,
                           dem_type=self.dem_type)
         self.dem = dem
+
+    
+    def _parse_dem_from_label(self, label):
+        return label['IsisCube']['Kernels']['ShapeModel']
     
     def _parse_radii_from_label(self, label):
         bodycode = label['NaifKeywords']['BODY_CODE']
@@ -65,9 +69,6 @@ class AGeoDataset(GeoDataset):
         semimajor = radii_triplet[0] * 1000  # Implicit km to m conversion
         semiminor = radii_triplet[1] * 1000
         return semimajor, semiminor
-    
-    def _parse_dem_from_label(self, label):
-        return label['IsisCube']['Kernels']['ShapeModel']
     
     def _make_dem_from_isis(self):
         label = pvl.load(self.file_name)

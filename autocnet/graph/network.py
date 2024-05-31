@@ -2186,17 +2186,11 @@ class NetworkCandidateGraph(CandidateGraph):
         """
 
         if dem is None:
-            dem_file = None
             log.warning(f'No dem argument passed; covariance matrices will be computed for the points.')
-        else:
-            if isinstance(dem, EllipsoidDem): # not sure about this
-                dem_file = f'EllipsoidDem a={dem.a} b {dem.b} c={dem.c}'
-            elif isinstance(dem, GdalDem):
-                dem_file = dem.dem.file_name
 
         # Read the cnet from the db
         with self.session_scope() as session:
-            df = io_controlnetwork.db_to_df(session, ground_radius=dem_file, ground_xyz=ground_xyz, **db_kwargs)
+            df = io_controlnetwork.db_to_df(session, ground_radius=dem, ground_xyz=ground_xyz, **db_kwargs)
 
         # Add the covariance matrices to ground measures
         if dem is not None:

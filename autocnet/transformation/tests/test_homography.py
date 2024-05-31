@@ -59,9 +59,7 @@ class TestHomography(unittest.TestCase):
 
     def test_compute_error_not_perfect(self):
         eps = np.random.normal(0,0.25, size=(3,3))
-        print(eps)
         h = self.H + eps
-        print(h)
         error = hm.compute_error(h, self.fph, self.tp)
 
         truth_means = np.array([ 0.5607765, 0.0027841, 1.64353546, 0.78280023])

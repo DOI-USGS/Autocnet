@@ -33,8 +33,6 @@ def compute_covariance(df, dem, latsigma, lonsigma, radsigma):
                The estimated sigma (error) in the radius direction
     """
 
-    semi_major = dem.a
-    semi_minor = dem.c
 
     def compute_covar(row, latsigma, lonsigma, radsigma, semi_major, semi_minor):
         if row['pointtype'] == 3 or row['pointtype'] == 4:
@@ -63,8 +61,8 @@ def compute_covariance(df, dem, latsigma, lonsigma, radsigma):
                                   args=(latsigma,
                                   lonsigma,
                                   radsigma,
-                                  semi_major,
-                                  semi_minor))
+                                  dem.a,
+                                  dem.b))
     return df
 
 def identify_potential_overlaps(cg, cn, overlap=True):

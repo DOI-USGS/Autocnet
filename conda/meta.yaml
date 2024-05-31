@@ -1,6 +1,6 @@
 package:
   name: autocnet
-  version: 1.1.0
+  version: 1.2.0
   
 channels:
   - conda-forge
@@ -64,9 +64,12 @@ requirements:
       - sqlalchemy
       - sqlalchemy-utils
       - redis-py<5
-      - conda-forge::usgscsm>=1.7.0
+      - conda-forge::usgscsm>=2.0.0
       - vlfeat
       - protobuf
+      - pip
+      - pip:
+        - image-registration
 
 test:
   imports:

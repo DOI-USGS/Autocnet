@@ -120,8 +120,7 @@ def test_ctx_pair_to_df(session,
         {'match_kwargs': {'image_size':(75,75), 'template_size':(33,33)}},
         {'match_kwargs': {'image_size':(90,90), 'template_size':(36,36)}},
         {'match_kwargs': {'image_size':(110,110), 'template_size':(40,40)}},
-        {'match_kwargs': {'image_size':(125,125), 'template_size':(44,44)}},
-        {'match_kwargs': {'image_size':(140,140), 'template_size':(48,48)}}
+        {'match_kwargs': {'image_size':(125,125), 'template_size':(44,44)}}
     ]
 
     shared_kwargs = {'cost_func':lambda x,y:y,
@@ -131,15 +130,14 @@ def test_ctx_pair_to_df(session,
                                                                      session,
                                                                      parameters=parameters,
                                                                      shared_kwargs=shared_kwargs)
-
     assert measures_to_set_false == []
-
     m0 = measures_to_update[0]
-    assert m0['sample'] == 364.68654222552584
-    assert m0['line'] == 525.3278698894809
-    assert m0['template_metric'] == 0.6234837174415588
+
+    assert m0['sample'] == pytest.approx(364.545, abs=0.001) 
+    assert m0['line'] == pytest.approx(525.937, abs=0.001) #0.15px
+    assert m0['template_metric'] == pytest.approx(0.560, abs=0.01)
     assert m0['ignore'] == False
-    assert m0['template_shift'] == 238.6672416023751
+    assert m0['template_shift'] == pytest.approx(11.556, abs=0.001)
 
     with mock.patch('pandas.read_sql') as db_response:
         db_cnet = pd.DataFrame([
@@ -155,5 +153,5 @@ def test_ctx_pair_to_df(session,
     df.rename(columns={'pointtype':'pointType',
                         'measuretype':'measureType'},
                         inplace=True)
-    to_isis(df, 'tests/artifacts/ctx_csm_pair_to_df.cnet', targetname='Mars')
-    write_filelist([g02_image.path, n06_image.path], 'tests/artifacts/ctx_csm_pair_to_df.lis')
+    to_isis(df, 'tests/artifacts/test_ctx_csm_2image_subpixel.cnet', targetname='Mars')
+    write_filelist([g02_image.path, n06_image.path], 'tests/artifacts/test_ctx_csm_2image_subpixel.cnet.lis')

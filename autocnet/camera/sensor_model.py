@@ -10,7 +10,7 @@ import logging
 from subprocess import CalledProcessError
 from numbers import Number
 
-from autocnet.transformation.spatial import og2oc, og2xyz, xyz2og, xyz2oc
+from autocnet.transformation.spatial import og2oc, og2xyz, xyz2og
 from autocnet.io import isis
 
 import numpy as np
@@ -23,7 +23,6 @@ except Exception as exception:
     isis = FailedImport(exception)
 
 from knoten.csm import create_csm, generate_ground_point, generate_image_coordinate
-from csmapi import csmapi
 
 # set up the logger file
 log = logging.getLogger(__name__)
@@ -276,14 +275,14 @@ class ISISSensor(BaseSensor):
             Latitude coordinate(s).
 
         """
-        # ISIS is expecting ocentric latitudes. Convert from ographic before passing.
         lonoc, latoc = og2oc(lon, lat, self.semi_major, self.semi_minor)
         res = self._point_info(lonoc, latoc, "ground", allowoutside=allowoutside)
         if isinstance(lon, (collections.abc.Sequence, np.ndarray)):
             samples, lines = np.asarray([[r["Sample"], r["Line"]] for r in res]).T
         else:
             samples, lines = res["Sample"], res["Line"]
-
+        
+        log.debug(f'Samples: {samples} Lines: {lines}')
         return samples, lines
 
     def sampline2xyz(self, sample, line):
@@ -367,6 +366,7 @@ class ISISSensor(BaseSensor):
             are possible.  Please see the campt or mappt documentation.
 
         """
+        logging.debug(f'Sample: {sample}, Line: {line}')
         res = self._point_info(sample, line, "image", allowoutside=allowoutside)
         if isinstance(sample, (collections.abc.Sequence, np.ndarray)):
             lon_list = list()
@@ -380,6 +380,8 @@ class ISISSensor(BaseSensor):
         else:
             lons = self._get_value(res[lontype])
             lats = self._get_value(res[lattype])
+        log.debug(f'Latitude Type: {lattype}')
+        log.debug(f'Lons: {lons} Lats: {lats}')
         return lons, lats   
 
     def lonlat2xyz(self, lon, lat):

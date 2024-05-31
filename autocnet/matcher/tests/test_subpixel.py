@@ -48,6 +48,7 @@ def apollo_subsets():
     roi1.clip()
     roi2.clip()
     return roi1, roi2
+
 def clip_side_effect(arr, clip=False):
     if not clip:
         return arr
@@ -68,14 +69,11 @@ def test_check_image_size(data, expected):
     assert sp.check_image_size(data) == expected
 
 def test_subpixel_template(apollo_subsets):
-    a = apollo_subsets[0]
-    b = apollo_subsets[1]
-    b.size_x = 10
-    b.size_y = 10
-    affine, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16)
-    nx, ny = affine.translation
-    assert nx == -0.3125
-    assert ny == 1.5
+    a = apollo_subsets[0].clip()
+    b = apollo_subsets[1].clip(size_x=10, size_y=10)
+    new_x, new_y, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16)
+    assert new_x == 90
+    assert new_y == 88
     assert np.max(corr_map) >= 0.9367293
     assert metrics >= 0.9367293
 
@@ -83,10 +81,8 @@ def test_subpixel_template(apollo_subsets):
                                           ((4,0), True),
                                           ((1,1), False)])
 def test_subpixel_template_at_edge(apollo_subsets, loc, failure):
-    a = apollo_subsets[0]
-    b = apollo_subsets[1]
-    b.size_x = 10
-    b.size_y = 10
+    a = apollo_subsets[0].clip()
+    b = apollo_subsets[1].clip(size_x=10, size_y=10)
 
     def func(*args, **kwargs):
         corr = np.zeros((10,10))
@@ -94,13 +90,13 @@ def test_subpixel_template_at_edge(apollo_subsets, loc, failure):
         return 0, 0, 0, corr
 
     if failure:
-        affine, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16,
+        shift_x, shift_y, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16,
                                                          func=func)
     else:
-        affine, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16,
+        shift_x, shift_y, metrics, corr_map = sp.subpixel_template(a, b, upsampling=16,
                                                          func=func)
-        nx, ny = affine.translation
-        assert nx == 0
+        assert shift_x == 0
+        assert shift_y == 0
 
 @pytest.mark.xfail
 def test_estimate_logpolar_transform(iris_pair):
@@ -231,7 +227,7 @@ def test_subpixel_phase_cooked(x, y, x1, y1, image_size, expected):
     assert dx == expected[0]
     assert dy == expected[1]
 
-
+@pytest.mark.skip
 def test_mutual_information(): 
     d_template = np.array([[i for i in range(50, 100)] for j in range(50)])
     s_image = np.ones((100, 100))

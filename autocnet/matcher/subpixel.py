@@ -20,7 +20,7 @@ from sqlalchemy.sql.expression import bindparam
 from sqlalchemy import inspect
 from matplotlib import pyplot as plt
 
-from autocnet.matcher.naive_template import pattern_match
+from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg
 from autocnet.matcher.mutual_information import mutual_information
 from autocnet.io import isis
 from autocnet.io.geodataset import AGeoDataset
@@ -89,10 +89,8 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
     : tuple
       With the RMSE error and absolute difference in phase
     """
-    reference_roi.clip()
-    reference_image = reference_roi.clipped_array
-    moving_roi.clip(affine=affine, warp_mode="constant", coord_mode="constant")
-    walking_template = moving_roi.clipped_array
+    reference_image = reference_roi.clip()
+    walking_template = moving_roi.clip(affine=affine, warp_mode="constant", coord_mode="constant")
 
     if reference_image.shape != walking_template.shape:
         reference_size = reference_image.shape
@@ -116,10 +114,8 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
         reference_roi.size_x, reference_roi.size_y = size
         moving_roi.size_x, moving_roi.size_y = size
 
-        reference_roi.clip()
-        reference_image = reference_roi.clipped_array
-        moving_roi.clip(affine=affine)
-        walking_template = moving_roi.clipped_array
+        reference_image = reference_roi.clip()
+        walking_template = moving_roi.clip(affine=affine)
 
     (shift_y, shift_x), error, diffphase = registration.phase_cross_correlation(reference_image,
                                                                                 walking_template,
@@ -129,9 +125,8 @@ def subpixel_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), **kwa
     new_affine = tf.AffineTransform(translation=(-shift_x, -shift_y))
     return new_affine, error, diffphase
 
-def subpixel_template(reference_roi, 
-                      moving_roi, 
-                      affine=tf.AffineTransform(), 
+def subpixel_template(moving_clip, 
+                      reference_clip, 
                       func=pattern_match,
                       **kwargs):
     """
@@ -171,46 +166,28 @@ def subpixel_template(reference_roi,
     autocnet.matcher.naive_template.pattern_match : for the kwargs that can be passed to the matcher
     autocnet.matcher.naive_template.pattern_match_autoreg : for the kwargs that can be passed to the autoreg style matcher
     """
-
-    try:
-        s_image_dtype = isis.isis2np_types[pvl.load(reference_roi.data.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
-    except:
-        s_image_dtype = None
-
-    try:
-        d_template_dtype = isis.isis2np_types[pvl.load(moving_roi.data.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
-    except:
-        d_template_dtype = None
     
+    # try:
+    #     s_image_dtype = isis.isis2np_types[pvl.load(reference_roi.data.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    # except:
+    #     s_image_dtype = None
+
+    # try:
+    #     d_template_dtype = isis.isis2np_types[pvl.load(moving_roi.data.file_name)["IsisCube"]["Core"]["Pixels"]["Type"]]
+    # except:
+    #     d_template_dtype = None
     
     # In ISIS, the reference image is the search and moving image is the pattern.
-    reference_roi.clip(dtype = s_image_dtype)
-    ref_clip = reference_roi.clipped_array
-    moving_roi.clip(affine=affine, dtype=d_template_dtype)
-    moving_clip = moving_roi.clipped_array
-    
-    if moving_clip.var() == 0:
+    if np.var(moving_clip) == 0:
         warnings.warn('Input ROI has no variance.')
         return [None] * 3
-
-    if (ref_clip is None) or (moving_clip is None):
+    if (reference_clip is None) or (moving_clip is None):
         return None, None, None
 
-    matcher_shift_x, matcher_shift_y, metrics, corrmap = func(moving_clip, ref_clip, **kwargs)
+    matcher_shift_x, matcher_shift_y, metrics, corrmap = func(reference_clip, moving_clip, **kwargs)
     if matcher_shift_x is None:
         return None, None, None
-
-    # shift_x, shift_y are in the affine transformed space. They are relative to center of the affine transformed ROI.
-    # Apply the shift to the center of the moving roi to the center of the reference ROI in index space.
-    new_center_x = moving_roi.clip_center[0] + matcher_shift_x
-    new_center_y = moving_roi.clip_center[1] + matcher_shift_y
-    
-    new_x, new_y = moving_roi.clip_coordinate_to_image_coordinate(new_center_x, new_center_y)
-    
-    new_affine = tf.AffineTransform(translation=(-(moving_roi.x - new_x),
-                                                 -(moving_roi.y - new_y)))
-    
-    return new_affine, metrics, corrmap
+    return matcher_shift_x, matcher_shift_y, metrics, corrmap
 
 def iterative_phase(reference_roi, moving_roi, affine=tf.AffineTransform(), reduction=11, convergence_threshold=0.1, max_dist=50, **kwargs):
     """
@@ -394,9 +371,9 @@ def subpixel_register_point(pointid,
             baseline_affine = estimate_local_affine(reference_roi, moving_roi)
             # Updated so that the affine used is computed a single time.
             # Has not scale or shear or rotation.
-            updated_affine, maxcorr, _ = subpixel_template(reference_roi,
+            new_x, new_y, maxcorr, _ = subpixel_template(reference_roi,
                                                         moving_roi,
-                                                        affine=baseline_affine)
+                                                        func=func)
         except:
             updated_affine = None
         
@@ -419,7 +396,9 @@ def subpixel_register_point(pointid,
             continue
 
         measure.template_metric = maxcorr
-        dist = np.linalg.norm([measure.apriorisample-new_x, measure.aprioriline-new_y])
+        dist = np.sqrt((new_y - measure.aprioriline) ** 2 +\
+                    (new_x - measure.apriorisample) ** 2)
+        #dist = np.linalg.norm([measure.apriorisample-new_x, measure.aprioriline-new_y])
         measure.template_shift = dist
 
         cost = cost_func(measure.template_shift, measure.template_metric)
@@ -787,7 +766,7 @@ def fourier_mellen(ref_image, moving_image, affine=tf.AffineTransform(), verbose
       Error returned by the iterative phase matcher
     """
     # Get the affine transformation for scale + rotation invariance
-    affine = estimate_logpolar_transform(ref_image.clipped_array, moving_image.clipped_array, verbose=verbose)
+    affine = estimate_logpolar_transform(ref_image.clip(), moving_image.clip(), verbose=verbose)
 
     # get translation with iterative phase
     subpixel_affine, error, diffphase = iterative_phase(ref_image, moving_image, affine=affine, **phase_kwargs)
@@ -827,6 +806,7 @@ def subpixel_register_point_smart(point,
                                   parameters=[],
                                   chooser='subpixel_register_point_smart',
                                   verbose=False,
+                                  func=pattern_match,
                                   ncg=None):
 
     """
@@ -879,6 +859,7 @@ def subpixel_register_point_smart(point,
         nodes = {}
         for measure in measures:
             res = session.query(Images).filter(Images.id == measure.imageid).one()
+            logging.debug(f'Node instantiation image query result: {res.path, res.cam_type, res.dem, res.dem_type}')
             nn = NetworkNode(node_id=measure.imageid, 
                             image_path=res.path,
                             cam_type=res.cam_type,
@@ -894,41 +875,25 @@ def subpixel_register_point_smart(point,
     log.info(f'Source: sample: {source.sample} | line: {source.line}')
     updated_measures = []
     for i, measure in enumerate(measures):
-
         # If this is the reference node, do not attempt to match it.
         if i == reference_index:
             continue
 
         cost = None
         destination_node = nodes[measure.imageid]
-        log.info(f'Registering measure {measure.id} (image: {measure.imageid})')
-
-        # Compute the baseline metrics using the smallest window
-        size_x = np.inf
-        size_y = np.inf
-        for p in parameters:
-            match_kwarg = p['match_kwargs']
-            if match_kwarg['template_size'][0] < size_x:
-                size_x = match_kwarg['template_size'][0]
-            if match_kwarg['template_size'][1] < size_y:
-                size_y = match_kwarg['template_size'][1]
+        log.info(f'Registering measure {measure.id} (image: {measure.imageid}, serial: {measure.serial})')
 
         reference_roi = roi.Roi(source_node.geodata, 
                                 source.apriorisample, 
-                                source.aprioriline, 
-                                size_x=size_x, 
-                                size_y=size_y, 
-                                buffer=0)
+                                source.aprioriline)
+
         moving_roi = roi.Roi(destination_node.geodata, 
                              measure.apriorisample, 
-                             measure.aprioriline, 
-                             size_x=size_x, 
-                             size_y=size_y, 
-                             buffer=20)
-
+                             measure.aprioriline,
+                             )
         try:
-            baseline_affine = estimate_local_affine(reference_roi,
-                                                    moving_roi)
+            baseline_affine = estimate_local_affine(moving_roi,
+                                                    reference_roi)
         except Exception as e:
             log.exception(e)
             m = {'id': measure.id,
@@ -938,15 +903,12 @@ def subpixel_register_point_smart(point,
                  'choosername':chooser}
             updated_measures.append([None, None, m])
             continue
-
-        reference_roi.clip()
-        reference_clip = reference_roi.clipped_array
-
+        
         # If the image read center plus buffer is outside the image, clipping
         # raises an index error. Handle and set the measure false.
         try:
-            moving_roi.clip(affine=baseline_affine)
-            moving_clip = moving_roi.clipped_array
+            reference_clip = reference_roi.clip(affine=baseline_affine, buffer=10)
+            moving_clip = moving_roi.clip(buffer=5)
         except Exception as e:
             log.error(e)
             m = {'id': measure.id,
@@ -979,72 +941,62 @@ def subpixel_register_point_smart(point,
             continue
 
         # Compute the a priori template and MI correlations with no shifts allowed. 
-        _, baseline_corr, _ = subpixel_template(reference_roi, 
-                                                moving_roi,
-                                                affine=baseline_affine)
-        
+        _,_, baseline_corr, _ = subpixel_template(reference_clip, 
+                                                  moving_clip)
+        if baseline_corr == None:
+            baseline_corr = -1.0
+
         baseline_mi = 0 #mutual_information_match(reference_roi, 
                         #                         moving_roi, 
                         #                         affine=baseline_affine)
         
         log.info(f'Baseline MI: {baseline_mi} | Baseline Corr: {baseline_corr}')
-        
+
         for parameter in parameters:
             match_kwargs = parameter['match_kwargs']
 
-            reference_roi = roi.Roi(source_node.geodata,
-                                    source.apriorisample,
-                                    source.aprioriline,
-                                    size_x=match_kwargs['image_size'][0],
-                                    size_y=match_kwargs['image_size'][1], 
-                                    buffer=0)
-            moving_roi = roi.Roi(destination_node.geodata,
-                                 measure.apriorisample,
-                                 measure.aprioriline,
-                                 size_x=match_kwargs['template_size'][0],
-                                 size_y=match_kwargs['template_size'][1], 
-                                 buffer=20)
+            reference_clip = reference_roi.clip(size_x=match_kwargs['template_size'][0],
+                                                size_y=match_kwargs['template_size'][1],
+                                                buffer=10)
+            moving_clip = moving_roi.clip(size_x=match_kwargs['image_size'][0],
+                                          size_y=match_kwargs['image_size'][1], 
+                                          affine=baseline_affine,
+                                          buffer=5)
             if verbose:
-                fig, axes = plt.subplots(1,2)
-                reference_roi.clip()
-                moving_roi.clip(affine=baseline_affine)
-                axes[0].imshow(reference_roi.clipped_array, cmap='Greys')
-                axes[1].imshow(moving_roi.clipped_array, cmap='Greys')
-                plt.show()
+                try:
+                    fig, axes = plt.subplots(1,2)
+                    axes[0].imshow(reference_clip, cmap='Greys')
+                    axes[1].imshow(moving_clip, cmap='Greys')
+                    plt.show()
+                except: pass
             try:  # Handle the case where the parameter set plus the buffer is outside
                   # the image and the clip raises an index error.
-                updated_affine, maxcorr, _ = subpixel_template(reference_roi,
-                                                            moving_roi,
-                                                            affine=baseline_affine)
+                clip_x, clip_y , maxcorr, _ = subpixel_template(reference_clip,
+                                                                  moving_clip,
+                                                                  func=func)
             except Exception as e:
                 log.error(e)
-                updated_affine = None
-
-            if updated_affine is None:
                 log.warning(f'Unable to match with this parameter set.')
                 continue
-            else:
-                mi_metric=0
-                metric = maxcorr
-                new_x, new_y = updated_affine([measure.apriorisample, measure.aprioriline])[0]
-                
-                dist = np.linalg.norm([measure.aprioriline-new_x, 
-                                       measure.apriorisample-new_y])
-                cost = cost_func(dist, metric)
 
-                m = {'id': measure.id,
-                    'sample':new_x,
-                    'line':new_y,
-                    'weight':cost,
-                    'choosername':chooser,
-                    'template_metric':metric,
-                    'template_shift':dist,
-                    'mi_metric': mi_metric,
-                    'status': True}
-                log.info(f'METRIC: {metric}| SAMPLE: {new_x} | LINE: {new_y} | MI: {mi_metric}')
+            new_x, new_y = moving_roi.clip_coordinate_to_image_coordinate((clip_x,clip_y))
+            dist = np.sqrt((measure.aprioriline - new_y) ** 2 +\
+                            (measure.apriorisample - new_x) ** 2)
+            
+            cost = cost_func(dist, maxcorr)
+
+            m = {'id': measure.id,
+                'sample':new_x,
+                'line':new_y,
+                'weight':cost,
+                'choosername':chooser,
+                'template_metric':maxcorr,
+                'template_shift':dist,
+                'mi_metric': 0,
+                'status': True}
+            log.info(f'METRIC: {maxcorr}| SAMPLE: {new_x} | LINE: {new_y} | MI: 0')
             
             updated_measures.append([baseline_mi, baseline_corr, m])
-
     # Baseline MI, Baseline Correlation, updated measures to select from
     return updated_measures
 
@@ -1088,7 +1040,7 @@ def check_for_shift_consensus(shifts, tol=0.1):
     # a close location
     return col_sums >= 2
     
-def decider(measures, tol=0.5):
+def decider(measures, tol=0.6):
     """
     The logical decision function that determines which measures would be updated
     with subpixel registration or ignored. The function iterates over the measures,
@@ -1138,13 +1090,10 @@ def decider(measures, tol=0.5):
         baseline_mi = v[:,4]
         baseline_corr = v[:,5]
         cost = (baseline_mi - mi) + (baseline_corr - corr)
-
         # At least two of the correlators need to have found a soln within 0.5 pixels.
         shift_mask = check_for_shift_consensus(v[:,:2], tol=tol)
-
         # This is formulated as a minimization, so the best is the min cost
         best_cost = np.argmin(cost)
-
         if shift_mask[best_cost] == False:
             # The best cost does not have positional consensus
             measures_to_set_false.append(k)
@@ -1171,6 +1120,7 @@ def validate_candidate_measure(measure_to_register,
                                session=None,
                                ncg=None,
                                parameters=[],
+                               func=pattern_match,
                                **kwargs):
     """
     Compute the matching distances, matching the reference measure to the measure
@@ -1226,12 +1176,20 @@ def validate_candidate_measure(measure_to_register,
 
         source_imageid = measure.imageid
         source_image = session.query(Images).filter(Images.id == source_imageid).one()
-        source_node = NetworkNode(node_id=source_imageid, image_path=source_image.path)
+        source_node = NetworkNode(node_id=source_imageid, 
+                                  image_path=source_image.path, 
+                                  cam_type=source_image.cam_type,
+                                  dem=source_image.dem,
+                                  dem_type=source_image.dem_type)
         source_node.parent = ncg
 
         destination_imageid = reference_measure.imageid
         destination_image = session.query(Images).filter(Images.id == destination_imageid).one()
-        destination_node = NetworkNode(node_id=destination_imageid, image_path=destination_image.path)
+        destination_node = NetworkNode(node_id=destination_imageid, 
+                                       image_path=destination_image.path,
+                                       cam_type=source_image.cam_type,
+                                       dem=destination_image.dem,
+                                       dem_type=destination_image.dem_type)
         destination_node.parent = ncg
         session.expunge_all()
 
@@ -1243,56 +1201,41 @@ def validate_candidate_measure(measure_to_register,
     reference_roi = roi.Roi(source_node.geodata, 
                             sample, 
                             line, 
-                            size_x=parameters[0]['match_kwargs']['image_size'][0],
-                            size_y=parameters[0]['match_kwargs']['image_size'][1], 
-                            buffer=0)
+                            buffer=2)
     moving_roi = roi.Roi(destination_node.geodata, 
                             reference_measure.sample, 
                             reference_measure.line, 
-                            size_x=parameters[0]['match_kwargs']['template_size'][0],
-                            size_y=parameters[0]['match_kwargs']['template_size'][1],
                             buffer=20)
-
-    try:
-        baseline_affine = estimate_local_affine(reference_roi, moving_roi)
-    except:
-        log.error('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
-        return [np.inf] * len(parameters)
     
+    try:
+        baseline_affine = estimate_local_affine(moving_roi, reference_roi)
+    except:
+       log.error('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
+       return [np.inf] * len(parameters)
 
     dists = []
     for i, parameter in enumerate(parameters):
         match_kwargs = parameter['match_kwargs']
 
-        reference_roi = roi.Roi(source_node.geodata, 
-                                sample, 
-                                line, 
-                                size_x=match_kwargs['image_size'][0],
-                                size_y=match_kwargs['image_size'][1], 
-                                buffer=0)
-        moving_roi = roi.Roi(destination_node.geodata, 
-                                reference_measure.sample, 
-                                reference_measure.line, 
-                                size_x=match_kwargs['template_size'][0],
-                                size_y=match_kwargs['template_size'][1],
-                                buffer=20)
+        reference_clip = reference_roi.clip(size_x=match_kwargs['template_size'][0],
+                                            size_y=match_kwargs['template_size'][1],
+                                            buffer=2)
+        moving_clip = moving_roi.clip(size_x=match_kwargs['image_size'][0],
+                                      size_y=match_kwargs['image_size'][1],
+                                      affine=baseline_affine.inverse,
+                                      buffer=20)
 
         # Handle the exception where the clip can raise an index error if it is outside the image
         try:
-            updated_affine, maxcorr, _ = subpixel_template(reference_roi,
-                                                        moving_roi,
-                                                        affine=baseline_affine)
+            clip_x, clip_y, maxcorr, _ = subpixel_template(reference_clip,
+                                                             moving_clip,
+                                                             func=func)
         except:
-            updated_affine = None
-
-        if updated_affine is None:
             continue
-        
-        new_x, new_y = updated_affine([reference_measure.sample, 
-                                    reference_measure.line])[0]
-        
-        dist = np.sqrt((new_y - reference_measure.line) ** 2 +\
-                    (new_x - reference_measure.sample) ** 2)
+        new_x, new_y = moving_roi.clip_coordinate_to_image_coordinate((clip_x,
+                                                                  clip_y))
+        dist = np.sqrt((new_y - reference_measure.aprioriline) ** 2 +\
+                    (new_x - reference_measure.apriorisample) ** 2)
         log.info(f'Validating using parameter set {i}. Reprojection distance: {dist}. Metric: {maxcorr}')
         dists.append(dist)
     return dists
@@ -1301,7 +1244,7 @@ def smart_register_point(point,
                          session=None,
                          parameters=[], 
                          shared_kwargs={}, 
-                         valid_reprojection_distance=1.1, 
+                         valid_reprojection_distance=1.5, 
                          ncg=None):
     """
     The entry func for the smart subpixel registration code. This is the user
@@ -1359,6 +1302,7 @@ def smart_register_point(point,
     # Validate that the new position has consensus
     for measure in measures_to_update:
         reprojection_distances = validate_candidate_measure(measure, session, parameters=parameters, ncg=ncg, **shared_kwargs)
+        log.info(f'Validation Distance Boolean: {np.array(reprojection_distances) < valid_reprojection_distance}')
         if np.sum(np.array(reprojection_distances) < valid_reprojection_distance) < 2:
             log.info(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")
             measures_to_set_false.append(measure['id'])
@@ -1432,11 +1376,8 @@ def mutual_information_match(moving_roi,
                Map of corrilation coefficients when comparing the template to
                locations within the search area
     """
-    reference_roi.clip()
-    moving_roi.clip(affine=affine)
-
-    moving_image = moving_roi.clipped_array
-    reference_template = reference_roi.clipped_array
+    reference_template = reference_roi.clip()
+    moving_image = moving_roi.clip(affine=affine)
 
     if func == None:
         func = mutual_information
