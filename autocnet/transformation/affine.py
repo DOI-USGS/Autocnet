@@ -31,11 +31,11 @@ def check_for_excessive_shear(transformation):
     return False
 
 def estimate_affine_from_sensors(reference_image,
-                                moving_image,
-                                bcenter_x,
-                                bcenter_y,
-                                size_x=60,
-                                size_y=60):
+                                 moving_image,
+                                 bcenter_x,
+                                 bcenter_y,
+                                 size_x=40,
+                                 size_y=40):
     """
     Using the a priori sensor model, project corner and center points from the reference_image into
     the moving_image and use these points to estimate an affine transformation.
@@ -75,14 +75,14 @@ def estimate_affine_from_sensors(reference_image,
     match_size = reference_image.raster_size
 
     # for now, require the entire window resides inside both cubes.
-    if base_stopx > match_size[0]:
-        raise Exception(f"Window: {base_stopx} > {match_size[0]}, center: {bcenter_x},{bcenter_y}")
-    if base_startx < 0:
-        raise Exception(f"Window: {base_startx} < 0, center: {bcenter_x},{bcenter_y}")
-    if base_stopy > match_size[1]:
-        raise Exception(f"Window: {base_stopy} > {match_size[1]}, center: {bcenter_x},{bcenter_y} ")
-    if base_starty < 0:
-        raise Exception(f"Window: {base_starty} < 0, center: {bcenter_x},{bcenter_y}")
+    # if base_stopx > match_size[0]:
+    #     raise Exception(f"Window: {base_stopx} > {match_size[0]}, center: {bcenter_x},{bcenter_y}")
+    # if base_startx < 0:
+    #     raise Exception(f"Window: {base_startx} < 0, center: {bcenter_x},{bcenter_y}")
+    # if base_stopy > match_size[1]:
+    #     raise Exception(f"Window: {base_stopy} > {match_size[1]}, center: {bcenter_x},{bcenter_y} ")
+    # if base_starty < 0:
+    #     raise Exception(f"Window: {base_starty} < 0, center: {bcenter_x},{bcenter_y}")
     
     x_coords = [base_startx, base_startx, base_stopx, base_stopx, bcenter_x]
     y_coords = [base_starty, base_stopy, base_stopy, base_starty, bcenter_y]
@@ -99,21 +99,29 @@ def estimate_affine_from_sensors(reference_image,
         if xs[i] is not None and ys[i] is not None:
             dst_gcps.append((xs[i], ys[i]))
             base_gcps.append((base_x, base_y))
-
     if len(dst_gcps) < 3:
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_gcps)} points, but need at least 3.')
 
     log.debug(f'Number of GCPs for affine estimation: {len(dst_gcps)}')
+    affine = tf.AffineTransform()
+    # Estimate the affine twice. The first time to get an initial estimate
+    # and the second time to drop points with an estimated reprojection 
+    # error greater than or equal to 0.1px.
+    affine.estimate(np.array(base_gcps), np.array(dst_gcps))
+    residuals = affine.residuals(np.array(base_gcps), np.array(dst_gcps))
+    mask = residuals <= 0.1
+    if len(np.array(base_gcps)[mask]) < 3:
+        raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(np.array(dst_gcps)[mask])} points, but need at least 3.')
 
-    affine = tf.estimate_transform('projective', np.array([*base_gcps]), np.array([*dst_gcps]))
-    #affine = tf.estimate_transform('affine', np.array([*base_gcps]), np.array([*dst_gcps]))
+    affine.estimate(np.array(base_gcps)[mask], np.array(dst_gcps)[mask])
+    affine = tf.estimate_transform('affine', np.array(base_gcps), np.array(dst_gcps))
     log.debug(f'Computed afffine: {affine}')
     t2 = time.time()
     log.debug(f'Estimation of local affine took {t2-t1} seconds.')
     return affine
 
 
-def estimate_local_affine(reference_roi, moving_roi):
+def estimate_local_affine(reference_roi, moving_roi, size_x=60, size_y=60):
     """
     Applies the affine transfromation calculated in estimate_affine_from_sensors to the moving region of interest (ROI).
     
@@ -132,51 +140,17 @@ def estimate_local_affine(reference_roi, moving_roi):
     affine
         Affine matrix to transform the moving image onto the center image
     """
-    # get initial affine
-    roi_buffer = reference_roi.buffer
-    size_x = 60  # reference_roi.size_x + roi_buffer
-    size_y = 60  # reference_roi.size_y + roi_buffer
-    
-    affine_transform = estimate_affine_from_sensors(reference_roi.data, 
+    transformation_matrix = estimate_affine_from_sensors(reference_roi.data, 
                                                     moving_roi.data, 
                                                     reference_roi.x, 
                                                     reference_roi.y, 
                                                     size_x=size_x, 
                                                     size_y=size_y)
 
-    #log.debug(f'Affine shear: {affine_transform.shear}')
-    # if abs(affine_transform.shear) > 1e-2:
-    #     # Matching LROC NAC high slew images to nadir images demonstrated that affine transformations
-    #     # with high shear match poorly. The search templates also have reflection (ROI object, x/y_read_length)
-    #     # because a high shear affine requires  alot of data to be read in. 
-    #     # TODO: Consider handling this differently in the future should nadir to high slew image matching be required.
-    #     raise Exception(f'Affine shear: {affine_transform.shear} is greater than 1e-2. It is highly unlikely that these images will match, so skipping.')
-    # The above coordinate transformation to get the center of the ROI handles translation. 
-    # So, we only need to rotate/shear/scale the ROI. Omitting scale, which should be 1 (?) results
-    # in an affine transoformation that does not match the full image affine
-    # tf_rotate = tf.AffineTransform(rotation=affine_transform.rotation, 
-    #                                shear=affine_transform.shear,
-    #                                scale=affine_transform.scale)
-    # Remove the translation from the transformation. Translation is added below to ensure the
-    # transform is centered on the ROI.
-    matrix = affine_transform.params
+
+    # Remove the translation from the transformation. Users of this function should add
+    matrix = transformation_matrix.params
     matrix[0][-1] = 0
     matrix[1][-1] = 0
-    affine_transform = tf.AffineTransform(matrix)
-
-    # This rotates about the center of the image
-    shift_x, shift_y = moving_roi.clip_center
-    if moving_roi.buffer:
-        shift_x += moving_roi.buffer
-        shift_y += moving_roi.buffer
-        
-    tf_shift = tf.SimilarityTransform(translation=[shift_x, shift_y])
-    tf_shift_inv = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
-    
-    # Define the full chain multiplying the transformations (read right to left),
-    # this is 'shift to the center', apply the rotation, shift back
-    # to the origin.
-    trans = tf_shift_inv + affine_transform + tf_shift
-    if check_for_excessive_shear(trans):
-        raise Exception(f'Shear Warning: It is highly unlikely that these images will not match, due to differing view geometries.')
-    return trans
+    tf_rotate = tf.AffineTransform(matrix)
+    return tf_rotate

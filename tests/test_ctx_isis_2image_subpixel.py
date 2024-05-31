@@ -131,15 +131,13 @@ def test_ctx_pair_to_df(session,
                                                                      session,
                                                                      parameters=parameters,
                                                                      shared_kwargs=shared_kwargs)
-
     assert measures_to_set_false == []
-
     m0 = measures_to_update[0]
-    # assert m0['sample'] == 364.76756113601755
-    # assert m0['line'] == 525.3550626650527
-    # assert m0['template_metric'] == 0.625694990158081
-    # assert m0['ignore'] == False
-    # assert m0['template_shift'] == 238.62787986417288
+    assert m0['sample'] == pytest.approx(364.581, abs=0.001) 
+    assert m0['line'] == pytest.approx(525.853, abs=0.001)
+    assert m0['template_metric'] == pytest.approx(0.56, abs=0.01)
+    assert m0['ignore'] == False
+    assert m0['template_shift'] == pytest.approx(11.647, abs=0.001)
 
     with mock.patch('pandas.read_sql') as db_response:
         db_cnet = pd.DataFrame([
@@ -155,5 +153,5 @@ def test_ctx_pair_to_df(session,
     df.rename(columns={'pointtype':'pointType',
                         'measuretype':'measureType'},
                         inplace=True)
-    to_isis(df, 'tests/artifacts/ctx_isis_pair_to_df.cnet', targetname='Mars')
-    write_filelist([g02_image.path, n06_image.path], 'tests/artifacts/ctx_isis_pair_to_df.lis')
+    to_isis(df, 'tests/artifacts/test_ctx_isis_2image_subpixel.cnet', targetname='Mars')
+    write_filelist([g02_image.path, n06_image.path], 'tests/artifacts/test_ctx_isis_2image_subpixel.lis')

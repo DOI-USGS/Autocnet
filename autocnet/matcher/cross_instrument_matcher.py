@@ -357,7 +357,6 @@ def propagate_point(lon,
                 axes[2].set_title(f'Affine Transformed Moving Image');
 
                 new_center_x, new_center_y = updated_affine([moving_roi.clip_center[0], moving_roi.clip_center[1]])[0]
-                print(new_center_x, new_center_y)
                 axes[2].scatter(new_center_x, new_center_y, c='b', label='registered point');
                 axes[2].legend();
                 plt.show();

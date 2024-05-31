@@ -56,7 +56,7 @@ class Roi():
              a scikit image affine transformation object that is applied when clipping. The default,
              identity matrix results in no transformation.
     """
-    def __init__(self, data, x, y, size_x=200, size_y=200, ndv=None, ndv_threshold=0.5, buffer=5, affine=tf.AffineTransform()):
+    def __init__(self, data, x, y, size_x=200, size_y=200, ndv=None, ndv_threshold=0.5, buffer=5):
         if not isinstance(data, AGeoDataset):
             raise TypeError('Error: data object must be an autocnet AGeoDataset')
         self.data = data
@@ -66,26 +66,15 @@ class Roi():
         self.size_y = size_y
         self.ndv = ndv
         self._ndv_threshold = ndv_threshold
-        self.buffer = buffer
-        self.affine = affine
-
+    
     @property
     def center(self):
         return (self.x, self.y)
-
+    
     @property
     def clip_center(self):
-        if not hasattr(self, '_clip_center'):
-            self.clip()
-        return self._clip_center
-
-    @property
-    def affine(self):
-        return self._affine
-
-    @affine.setter
-    def affine(self, affine=tf.AffineTransform()):
-        self._affine = affine
+        return (self.size_x - 0.5, 
+                self.size_y - 0.5)
 
     @property
     def x(self):
@@ -95,7 +84,6 @@ class Roi():
     def x(self, x):
         self._whole_x = floor(x)
         self._remainder_x = x - self._whole_x
-        return self._whole_x + self._remainder_x
 
     @property
     def y(self):
@@ -155,9 +143,6 @@ class Roi():
         In full image space, this method computes the valid
         pixel indices that can be extracted.
         """
-        raster_size = self.data.raster_size
-
-        # what is the extent that can actually be extracted?
         left_x = self._whole_x - self.size_x
         right_x = self._whole_x + self.size_x
         top_y = self._whole_y - self.size_y
@@ -165,71 +150,92 @@ class Roi():
 
         return [left_x, right_x, top_y, bottom_y]
 
-
-    @property
-    def is_valid(self):
+    def clip_coordinate_to_roi_coordinate(self, xy):
         """
-        True if all elements in the clipped ROI are valid, i.e.,
-        no null pixels (as defined by the no data value (ndv)) are
-        present.
-        """
-        if self.ndv == None:
-            return True
-        # Check if we have any ndv values this will return an inverted array
-        # where all no data values are true, we need to then invert the array
-        # and return the all result. This ensures that a valid array will return
-        # True
-        return np.invert(np.isclose(self.ndv, self.clipped_array)).all()
-
-
-    @property
-    def variance(self):
-        return np.var(self.clipped_array)
-
-    @property
-    def clipped_array(self):
-        """
-        The clipped array associated with this ROI.
-        """
-        if not hasattr(self, "_clipped_array"):
-            self.clip()
-        return self._clipped_array
-
-    def clip_coordinate_to_image_coordinate(self, x, y):
-        """
-        Take a passed coordinate in a clipped array from an ROI and return the coordinate
-        in the full image.
+        Take a passed coordinate in an array clipped from the ROI 
+        and return the coordinate in ROI reference frame.
 
         Parameters
         ----------
-        x : float
-            The x coordinate in an affinely tranfromed clipped array to be transformed 
-            into full image coordinates
-
-        y : float
-            The y coordinate in an affinely transfromed clipped array to be transformed 
-            into full image coordinates
+        xy : iterable
+            The (x,y) coordinate pair to be transformed.
 
         Returns
         -------
-        x_in_image_space : float
-                           The transformed x in image coordinate space
-
-        y_in_imag_space : float
-                          The transformed y in image coordinate space
+        xy_in_image_space : iterable
+                           The transformed xy in ROI reference frame
         """
-        x_in_affine_space = x + self._clip_start_x
-        y_in_affine_space = y + self._clip_start_y
+        clip_affine = (tf.SimilarityTransform(translation=((-self.size_x, -self.size_y))) + \
+                        (self.affine + \
+                        tf.SimilarityTransform(translation=(self.size_x, self.size_y))))
+        transformed = clip_affine.inverse(xy)
+        if len(transformed) == 1:
+            return transformed[0]
+        else:
+            return transformed
 
-        x_in_clip_space, y_in_clip_space = self.affine((x_in_affine_space,
-                                                        y_in_affine_space))[0]
+    def roi_coordinate_to_image_coordinate(self, xy):
+        """
+        Take a passed coordinate in the ROI reference frame and
+        transform it into the image reference frame.
 
-        x_in_image_space = x_in_clip_space + self._roi_x_to_clip_center
-        y_in_image_space = y_in_clip_space + self._roi_y_to_clip_center
+        Parameters
+        ----------
+        xy : iterable
+            The (x,y) coordinate pair to be transformed.
 
-        return x_in_image_space, y_in_image_space
+        Returns
+        -------
+        xy_in_image_space : iterable
+                           The transformed xy in full image reference frame
+        """
+        roi2image = tf.SimilarityTransform(translation=(self.x-self.size_x, self.y-self.size_y))
+        transformed = roi2image(xy)
+        if len(transformed) == 1:
+            return transformed[0]
+        else:
+            return transformed
 
-    def clip(self, size_x=None, size_y=None, affine=None, dtype=None, warp_mode="reflect", coord_mode="reflect"):
+    def clip_coordinate_to_image_coordinate(self, xy):
+        """
+        Take a passed coordinate in an array clipped from the ROI 
+        and return the coordinate in full images reference frame.
+
+        Parameters
+        ----------
+        xy : iterable
+            The (x,y) coordinate pair to be transformed.
+
+        Returns
+        -------
+        xy_in_image_space : iterable
+                           The transformed xy in full image reference frame
+        """
+        clipped2roi = self.clip_coordinate_to_roi_coordinate(xy)
+        roi2image = self.roi_coordinate_to_image_coordinate(clipped2roi)
+        if len(roi2image) == 1:
+            return roi2image[0]
+        else:
+            return roi2image
+
+    def _compute_valid_read_range(self, buffer):
+        """
+        Compute the valid range of pixels that can be read
+        from the ROI's geodataset object.
+        """
+        min_x = self._whole_x - self.size_x - buffer
+        min_y = self._whole_y - self.size_y - buffer
+        x_read_length = (self.size_x * 2) + (buffer * 2)
+        y_read_length = (self.size_y * 2) + (buffer * 2)
+
+        # series of checks to make sure all pixels inside image limits
+        raster_xsize, raster_ysize = self.data.raster_size
+        if min_x < 0 or min_y < 0 or min_x+x_read_length > raster_xsize or min_y+y_read_length > raster_ysize:
+            raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
+
+        return [min_x, min_y, x_read_length, y_read_length]
+    
+    def clip(self, size_x=None, size_y=None, affine=tf.AffineTransform(), buffer=0, dtype=None, warp_mode="constant", coord_mode="constant", min_size=24):
         """
         Compatibility function that makes a call to the array property.
         Warning: The dtype passed in via this function resets the dtype attribute of this
@@ -249,6 +255,11 @@ class Roi():
 
         affine : object
                  A scikit image AffineTransform object that is used to warp the clipped array.
+        
+        buffer : int
+                 The number of pixels to buffer the read by. The buffer argument is used to ensure
+                 that the final ROI does not have no data values in it due to reprojection by the 
+                 affine.
 
         mode : string
                An optional mode to be used when affinely transforming the clipped array. Ideally,
@@ -260,85 +271,30 @@ class Roi():
          : ndarray
            The array attribute of this object.
         """
+        self.affine = affine
         if size_x:
             self.size_x = size_x
         if size_y:
             self.size_y = size_y
+        pixels = self._compute_valid_read_range(buffer)
 
-        min_x = self._whole_x - self.size_x - self.buffer
-        min_y = self._whole_y - self.size_y - self.buffer
-        x_read_length = (self.size_x * 2) + 1 + (self.buffer * 2)
-        y_read_length = (self.size_y * 2) + 1 + (self.buffer * 2)
-
-        # series of checks to make sure all pixels inside image limits
-        raster_xsize, raster_ysize = self.data.raster_size
-        if min_x < 0 or min_y < 0 or min_x+x_read_length > raster_xsize or min_y+y_read_length > raster_ysize:
-            print('FAILURE: ', self.data.file_name, min_x, min_y, x_read_length, y_read_length)
-            raise IndexError('Image coordinates plus read buffer are outside of the available data. Please select a smaller ROI and/or a smaller read buffer.')
-
-        pixels = [min_x, min_y, x_read_length, y_read_length]
-        # This data is an nd-array that is larger than originally requested, because it may be affine warped.
         data = self.data.read_array(pixels=pixels, dtype=dtype)
 
-        data_center = np.array(data.shape[::-1]) / 2.  # Location within a pixel
-        self._roi_x_to_clip_center = self.x - data_center[0]
-        self._roi_y_to_clip_center = self.y - data_center[1]
+        # Create a data centered transformation (scikit-image defaults
+        # to warping about the upper-left origin).
+        roi_center = (np.array(data.shape))[::-1] / 2.  # Where center is a zero based index of the image center
+        self.subwindow_affine = (tf.SimilarityTransform(translation=(-roi_center)) + \
+                                (affine + \
+                                tf.SimilarityTransform(translation=roi_center)))
 
-        if affine:
-            self.affine = affine
-            # The cval is being set to the mean of the array,
-            warped_data = tf.warp(data,
-                                self.affine,
-                                order=3,
-                                mode=warp_mode,
-                                cval=0.1)
-
-
-            self.warped_array_center = self.affine.inverse(data_center)[0]
-
-            # Warped center coordinate - offset from pixel center to pixel edge - desired size
-            self._clip_start_x = self.warped_array_center[0] - 0.5 - self.size_x
-            self._clip_start_y = self.warped_array_center[1] - 0.5 - self.size_y
-
-            # Now that the whole pixel array has been warped, interpolate the array to align pixel edges
-            xi = np.linspace(self._clip_start_x,
-                             self._clip_start_x + (self.size_x * 2) + 1,
-                             (self.size_x * 2) + 1)
-            yi = np.linspace(self._clip_start_y,
-                             self._clip_start_y + (self.size_y * 2) + 1,
-                             (self.size_y * 2) + 1)
-
-            # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
-            pixel_locked = ndimage.map_coordinates(warped_data,
-                                        np.meshgrid(yi, xi, indexing='ij'),
-                                        mode=coord_mode,
-                                        order=3)
-
-            self._clip_center = tuple(np.array(pixel_locked.shape)[::-1] / 2.0)
-
-            self._clipped_array = img_as_float32(pixel_locked)
-
+        warped_data = tf.warp(data,
+                              self.subwindow_affine.inverse,
+                              order=3,
+                              preserve_range=True)
+        # If a buffer was passed, clip the returned data to remove the buffer.
+        # This is important when the affine transformation might introduce no
+        # data values about the edges that will impact template matching.
+        if buffer:
+            return warped_data[buffer:-buffer,buffer:-buffer]
         else:
-            # Now that the whole pixel array has been read, interpolate the array to align pixel edges
-            xi = np.linspace(self._remainder_x,
-                            ((self.buffer*2) + self._remainder_x + (self.size_x*2)),
-                            (self.size_x*2+1)+(self.buffer*2))
-            yi = np.linspace(self._remainder_y,
-                            ((self.buffer*2) + self._remainder_y + (self.size_y*2)),
-                            (self.size_y*2+1)+(self.buffer*2))
-
-            # the xi, yi are intentionally handed in backward, because the map_coordinates indexes column major
-            pixel_locked = ndimage.map_coordinates(data,
-                                        np.meshgrid(yi, xi, indexing='ij'),
-                                        mode=coord_mode,
-                                        order=3)
-            
-            if self.buffer != 0:
-                pixel_locked = pixel_locked[self.buffer:-self.buffer,
-                                            self.buffer:-self.buffer]
-
-            self._clip_center = tuple(np.array(pixel_locked.shape)[::-1] / 2.)
-            self.warped_array_center = self._clip_center
-            self._clipped_array = img_as_float32(pixel_locked)
-
-
+            return warped_data

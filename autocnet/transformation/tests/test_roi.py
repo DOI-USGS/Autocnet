@@ -27,11 +27,6 @@ def test_geodata_is_valid(geodata_b):
     roi.clip()
     assert roi.is_valid == True
 
-def test_center(geodata_c):
-    geodata_c.read_array.return_value = np.ones((20, 20))
-    roi = Roi(geodata_c, 5, 5, size_x=5, size_y=5, buffer=5)
-    assert roi.center == (5.0, 5.0)
-
 @pytest.mark.parametrize("x, y, axr, ayr",[
                          (10.1, 10.1, .1, .1),
                          (10.5, 10.5, .5, .5),

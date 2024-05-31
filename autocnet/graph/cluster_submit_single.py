@@ -1,13 +1,54 @@
-import sys
 import json
+import socket
+import sys
+from time import sleep
 
-from autocnet.graph.network import NetworkCandidateGraph
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
+
 from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
 from autocnet.utils.utils import import_func
-from autocnet.utils.serializers import JsonEncoder, object_hook
+from autocnet.utils.serializers import object_hook
+from autocnet.io.db.model import Measures, Points, Overlay, Images
 
-def _instantiate_obj(msg, ncg):
+apply_iterable_options = {
+                'measures' : Measures,
+                'measure' : Measures,
+                'm' : Measures,
+                2 : Measures,
+                'points' : Points,
+                'point' : Points,
+                'p' : Points,
+                3 : Points,
+                'overlaps': Overlay,
+                'overlap' : Overlay,
+                'o' :Overlay,
+                4: Overlay,
+                'image': Images,
+                'images': Images,
+                'i': Images,
+                5: Images
+            }
+
+def retry(max_retries=3, wait_time=300):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            if retries < max_retries:
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                except:
+                    retries += 1
+                    sleep(wait_time)
+            else:
+                raise Exception(f"Maximum retires of {func} exceeded")
+        return wrapper
+    return decorator
+
+@retry(max_retries=5)
+def _instantiate_obj(msg):
     """
     Instantiate either a NetworkNode or a NetworkEdge that is the
     target of processing.
@@ -22,21 +63,39 @@ def _instantiate_obj(msg, ncg):
         obj = NetworkEdge()
         obj.source = NetworkNode(node_id=id[0], image_path=image_path[0])
         obj.destination = NetworkNode(node_id=id[1], image_path=image_path[1])
-    obj.parent = ncg
     return obj
 
-def _instantiate_row(msg, ncg):
+@retry(max_retries=5)
+def _instantiate_row(msg, session):
     """
     Instantiate some db.io.model row object that is the target
     of processing.
     """
     # Get the dict mapping iterable keyword types to the objects
-    objdict = ncg.apply_iterable_options
-    obj = objdict[msg['along']]
-    with ncg.session_scope() as session:
-        res = session.query(obj).filter(getattr(obj, 'id')==msg['id']).one()
-        session.expunge_all() # Disconnect the object from the session
+    obj = apply_iterable_options[msg['along']]
+    res = session.query(obj).filter(getattr(obj, 'id')==msg['id']).one()
+    session.expunge_all() # Disconnect the object from the session
     return res
+
+@retry()
+def get_db_connection(dbconfig):
+    db_uri = 'postgresql://{}:{}@{}:{}/{}'.format(dbconfig['username'],
+                                                  dbconfig['password'],
+                                                  dbconfig['host'],
+                                                  dbconfig['pgbouncer_port'],
+                                                  dbconfig['name'])
+    hostname = socket.gethostname()
+
+    engine = create_engine(db_uri,
+        poolclass=NullPool,
+        connect_args={"application_name":f"AutoCNet_{hostname}"},
+        isolation_level="AUTOCOMMIT",
+        pool_pre_ping=True)
+    return engine
+
+@retry()
+def execute_func(func, *args, **kwargs):
+    return func(*args, **kwargs)
 
 def process(msg):
     """
@@ -48,15 +107,18 @@ def process(msg):
     msg : dict
           The message that parametrizes the job.
     """
+    from sqlalchemy.orm import Session
+
     # Deserialize the message
     msg = json.loads(msg, object_hook=object_hook)
 
-    ncg = NetworkCandidateGraph()
-    ncg.config_from_dict(msg['config'])
+    engine = get_db_connection(msg['config']['database'])
+    
     if msg['along'] in ['node', 'edge']:
-        obj = _instantiate_obj(msg, ncg)
-    elif msg['along'] in ['candidategroundpoints', 'points', 'measures', 'overlaps', 'images']:
-        obj = _instantiate_row(msg, ncg)
+        obj = _instantiate_obj(msg)
+    elif msg['along'] in ['points', 'measures', 'overlaps', 'images']:
+        with Session(engine) as session:
+            obj = _instantiate_row(msg, session)
     else:
         obj = msg['along']
 
@@ -66,22 +128,25 @@ def process(msg):
     #
     # All args/kwargs are passed through the RedisQueue, and then right on to the func.
     func = msg['func']
-    if callable(func):  # The function is a de-serialzied function
-        msg['args'] = (obj, *msg['args'])
-        msg['kwargs']['ncg'] = ncg
-    elif hasattr(obj, msg['func']):  # The function is a method on the object
-        func = getattr(obj, msg['func'])
-    else:  # The func is a function from a library to be imported
-        func = import_func(msg['func'])
-        # Get the object begin processed prepended into the args.
-        msg['args'] = (obj, *msg['args'])
-        # For now, pass all the potential config items through
-        # most funcs will simply discard the unnecessary ones.
-        msg['kwargs']['ncg'] = ncg
-        msg['kwargs']['session'] = ncg.Session
+    with Session(engine) as session:
+        if callable(func):  # The function is a de-serialzied function
+            msg['args'] = (obj, *msg['args'])
+            msg['kwargs']['session'] = session
+        elif hasattr(obj, msg['func']):  # The function is a method on the object
+            func = getattr(obj, msg['func'])
+        else:  # The func is a function from a library to be imported
+            func = import_func(msg['func'])
+            # Get the object begin processed prepended into the args.
+            msg['args'] = (obj, *msg['args'])
+            # For now, pass all the potential config items through
+            # most funcs will simply discard the unnecessary ones.
+            msg['kwargs']['session'] = session
 
     # Now run the function.
-    res = func(*msg['args'], **msg['kwargs'])
+    res = execute_func(func,*msg['args'], **msg['kwargs'])
+
+    del Session
+    del engine
 
     # Update the message with the True/False
     msg['results'] = res

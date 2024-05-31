@@ -7,6 +7,7 @@ from mock_alchemy.mocking import UnifiedAlchemyMagicMock
 from plio.io.io_controlnetwork import to_isis, write_filelist
 
 from autocnet.matcher.subpixel import smart_register_point
+from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg, pattern_match_chi2
 from autocnet.io.db.model import Points, Measures, Images
 from autocnet.io.db.controlnetwork import db_to_df
 from autocnet.examples import get_path
@@ -133,16 +134,16 @@ def test_ctx_pair_to_df(session,
     """
     # Pulled directly from CTX control project.
     parameters = [
-        {'match_kwargs': {'image_size':(60,60), 'template_size':(30,30)}},
-        {'match_kwargs': {'image_size':(75,75), 'template_size':(33,33)}},
-        {'match_kwargs': {'image_size':(90,90), 'template_size':(36,36)}},
-        {'match_kwargs': {'image_size':(110,110), 'template_size':(40,40)}},
-        {'match_kwargs': {'image_size':(125,125), 'template_size':(44,44)}},
-        {'match_kwargs': {'image_size':(140,140), 'template_size':(48,48)}}
+        {'match_kwargs': {'image_size':(30,30), 'template_size':(30,30)}},
+        {'match_kwargs': {'image_size':(40,40), 'template_size':(40,40)}},
+        {'match_kwargs': {'image_size':(50,50), 'template_size':(50,50)}},
+        {'match_kwargs': {'image_size':(60,60), 'template_size':(60,60)}}
     ]
 
     shared_kwargs = {'cost_func':lambda x,y:y,
-                     'chooser':'smart_subpixel_registration'}
+                     'chooser':'smart_subpixel_registration',
+                     'func':pattern_match_chi2}
+    
     for point in points:
 
         # Somewhere in subpixel, need to add the offsets back to samp/line based
@@ -152,22 +153,22 @@ def test_ctx_pair_to_df(session,
                                                                          session,
                                                                          parameters=parameters,
                                                                          shared_kwargs=shared_kwargs)
-
         assert measures_to_set_false == []
 
         m0 = measures_to_update[0]
-        assert m0['sample'] == pytest.approx(764.0372, abs=0.001)
-        assert m0['line'] == pytest.approx(1205.919, abs=0.001)
-        assert m0['template_metric'] == pytest.approx(0.962, abs=0.01)
+        assert m0['sample'] == pytest.approx(763.889, abs=0.001)
+        assert m0['line'] == pytest.approx(1205.944, abs=0.001)
+        assert m0['template_metric'] == pytest.approx(3.718, abs=0.01)
         assert m0['ignore'] == False
-        assert m0['template_shift'] == pytest.approx(631.688, abs=0.001)
-        
+        assert m0['template_shift'] == pytest.approx(8.069, abs=0.001)
+
         m1 = measures_to_update[1]
-        assert m1['sample'] == pytest.approx(842.99, abs=0.001)
-        assert m1['line'] == pytest.approx(1547.571, abs=0.001)
-        assert m1['template_metric'] == pytest.approx(0.957, abs=0.01)
+
+        assert m1['sample'] == pytest.approx(842.817, abs=0.001)
+        assert m1['line'] == pytest.approx(1547.653, abs=0.001)
+        assert m1['template_metric'] == pytest.approx(3.718, abs=0.01)
         assert m1['ignore'] == False
-        assert m1['template_shift'] == pytest.approx(1006.525, abs=0.001)
+        assert m1['template_shift'] == pytest.approx(12.048, abs=0.005)
 
         dfs = []
         with mock.patch('pandas.read_sql') as db_response:
@@ -187,5 +188,5 @@ def test_ctx_pair_to_df(session,
     df.rename(columns={'pointtype':'pointType',
                         'measuretype':'measureType'},
                         inplace=True)
-    to_isis(df, 'tests/artifacts/ctx_isis_trio_to_df2.cnet', targetname='Mars')
-    write_filelist([n12_image.path, b10_image.path, k12_image.path], 'tests/artifacts/ctx_isis_trio_to_df2.lis')
+    to_isis(df, 'tests/artifacts/test_ctx_isis_3image_subpixel2.cnet', targetname='Mars')
+    write_filelist([n12_image.path, b10_image.path, k12_image.path], 'tests/artifacts/test_ctx_isis_3image_subpixel2.lis')

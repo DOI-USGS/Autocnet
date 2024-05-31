@@ -40,3 +40,6 @@ dependencies:
   - conda-forge::usgscsm
   - vlfeat
   - protobuf
+  - pip
+  - pip:
+    - image-registration

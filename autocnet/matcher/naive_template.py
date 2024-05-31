@@ -7,11 +7,44 @@ import numpy as np
 from scipy.ndimage import center_of_mass
 from skimage.transform import rescale
 from skimage.util import img_as_float32
+from image_registration import chi2_shift
 
 log = logging.getLogger(__name__)
 
+def _template_match(image, template, metric):
+    template = img_as_float32(template)
+    image = img_as_float32(image)
+    
+    # If image is WxH and templ is wxh  , then result is (W-w)+1, (H-h)+1 .
+    w, h = template.shape[::-1]
+    corrmap = cv2.matchTemplate(image, template, method=metric)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(corrmap)
+    if metric in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+        top_left = min_loc
+        max_corr = min_val
+    else:
+        top_left = max_loc
+        max_corr = max_val
+    # This is the location in the image where the match has occurred.
+    # I need the shift in the template needed to get into alignment (so the inverse!)
+    # Need to take the initial location in the image and diff the updated location.
+    matched_x = top_left[0] + w//2
+    matched_y = top_left[1] + h//2
+    assert max_corr == np.max(corrmap)
+    return matched_x, matched_y, max_corr, corrmap
 
-def pattern_match_autoreg(template, image, subpixel_size=3, metric=cv2.TM_CCOEFF_NORMED):
+def pattern_match_chi2(image, template, usfac=16):
+    assert image.shape == template.shape
+
+    # Swapped so that we get the adjustment to the image to match the template
+    # like the other matchers.
+    dx, dy, err_x, err_y = chi2_shift(image, template, return_error=True, upsample_factor=usfac, boundary='constant')
+    shape_y, shape_x = np.array(template.shape)//2
+    err =  (err_x + err_y) / 2.
+    return shape_x-dx, shape_y-dy, err, None
+
+
+def pattern_match_autoreg(image, template, subpixel_size=5, metric=cv2.TM_CCOEFF_NORMED, upsampling=16):
     """
     Call an arbitrary pattern matcher using a subpixel approach where a center of gravity using
     the correlation coefficients are used for subpixel alignment.
@@ -44,50 +77,28 @@ def pattern_match_autoreg(template, image, subpixel_size=3, metric=cv2.TM_CCOEFF
                The strength of the correlation in the range [-1, 1].
     """
 
-    # Apply the pixel scale template matcher
-    result = cv2.matchTemplate(image, template, method=metric)
+    x, y, max_corr, corrmap = _template_match(image, template, metric)
+   
+    maxy, maxx = np.unravel_index(corrmap.argmax(), corrmap.shape)
+    area = corrmap[maxy - subpixel_size:maxy + subpixel_size + 1,
+                   maxx - subpixel_size:maxx + subpixel_size + 1]
 
-    # Find the 'best' correlation
-    if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
-        y, x = np.unravel_index(np.argmin(result, axis=None), result.shape)
-    else:
-        y, x = np.unravel_index(np.argmax(result, axis=None), result.shape)
-    max_corr = result[(y,x)]
-    
-    # Get the area around the best correlation; the surface
-    upper = int(2 + floor(subpixel_size / 2))
-    lower = upper - 1
-    # x, y are the location of the upper left hand corner of the template in the image
-    area = result[y-lower:y+upper,
-                  x-lower:x+upper]
-
-    # If the area is not square and large enough, this method should fail
-    if area.shape != (subpixel_size+2, subpixel_size+2):
-        raise Exception("Max correlation is too close to the boundary.")
-        # return None, None, 0, None
+    # # If the area is not square and large enough, this method should fail
+    # if area.shape != (subpixel_size+2, subpixel_size+2):
+    #     raise Exception("Max correlation is too close to the boundary.")
+    #     # return None, None, 0, None
 
     cmass = center_of_mass(area)
+
     subpixel_y_shift = subpixel_size - 1 - cmass[0]
     subpixel_x_shift = subpixel_size - 1 - cmass[1]
     
     # Apply the subpixel shift to the whole pixel shifts computed above
     y += subpixel_y_shift
     x += subpixel_x_shift
-    
-    # Compute the idealized shift (image center)
-    ideal_y = image.shape[0] / 2
-    ideal_x = image.shape[1] / 2
-    
-    #Compute the shift from the template upper left to the template center
-    y += (template.shape[0] / 2)
-    x += (template.shape[1] / 2)
-    
-    x -= ideal_x
-    y -= ideal_y
-    
-    return x, y, max_corr, result
+    return x, y, max_corr, corrmap
 
-def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED):
+def pattern_match(image, template, upsampling=8, metric=cv2.TM_CCOEFF_NORMED):
     """
     Call an arbitrary pattern matcher using a subpixel approach where the template and image
     are upsampled using a third order polynomial.
@@ -163,23 +174,15 @@ def pattern_match(template, image, upsampling=16, metric=cv2.TM_CCOEFF_NORMED):
 
     # Fit a 3rd order polynomial to upsample the images
     if upsampling != 1:
-        u_template = img_as_float32(rescale(template, upsampling, order=3, mode='edge'))
-        u_image = img_as_float32(rescale(image, upsampling, order=3, mode='edge'))
+        u_template = rescale(template, upsampling, order=3, mode='edge')
+        u_image = rescale(image, upsampling, order=3, mode='edge')
     else:
         u_template = template
         u_image = image
-    corrmap = cv2.matchTemplate(u_image, u_template, method=metric)
-    
-    if metric == cv2.TM_SQDIFF or metric == cv2.TM_SQDIFF_NORMED:
-        matched_y, matched_x = np.unravel_index(np.argmin(corrmap), corrmap.shape)
-    else:
-        matched_y, matched_x = np.unravel_index(np.argmax(corrmap), corrmap.shape)
+ 
+    # new_x, new_y is the updated center location in the image
+    new_x, new_y, max_corr, corrmap = _template_match(u_image, u_template, metric)
+    new_x /= upsampling
+    new_y /= upsampling
 
-    max_corr = corrmap[matched_y, matched_x]
-    
-    assert max_corr == np.max(corrmap)
-
-    shift_x = (matched_x - ((corrmap.shape[1]-1)/2)) / upsampling
-    shift_y = (matched_y - ((corrmap.shape[0]-1)/2)) / upsampling
-
-    return -shift_x, -shift_y , max_corr, corrmap
+    return new_x, new_y, max_corr, corrmap

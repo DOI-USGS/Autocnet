@@ -10,6 +10,9 @@ tests/artifacts/*
 notebooks/*
 !notebooks/*.ipynb
 
+#VSCode
+/.vscode
+
 #PyCharm
 /.idea
 

@@ -98,7 +98,7 @@ def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
 
     """
     if not nodes:
-        log.info("Tried to itterate through a node that does not exist, skipping")
+        log.info("Tried to iterate through a node that does not exist, skipping")
         return None, None
     # Iterate through the images to find an interesting point
     for reference_index, node in enumerate(nodes):
@@ -233,7 +233,11 @@ def place_points_in_overlap(overlap,
     nodes = []
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         for id in overlap.intersections:
-            res = session.query(Images).filter(Images.id == id).one()
+            try:
+                res = session.query(Images).filter(Images.id == id).one()
+            except:
+                warnings.warn(f'Unable to instantiate image with id: {id}')
+                continue
             nn = NetworkNode(node_id=id, 
                              image_path=res.path, 
                              cam_type=res.cam_type,

@@ -40,8 +40,8 @@ SELECT measures."pointid",
         points."pointIgnore",
         points."referenceIndex",
         points."identifier",
+        images."serial",
         measures."id",
-        measures."serialnumber",
         measures."sample",
         measures."line",
         measures."measureType",
@@ -52,6 +52,7 @@ SELECT measures."pointid",
         measures."apriorisample"
 FROM measures
 INNER JOIN points ON measures."pointid" = points."id"
+INNER JOIN images ON measures.imageid = images.id
 WHERE
     points."pointIgnore" = False AND
     measures."measureIgnore" = FALSE AND

@@ -33,6 +33,8 @@ heading to indicate that only the bug fixes and security fixes are in the bug fi
 release.
 -->
 ## [Unreleased]
+
+## [1.2.0]
 ### Added
 - Ability to choose whether to compute overlaps for a network candidate graph
 - Integration tests for end-to-end of an equatorial CTX pair and a mid-latitude CTX trio. These write out ISIS control networks that can be visually inspected in `qnet` in case changes exceed the test tolerances.
@@ -41,10 +43,14 @@ release.
 - Multiple cropped ISIS cubes and associated CSM sensor models for testing. These cubes account for the offset issue that the `ale` `isd_generate` script has with generating CSM ISDs from cropped observations.
 
 ### Changed
-- Affine transformations are now using projective transformations. The affine transformation out of skimage was **not** properly tracking reflection of the input data. The projective transformation does. This necessitated a change to how shear is being checked as the shearing components of the transformation are now encoded into [2][0] and [2][1] in the 3x3 matrix. This also means that the transformations are accounting for scale differences.
+- `cluster_submit_single` now uses a global retry in addition to a pre-ping on the pool. This accounts for database disconnects that are especially prevelent when the back, serverless, database is attempting to provision additional capacity. Each session access (e.g. session.query) will retry up to 5 times with a 300s timeout. Aurora should provision additional capacity in less than 300s.
+- Smart subpixel matcher now re-uses the clip call on the ROI object instead of re-instantiating an ROI object with each different parameter set. The result is a measurable performance increase.
+- Subpixel template now takes two arrays and return computed offsets. The caller is responsible for applying any transformations. For example, if an affine transformed moving template is passed, the caller of subpixel_template must apply the inverse transform.
 - CI on the library now uses a mocked sqlalchemy connection. All tests can now run locally without the need for a supplemental postgres container. This changed removed some non-optimal tests that were testing datbase triggers and database instantiation handled by SQLAlchemy.
 
 ### Fixed
+- Affine transformations are now properly accounting for data reflection.
+- Error in subpixel ROI extraction when an affine transformation is provided. The code was using the same translation, regardless of the size of the data pulled into the ROI. This caused the center code to fail with large swawthes of bad data. The fix computes the size of the read data, including buffer, and computes the proper translation.
 - Errors when importing sensor model in `overlap.py`
 - Dealt with None values trying to be converted to a shapely point in `centroids.py`
 - Dealt with Key Error when finding file paths in the network nodes.

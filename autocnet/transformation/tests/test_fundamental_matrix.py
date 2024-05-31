@@ -141,7 +141,6 @@ class TestFundamentalMatrix(unittest.TestCase):
                                               self.fixed_x2,
                                               threshold=0.005,
                                               method='fundamental')
-        print(new_mask['fundamental'].sum())
 
         self.assertTrue(new_mask['fundamental'].sum() == 9)
 
