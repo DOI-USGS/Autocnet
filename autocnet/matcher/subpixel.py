@@ -9,7 +9,6 @@ import warnings
 import logging
 
 import numpy as np
-import pvl
 from scipy.ndimage import center_of_mass
 from skimage import transform as tf
 from skimage import registration
@@ -20,11 +19,11 @@ from sqlalchemy.sql.expression import bindparam
 from sqlalchemy import inspect
 from matplotlib import pyplot as plt
 
-from autocnet.matcher.naive_template import pattern_match, pattern_match_autoreg
+from autocnet.matcher.naive_template import pattern_match
 from autocnet.matcher.mutual_information import mutual_information
-from autocnet.io import isis
 from autocnet.io.geodataset import AGeoDataset
 from autocnet.io.db.model import Measures, Points, Images, JsonEncoder
+from autocnet.io.db.connection import retry
 from autocnet.graph.node import NetworkNode
 from autocnet.transformation import roi
 from autocnet.transformation.affine import estimate_local_affine
@@ -800,6 +799,7 @@ def fourier_mellen(ref_image, moving_image, affine=tf.AffineTransform(), verbose
 
     return subpixel_affine, error, diffphase
 
+@retry(max_retries=5)
 def subpixel_register_point_smart(point,
                                   session=None,
                                   cost_func=lambda x,y: 1/x**2 * y,
@@ -1240,6 +1240,7 @@ def validate_candidate_measure(measure_to_register,
         dists.append(dist)
     return dists
 
+@retry(max_retries=5)
 def smart_register_point(point, 
                          session=None,
                          parameters=[], 

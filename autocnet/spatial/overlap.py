@@ -10,6 +10,7 @@ from subprocess import CalledProcessError
 from autocnet.cg import cg as compgeom
 from autocnet.graph.node import NetworkNode
 from autocnet.io.db.model import Images, Measures, Overlay, Points, JsonEncoder
+from autocnet.io.db.connection import retry
 from autocnet.transformation import roi
 from autocnet.matcher.cpu_extractor import extract_most_interesting
 from autocnet.matcher.validation import is_valid_lroc_image
@@ -143,6 +144,7 @@ def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
     log.debug(f'Current reference index: {reference_index}.')
     return reference_index, shapely.geometry.Point(sample, line)
 
+@retry(max_retries=5)
 def place_points_in_overlap(overlap,
                             identifier="place_points_in_overlaps",
                             interesting_func=find_interesting_point,
