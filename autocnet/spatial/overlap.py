@@ -10,10 +10,12 @@ from subprocess import CalledProcessError
 from autocnet.cg import cg as compgeom
 from autocnet.graph.node import NetworkNode
 from autocnet.io.db.model import Images, Measures, Overlay, Points, JsonEncoder
-from autocnet.io.db.connection import retry
+from autocnet.io.db.utils import get_nodes_for_overlap, get_overlap, bulk_commit
 from autocnet.transformation import roi
 from autocnet.matcher.cpu_extractor import extract_most_interesting
 from autocnet.matcher.validation import is_valid_lroc_image
+
+
 
 # set up the logger file
 log = logging.getLogger(__name__)
@@ -144,7 +146,6 @@ def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
     log.debug(f'Current reference index: {reference_index}.')
     return reference_index, shapely.geometry.Point(sample, line)
 
-@retry(max_retries=5)
 def place_points_in_overlap(overlap,
                             identifier="place_points_in_overlaps",
                             interesting_func=find_interesting_point,
@@ -215,9 +216,7 @@ def place_points_in_overlap(overlap,
     """
     t1 = time.time()
     if not isinstance(overlap, Overlay):
-        with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-            overlap = session.query(Overlay).filter(Overlay.id == overlap).one()
-            session.expunge_all()
+        overlap = get_overlap(ncg, session, overlap)
     
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
@@ -228,21 +227,8 @@ def place_points_in_overlap(overlap,
         return []
     log.info(f'Have {len(candidate_points)} potential points to place in overlap {overlap.id}.')
     
-    # If an NCG is passed, instantiate a session off the NCG, else just pass the session through
-    nodes = []
-    with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-        for id in overlap.intersections:
-            try:
-                res = session.query(Images).filter(Images.id == id).one()
-            except Exception as e:
-                warnings.warn(f'Unable to instantiate image with id: {id} with error: {e}')
-                continue
-            nn = NetworkNode(node_id=id, 
-                             image_path=res.path, 
-                             cam_type=res.cam_type,
-                             dem=res.dem,
-                             dem_type=res.dem_type)
-            nodes.append(nn)
+    nodes = get_nodes_for_overlap(ncg, session, overlap)
+
     points_to_commit = []
     for valid in candidate_points:
         log.debug(f'Valid point: {valid}')
@@ -281,11 +267,10 @@ def place_points_in_overlap(overlap,
         else:
             if len(point.measures) >= 2:
                 points_to_commit.append(point)
+    
     log.debug(f'Committing: {points_to_commit}')
     if points_to_commit:
-        with ncg.session_scope() if ncg else nullcontext(session) as session:
-            session.add_all(points_to_commit)
-            session.commit()
+        bulk_commit(ncg, session, points_to_commit)
     t2 = time.time()
     log.info(f'Placed {len(candidate_points)} in {t2-t1} seconds.')
 

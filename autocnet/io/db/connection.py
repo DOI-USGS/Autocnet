@@ -13,7 +13,7 @@ class Parent:
         self.session = Session()
         self.session.begin()
 
-def retry(max_retries=3, wait_time=300):
+def retry(max_retries=5, wait_time=300):
     def decorator(func):
         def wrapper(*args, **kwargs):
             retries = 0
@@ -29,7 +29,7 @@ def retry(max_retries=3, wait_time=300):
         return wrapper
     return decorator
 
-@retry(max_retries=5)
+@retry
 def new_connection(dbconfig):
     """
     Using the user supplied config create a NullPool database connection.

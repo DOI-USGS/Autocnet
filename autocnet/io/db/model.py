@@ -23,6 +23,7 @@ from shapely.geometry import Point
 
 from autocnet.transformation.spatial import reproject, og2oc
 from autocnet.utils.serializers import JsonEncoder
+from autocnet.io.db.connection import retry
 
 log = logging.getLogger(__name__)
 
@@ -388,6 +389,7 @@ class Overlay(BaseMixin, Base):
     def geom(self, geom):
         self._geom = from_shape(geom, srid=self.latitudinal_srid)
 
+    @retry(max_retries=5)
     @classmethod
     def overlapping_larger_than(cls, size_threshold, session):
         """
