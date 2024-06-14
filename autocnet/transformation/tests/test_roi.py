@@ -60,11 +60,11 @@ def test_extent_computation(x, y, size_arr, size_roi, expected, geodata_c):
 def test_array_extent_computation(x, y, size_arr, size_roi, buffer, expected, geodata_c):
     geodata_c.read_array.return_value = np.arange(size_arr[0]*size_arr[1]).reshape(size_arr)
 
-    roi = Roi(geodata_c, x, y, size_x=size_roi[0], size_y=size_roi[1], buffer=buffer)
-    roi.clip()
+    roi = Roi(geodata_c, x, y)
+    arr = roi.clip(size_x=size_roi[0], size_y=size_roi[1], buffer=buffer)
 
-    assert roi.clipped_array.dtype == np.float32
-    assert (roi.clipped_array.shape == np.asarray(size_roi) * 2 + 1).all()
+    assert roi.arr.dtype == np.float32
+    assert (roi.arr.shape == np.asarray(size_roi) * 2 + 1).all()
 
 @pytest.mark.parametrize("x, y, x1, y1, xs, ys, size_arr, size_roi, expected",[
     (50, 50, 50, 50, -5, -5, (100, 100), (10, 10), (45, 45)),

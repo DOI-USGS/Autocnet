@@ -33,6 +33,11 @@ heading to indicate that only the bug fixes and security fixes are in the bug fi
 release.
 -->
 ## [Unreleased]
+### Added
+- Debug logging to `place_points_in_overlap` and `distribute_points_in_geom` to make debugging issues easier.
+
+### Fixed
+- Error in `find_interesting_feature` that was mis-using the ROI API. This bug was introduced in 1.2.0 when the ROI API updated.
 
 ## [1.2.0]
 ### Added

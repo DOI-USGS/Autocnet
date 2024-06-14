@@ -117,12 +117,8 @@ def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
         line = try_line
 
         # Extract ORB features in a sub-image around the desired point
-        image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
-        try:
-            roi_array = image_roi.clipped_array # Units are pixels for the array
-        except:
-            log.info(f'Failed to find interesting features in image.')
-            continue
+        image_roi = roi.Roi(node.geodata, sample, line)
+        roi_array = image_roi.clip(size_x=size, size_y=size) # Units are pixels for the array
 
         # Check if the image is valid and could be used as the reference
         if not is_valid_lroc_image(roi_array):
@@ -130,7 +126,7 @@ def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
             continue
 
         # Extract the most interesting feature in the search window
-        interesting = extract_most_interesting(image_roi.clipped_array)
+        interesting = extract_most_interesting(roi_array)
         
         if interesting is not None:
             # We have found an interesting feature and have identified the reference point.
@@ -224,6 +220,7 @@ def place_points_in_overlap(overlap,
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
     candidate_points = compgeom.distribute_points_in_geom(geom, ratio_size=ratio_size, **distribute_points_kwargs, **kwargs)
+    logging.debug(f'Found {len(candidate_points)} in overlap {overlap.id}.')
     if not candidate_points.any():
         warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
@@ -282,6 +279,7 @@ def place_points_in_overlap(overlap,
         else:
             if len(point.measures) >= 2:
                 points_to_commit.append(point)
+    log.debug(f'Committing: {points_to_commit}')
     if points_to_commit:
         with ncg.session_scope() if ncg else nullcontext(session) as session:
             session.add_all(points_to_commit)
@@ -359,12 +357,9 @@ def place_points_in_image(image,
             continue
 
         # Extract ORB features in a sub-image around the desired point
-        image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
-        image_roi.clip()
-        try:
-            interesting = extract_most_interesting(image.clipped_array)
-        except:
-            continue
+        image_roi = roi.Roi(node.geodata, sample, line)
+        roi_array = image_roi.clip(size_x=size, size_y=size)
+        interesting = extract_most_interesting(roi_array)
 
         # kps are in the image space with upper left origin and the roi
         # could be the requested size or smaller if near an image boundary.
