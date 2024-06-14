@@ -232,8 +232,8 @@ def place_points_in_overlap(overlap,
         for id in overlap.intersections:
             try:
                 res = session.query(Images).filter(Images.id == id).one()
-            except:
-                warnings.warn(f'Unable to instantiate image with id: {id}')
+            except Exception as e:
+                warnings.warn(f'Unable to instantiate image with id: {id} with error: {e}')
                 continue
             nn = NetworkNode(node_id=id, 
                              image_path=res.path, 

@@ -1,14 +1,8 @@
-import socket
-
-import sqlalchemy
-from sqlalchemy import create_engine, pool, orm
-from sqlalchemy.orm import create_session, scoped_session, sessionmaker
-
 import logging
-import os
 import socket
-import warnings
-import yaml
+from time import sleep
+
+from sqlalchemy import orm, create_engine, pool
 
 # set up the logging file
 log = logging.getLogger(__name__)
@@ -19,6 +13,23 @@ class Parent:
         self.session = Session()
         self.session.begin()
 
+def retry(max_retries=3, wait_time=300):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            if retries < max_retries:
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                except:
+                    retries += 1
+                    sleep(wait_time)
+            else:
+                raise Exception(f"Maximum retries of {func} exceeded! Is the database accessible?")
+        return wrapper
+    return decorator
+
+@retry(max_retries=5)
 def new_connection(dbconfig):
     """
     Using the user supplied config create a NullPool database connection.
@@ -43,8 +54,8 @@ def new_connection(dbconfig):
                                                   dbconfig['pgbouncer_port'],
                                                   dbconfig['name'])
     hostname = socket.gethostname()
-    engine = sqlalchemy.create_engine(db_uri,
-                poolclass=sqlalchemy.pool.NullPool,
+    engine = create_engine(db_uri,
+                poolclass=pool.NullPool,
                 connect_args={"application_name":f"AutoCNet_{hostname}"},
                 isolation_level="AUTOCOMMIT",
                 pool_pre_ping=True)
