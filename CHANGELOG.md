@@ -33,6 +33,8 @@ heading to indicate that only the bug fixes and security fixes are in the bug fi
 release.
 -->
 ## [Unreleased]
+
+## [1.2.1]
 ### Added
 - Debug logging to `place_points_in_overlap` and `distribute_points_in_geom` to make debugging issues easier.
 

@@ -42,4 +42,4 @@ dependencies:
   - protobuf
   - pip
   - pip:
-    - image-registration
+    - image_registration
