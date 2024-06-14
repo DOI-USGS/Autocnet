@@ -34,24 +34,9 @@ class Roi():
     ndv : float
           An optional no data value override to set a custom no data value on the ROI.
 
-    buffer : int
-             An integer number of pixels to buffer the read number of pixels from a GeoDataset. This parameter
-             can be used to ensure that an affinely warped ROI contains only valid data. A buffer too small can
-             result in no data on one or more edges.
+    center : tuple
+             The x,y coordinates as a tuple.
 
-    clip_center : tuple
-                  on instantiation, set to (). When clip is called and the clipped_array
-                  variable is set, the clip_center is set to the center of the, potentially
-                  affine transformed, cliped_array.
-
-    clipped_array : ndarray
-                    After calling the clip method, this is the resulting clipped, and possibly affinely warped
-                    data array.
-
-    warped_array_center : tuple
-                          During clipping, if an affine transformation is provided, the clipped array is warped. The center
-                          of the warped array is not the same as the center of the clipped array. This attribute is the
-                          affine transformation of the clip_center.
     affine : object
              a scikit image affine transformation object that is applied when clipping. The default,
              identity matrix results in no transformation.

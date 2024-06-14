@@ -112,12 +112,8 @@ def generate_ground_points(Session,
             log.warning(f'Line or sample are outside of the base.')
             continue
         
-        image = roi.Roi(ground_mosaic, sample, line, size_x=size[0], size_y=size[1])
-        try:
-            image.clip()
-        except:
-            continue
-        image_roi = image.clipped_array
+        image = roi.Roi(ground_mosaic, sample, line)
+        image_roi = image.clip(size_x=size[0], size_y=size[1])
 
         interesting = extract_most_interesting(bytescale(image_roi),  extractor_parameters={}, extractor_method='vlfeat')
         # interesting = extract_most_interesting(bytescale(image_roi),  extractor_parameters={'nfeatures':500}, extractor_method='orb')

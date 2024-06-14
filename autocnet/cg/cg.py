@@ -460,6 +460,7 @@ def distribute_points_in_geom(geom, method="classic",
                               ewpts_func=lambda x: ceil(round(x,1)*5),
                               Session=None,
                               ratio_size=0.1,
+                              min_area=0.004,
                               **kwargs):
     """
     Given a geometry, attempt a basic classification of the shape.
@@ -487,10 +488,15 @@ def distribute_points_in_geom(geom, method="classic",
 
     ewpts_func : obj
                  Function taking a Number and returning an int
+    
     ratio_size : float
                  A number that represent the minimum size the
                  ratio is set at to be considered a sliver.
 
+    min_area : float
+               The minimum area, as measured in the project SRID,
+               below which points will not be placed and above which
+               points will be placed.
     Returns
     -------
     valid : np.ndarray
@@ -523,6 +529,9 @@ def distribute_points_in_geom(geom, method="classic",
             longid = i
     ratio = short/long
     
+    logging.debug(f'Area: {geom.area}')
+    logging.debug(f'Ratio: {ratio}')
+
     ns = False
     ew = False
     valid = []
@@ -536,13 +545,14 @@ def distribute_points_in_geom(geom, method="classic",
         ew = True
 
     # Decision Tree
-    if ratio < ratio_size and geom.area < 0.01:
-        # Class: Slivers - ignore.
+    if ratio < ratio_size and geom.area < min_area:
+        logging.debug('Ratio check failed.')
         return np.array([])
-    elif geom.area <= 0.004 and ratio >= 0.25:
-        # Single point at the centroid
+    elif geom.area <= min_area and ratio >= ratio_size:
+        logging.debug('Placing a single point.')
         valid = single_centroid(geom)
     elif ns==True:
+        logging.debug('Placing N/S oriented points.')
         # Class, north/south poly, multi-point
         nspts = nspts_func(long)
         ewpts = ewpts_func(short)
@@ -551,6 +561,7 @@ def distribute_points_in_geom(geom, method="classic",
         else:
             valid = point_distribution_func(geom, nspts, ewpts, Session=Session, **kwargs)
     elif ew == True:
+        logging.debug('Placing E/W oriented points.')
         # Since this is an LS, we should place these diagonally from the 'lower left' to the 'upper right'
         nspts = ewpts_func(short)
         ewpts = nspts_func(long)

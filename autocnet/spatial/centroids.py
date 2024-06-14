@@ -186,9 +186,9 @@ def find_intresting_point(nodes, lon, lat, size=71):
         line = try_line
 
         # Extract ORB features in a sub-image around the desired point
-        image_roi = roi.Roi(node.geodata, sample, line, size_x=size, size_y=size)
+        image_roi = roi.Roi(node.geodata, sample, line)
         try:
-            roi_array = image_roi.clipped_array # Units are pixels for the array
+            roi_array = image_roi.clip(size_x=size, size_y=size) # Units are pixels for the array
         except:
             log.info(f'Failed to find interesting features in image.')
             continue
@@ -199,7 +199,7 @@ def find_intresting_point(nodes, lon, lat, size=71):
             continue
 
         # Extract the most interesting feature in the search window
-        interesting = extract_most_interesting(image_roi.clipped_array)
+        interesting = extract_most_interesting(roi_array)
         
         if interesting is not None:
             # We have found an interesting feature and have identified the reference point.
