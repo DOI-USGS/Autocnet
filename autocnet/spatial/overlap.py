@@ -217,7 +217,7 @@ def place_points_in_overlap(overlap,
     t1 = time.time()
     if not isinstance(overlap, Overlay):
         overlap = get_overlap(ncg, session, overlap)
-    
+
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
     candidate_points = compgeom.distribute_points_in_geom(geom, ratio_size=ratio_size, **distribute_points_kwargs, **kwargs)
@@ -228,7 +228,7 @@ def place_points_in_overlap(overlap,
     log.info(f'Have {len(candidate_points)} potential points to place in overlap {overlap.id}.')
     
     nodes = get_nodes_for_overlap(ncg, session, overlap)
-
+    logging.debug(f'Nodes: {nodes}')
     points_to_commit = []
     for valid in candidate_points:
         log.debug(f'Valid point: {valid}')

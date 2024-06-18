@@ -29,8 +29,8 @@ def retry(max_retries=5, wait_time=300):
         return wrapper
     return decorator
 
-@retry
-def new_connection(dbconfig):
+@retry()
+def new_connection(dbconfig, with_session=False):
     """
     Using the user supplied config create a NullPool database connection.
 
@@ -40,6 +40,8 @@ def new_connection(dbconfig):
                Dictionary defining necessary parameters for the database
                connection
 
+    with_session : boolean
+                   If true return a SQL Alchemy session factory. Default False.
     Returns
     -------
     Session : object
@@ -57,8 +59,9 @@ def new_connection(dbconfig):
     engine = create_engine(db_uri,
                 poolclass=pool.NullPool,
                 connect_args={"application_name":f"AutoCNet_{hostname}"},
-                isolation_level="AUTOCOMMIT",
                 pool_pre_ping=True)
-    Session = orm.sessionmaker(bind=engine, autocommit=False)
-    log.debug(Session, engine)
-    return Session, engine
+    if with_session:
+        Session = orm.sessionmaker(bind=engine, autocommit=False)
+        log.debug(Session, engine)
+        return Session, engine
+    return engine

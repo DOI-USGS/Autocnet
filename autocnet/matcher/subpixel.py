@@ -1156,7 +1156,9 @@ def validate_candidate_measure(point,
     sample = measure_to_register['sample']
     line = measure_to_register['line']
 
-    log.info(f'Validating measure: {measure_to_register['id']} on image: {source_imageid}')
+    mid = measure_to_register['id']
+    sid = measure_to_register['imageid']
+    log.info(f'Validating measure: {mid} on image: {sid}')
 
     reference_roi = roi.Roi(source_node.geodata, 
                             sample, 

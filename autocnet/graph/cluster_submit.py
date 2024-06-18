@@ -215,7 +215,7 @@ def main():  # pragma: no cover
     logging.basicConfig(level=os.environ.get("AUTOCNET_LOGLEVEL", "INFO"))
     # Get the message
     queue = StrictRedis(host=args['host'], port=args['port'], db=0,
-                        socket_timeout=30, socket_connect_timeout=300)
+                        socket_timeout=30, socket_connect_timeout=30)
     manage_messages(args, queue)
 
 if __name__ == '__main__':

@@ -2418,7 +2418,7 @@ class NetworkCandidateGraph(CandidateGraph):
         >>> ncg.add_from_remote_database(source_db_config, outpath, query_string=query)
         """
 
-        sourceSession, _ = new_connection(source_db_config)
+        sourceSession, _ = new_connection(source_db_config, with_session=True)
         sourcesession = sourceSession()
 
         sourceimages = sourcesession.execute(query_string).fetchall()
