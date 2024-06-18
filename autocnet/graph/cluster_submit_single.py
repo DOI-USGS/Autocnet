@@ -1,9 +1,5 @@
 import json
-import socket
 import sys
-
-from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
 
 from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
@@ -31,7 +27,14 @@ apply_iterable_options = {
                 5: Images
             }
 
-
+def set_srids(spatial):
+    latitudinal_srid = spatial['latitudinal_srid']
+    rectangular_srid = spatial['rectangular_srid']
+    for cls in [Points, Overlay, Images]:
+        setattr(cls, 'latitudinal_srid', latitudinal_srid)
+        setattr(cls, 'rectangular_srid', rectangular_srid)
+    Points.semimajor_rad = spatial['semimajor_rad']
+    Points.semiminor_rad = spatial['semiminor_rad']
 
 @retry(max_retries=5)
 def _instantiate_obj(msg):
@@ -82,8 +85,13 @@ def process(msg):
     # Deserialize the message
     msg = json.loads(msg, object_hook=object_hook)
 
-    _, engine = new_connection(msg['config']['database'])
+    # Get the database connection
+    engine = new_connection(msg['config']['database'])
     
+    # Set the SRIDs on the table objects based on the passed config
+    set_srids(msg['config']['spatial'])
+
+    # Instantiate the objects to be used
     if msg['along'] in ['node', 'edge']:
         obj = _instantiate_obj(msg)
     elif msg['along'] in ['points', 'measures', 'overlaps', 'images']:
@@ -115,13 +123,11 @@ def process(msg):
     # Now run the function.
     res = execute_func(func,*msg['args'], **msg['kwargs'])
 
-    del Session
-    del engine
-
     # Update the message with the True/False
     msg['results'] = res
-    # Update the message with the correct callback function
-
+    
+    engine.dispose()
+    del engine
     return msg
 
 def main():

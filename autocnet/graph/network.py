@@ -1620,7 +1620,7 @@ class NetworkCandidateGraph(CandidateGraph):
         self._Session = Session
 
     def _setup_database(self):
-        self.Session, self.engine = new_connection(self.config['database'])
+        self.Session, self.engine = new_connection(self.config['database'], with_session=True)
         try_db_creation(self.engine, self.config)
 
     # def _setup_nodes(self):

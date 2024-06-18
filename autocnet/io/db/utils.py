@@ -1,6 +1,5 @@
 from contextlib import nullcontext
 import logging
-import warnings
 
 from sqlalchemy.sql.expression import bindparam
 
@@ -8,7 +7,11 @@ from autocnet.io.db.connection import retry
 from autocnet.io.db.model import Images, Overlay, Points, Measures
 from autocnet.graph.node import NetworkNode
 
-@retry
+# set up the logger file
+log = logging.getLogger(__name__)
+
+
+@retry()
 def update_measures(ncg, session, measures_iterable_to_update):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         stmt = Measures.__table__.update().\
@@ -21,9 +24,9 @@ def update_measures(ncg, session, measures_iterable_to_update):
                                         'sample':bindparam('sample'),
                                         'ChooserName':bindparam('choosername')})
         session.execute(stmt, measures_iterable_to_update)
-        return
+    return
 
-@retry
+@retry()
 def ignore_measures(ncg, session, measures_iterable_to_ignore, chooser):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         measures_to_set_false = [{'_id':i} for i in measures_to_set_false]
@@ -33,49 +36,48 @@ def ignore_measures(ncg, session, measures_iterable_to_ignore, chooser):
                                 values({'measureIgnore':True,
                                         'ChooserName':chooser})
         session.execute(stmt, measures_to_set_false)
+    return 
 
-@retry
+#@retry(wait_time=30)
 def get_nodes_for_overlap(ncg, session, overlap):
     # If an NCG is passed, instantiate a session off the NCG, else just pass the session through
+    ids = tuple([i for i in overlap.intersections])
     nodes = []
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-        for id in overlap.intersections:
-            try:
-                res = session.query(Images).filter(Images.id == id).one()
-            except Exception as e:
-                warnings.warn(f'Unable to instantiate image with id: {id} with error: {e}')
-                continue
-            nn = NetworkNode(node_id=id, 
-                             image_path=res.path, 
-                             cam_type=res.cam_type,
-                             dem=res.dem,
-                             dem_type=res.dem_type)
+        results = session.query(Images).filter(Images.id.in_(ids)).all()
+    
+        for res in results:
+            nn = NetworkNode(node_id=res.id, 
+                            image_path=res.path, 
+                            cam_type=res.cam_type,
+                            dem=res.dem,
+                            dem_type=res.dem_type)
             nodes.append(nn)
+    return nodes
 
-@retry
+@retry(wait_time=30)
 def get_nodes_for_measures(ncg, session, measures):
-        nodes = {}
-        with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-            for measure in measures:
-                res = session.query(Images).filter(Images.id == measure.imageid).one()
-                logging.debug(f'Node instantiation image query result: {res.path, res.cam_type, res.dem, res.dem_type}')
-                nn = NetworkNode(node_id=measure.imageid, 
-                                image_path=res.path,
-                                cam_type=res.cam_type,
-                                dem=res.dem,
-                                dem_type=res.dem_type)
-                nodes[measure.imageid] = nn
-            session.expunge_all()  
-        return nodes  
+    nodes = {}
+    with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
+        imageids = tuple([measure.imageid for measure in measures])
+        results = session.query(Images).filter(Images.id.in_(imageids)).all()
+        for res in results:
+            nn = NetworkNode(node_id=res.imageid, 
+                            image_path=res.path,
+                            cam_type=res.cam_type,
+                            dem=res.dem,
+                            dem_type=res.dem_type)
+            nodes[res.imageid] = nn
+    return nodes  
 
-@retry
+@retry(wait_time=30)
 def get_overlap(ncg, session, overlapid):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         overlap = session.query(Overlay).filter(Overlay.id == overlapid).one()
         session.expunge_all()
     return overlap
 
-@retry
+@retry(wait_time=30)
 def get_point(ncg, session, pointid):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         point = session.query(Points).filter(Points.id == pointid).one()
@@ -84,8 +86,9 @@ def get_point(ncg, session, pointid):
 
 
 
-@retry
+
 def bulk_commit(ncg, session, iterable_of_objs_to_commit):
     with ncg.session_scope() if ncg else nullcontext(session) as session:
         session.add_all(iterable_of_objs_to_commit)
         session.commit()
+    return
