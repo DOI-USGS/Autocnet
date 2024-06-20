@@ -58,6 +58,7 @@ def get_nodes_for_overlap(ncg, session, overlap):
 @retry(wait_time=30)
 def get_nodes_for_measures(ncg, session, measures):
     nodes = {}
+
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         imageids = tuple([measure.imageid for measure in measures])
         results = session.query(Images).filter(Images.id.in_(imageids)).all()
@@ -81,6 +82,8 @@ def get_overlap(ncg, session, overlapid):
 def get_point(ncg, session, pointid):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         point = session.query(Points).filter(Points.id == pointid).one()
+        # Get the measures as well.
+        _ = point.measures
         session.expunge_all()
     return point
 
