@@ -13,6 +13,8 @@ log = logging.getLogger(__name__)
 
 @retry()
 def update_measures(ncg, session, measures_iterable_to_update):
+    if not measures_iterable_to_update:
+        return
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         stmt = Measures.__table__.update().\
                         where(Measures.__table__.c.id == bindparam('_id')).\
@@ -29,7 +31,7 @@ def update_measures(ncg, session, measures_iterable_to_update):
 @retry()
 def ignore_measures(ncg, session, measures_iterable_to_ignore, chooser):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-        measures_to_set_false = [{'_id':i} for i in measures_to_set_false]
+        measures_to_set_false = [{'_id':i} for i in measures_iterable_to_ignore]
         # Set ignore=True measures that failed
         stmt = Measures.__table__.update().\
                                 where(Measures.__table__.c.id == bindparam('_id')).\
@@ -38,7 +40,7 @@ def ignore_measures(ncg, session, measures_iterable_to_ignore, chooser):
         session.execute(stmt, measures_to_set_false)
     return 
 
-#@retry(wait_time=30)
+@retry(wait_time=30)
 def get_nodes_for_overlap(ncg, session, overlap):
     # If an NCG is passed, instantiate a session off the NCG, else just pass the session through
     ids = tuple([i for i in overlap.intersections])
@@ -58,17 +60,17 @@ def get_nodes_for_overlap(ncg, session, overlap):
 @retry(wait_time=30)
 def get_nodes_for_measures(ncg, session, measures):
     nodes = {}
-
+    imageids = tuple([measure.imageid for measure in measures])
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-        imageids = tuple([measure.imageid for measure in measures])
         results = session.query(Images).filter(Images.id.in_(imageids)).all()
         for res in results:
-            nn = NetworkNode(node_id=res.imageid, 
+            nn = NetworkNode(node_id=res.id, 
+                             image_name=res.name,
                             image_path=res.path,
                             cam_type=res.cam_type,
                             dem=res.dem,
                             dem_type=res.dem_type)
-            nodes[res.imageid] = nn
+            nodes[res.id] = nn
     return nodes  
 
 @retry(wait_time=30)

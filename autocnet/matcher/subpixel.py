@@ -1050,6 +1050,9 @@ def decider(measures, tol=0.6):
                             of meaure ids to be ignored beause theu fail the consensus
                             building approach
     """
+    #TODO: This is super janky. I had to add imageid above, int he func, to the by_id
+    # list, and then again to the else statement at the end. This is way to hard
+    # to extend with new attributes.
     by_id = defaultdict(list)
     measures_to_set_false = []
     for m in measures:
@@ -1064,7 +1067,8 @@ def decider(measures, tol=0.6):
                                   m['template_metric'],
                                   baseline_mi,
                                   baseline_corr,
-                                  m['template_shift']])
+                                  m['template_shift'],
+                                  m['imageid']])
         else:
             measures_to_set_false.append(m['id'])
 
@@ -1093,7 +1097,8 @@ def decider(measures, tol=0.6):
                  'template_shift': best_measure[6],
                  'choosername': choosername,
                  'ignore':False,
-                 'best_parameter_index': best_cost}
+                 'best_parameter_index': best_cost,
+                 'imageid': best_measure[7]}
             measures_to_update.append(m)
     # A measure could have one bad regitration and get set false, if a different parameter set passed,
     # remove from the set false list.
@@ -1257,7 +1262,7 @@ def smart_register_point(point,
         
     measure_results, node_cache = subpixel_register_point_smart(point, session, ncg=ncg, parameters=parameters, **shared_kwargs)
     measures_to_update, measures_to_set_false = decider(measure_results)
-    log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
+    log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus.')
     # Validate that the new position has consensus
     for measure in measures_to_update:
         reprojection_distances = validate_candidate_measure(point, measure, node_cache, parameters=parameters, **shared_kwargs)
@@ -1268,7 +1273,6 @@ def smart_register_point(point,
 
     for measure in measures_to_update:
         measure['_id'] = measure.pop('id', None)
-
 
     # Update the measures that passed and failed registration
     update_measures(ncg, session, measures_to_update)
