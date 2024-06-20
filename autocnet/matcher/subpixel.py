@@ -853,7 +853,6 @@ def subpixel_register_point_smart(point,
     # Build a node cache so that this is an encapsulated database call. Then nodes
     # can be pulled from the lookup sans database.
     nodes_cache = get_nodes_for_measures(ncg, session, measures)
-
     log.info(f'Attempting to subpixel register {len(measures)-1} measures for point {pointid}')
     # Set the reference image
     source_node = nodes_cache[reference_index_id]
@@ -1256,7 +1255,7 @@ def smart_register_point(point,
     if not isinstance(point, Points):
         point = get_point(ncg, session, point)
         
-    measure_results, node_cache = subpixel_register_point_smart(point, session, parameters=parameters, **shared_kwargs)
+    measure_results, node_cache = subpixel_register_point_smart(point, session, ncg=ncg, parameters=parameters, **shared_kwargs)
     measures_to_update, measures_to_set_false = decider(measure_results)
     log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus. Running validation now...')
     # Validate that the new position has consensus
