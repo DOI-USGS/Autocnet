@@ -11,7 +11,7 @@ from autocnet.graph.node import NetworkNode
 log = logging.getLogger(__name__)
 
 
-#@retry()
+@retry()
 def update_measures(ncg, session, measures_iterable_to_update):
     if not measures_iterable_to_update:
         return
@@ -26,10 +26,13 @@ def update_measures(ncg, session, measures_iterable_to_update):
                                         'sample':bindparam('sample'),
                                         'ChooserName':bindparam('choosername')})
         session.execute(stmt, measures_iterable_to_update)
+        session.commit()  # Needed because the nullcontext(session) has not automatic commit
     return
 
-#@retry()
+@retry()
 def ignore_measures(ncg, session, measures_iterable_to_ignore, chooser):
+    if not measures_iterable_to_ignore:
+        return
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         measures_to_set_false = [{'_id':i} for i in measures_iterable_to_ignore]
         # Set ignore=True measures that failed
@@ -38,6 +41,7 @@ def ignore_measures(ncg, session, measures_iterable_to_ignore, chooser):
                                 values({'measureIgnore':True,
                                         'ChooserName':chooser})
         session.execute(stmt, measures_to_set_false)
+        session.commit() # Needed because the nullcontext(session) has not automatic commit
     return 
 
 @retry(wait_time=30)
