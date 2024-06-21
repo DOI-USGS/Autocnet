@@ -868,14 +868,18 @@ def subpixel_register_point_smart(point,
         destination_node = nodes_cache[measure.imageid]
         log.info(f'Registering measure {measure.id} (image: {measure.imageid}, serial: {measure.serial})')
 
+        match_kwargs = parameters[0]['match_kwargs']
         reference_roi = roi.Roi(source_node.geodata, 
                                 source.apriorisample, 
-                                source.aprioriline)
+                                source.aprioriline,
+                                size_x=match_kwargs['image_size'][0],
+                                size_y=match_kwargs['image_size'][1])
 
         moving_roi = roi.Roi(destination_node.geodata, 
                              measure.apriorisample, 
                              measure.aprioriline,
-                             )
+                             size_x=match_kwargs['image_size'][0],
+                             size_y=match_kwargs['image_size'][1])
         try:
             baseline_affine = estimate_local_affine(moving_roi,
                                                     reference_roi)
@@ -892,8 +896,13 @@ def subpixel_register_point_smart(point,
         # If the image read center plus buffer is outside the image, clipping
         # raises an index error. Handle and set the measure false.
         try:
-            reference_clip = reference_roi.clip(affine=baseline_affine, buffer=10)
-            moving_clip = moving_roi.clip(buffer=5)
+            reference_clip = reference_roi.clip(affine=baseline_affine, 
+                                                buffer=10,
+                                                size_x=match_kwargs['image_size'][0],
+                                                size_y=match_kwargs['image_size'][1])
+            moving_clip = moving_roi.clip(buffer=5,
+                                          size_x=match_kwargs['image_size'][0],
+                                          size_y=match_kwargs['image_size'][1])
         except Exception as e:
             log.error(e)
             m = {'id': measure.id,
