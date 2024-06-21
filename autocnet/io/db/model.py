@@ -436,7 +436,7 @@ class Points(Base, BaseMixin):
                                 spatial_index=False))
     measures = relationship('Measures', 
                             order_by="asc(Measures.id)", 
-                            backref=backref('point', lazy='joined'),
+                            back_populates="point",
                             passive_deletes=True)
     reference_index = Column("referenceIndex", Integer, default=0)
     _residuals = Column("residuals", ARRAY(Float))
@@ -690,7 +690,7 @@ class Measures(BaseMixin, Base):
     linesigma = Column(Float)
     weight = Column(Float, default=None)
     rms = Column(Float)
-
+    point = relationship("Points", back_populates="measures")
     
     _default_fields = ['id', 'pointid', 'imageid', 'serial', 'measuretype', 'ignore',
                        'line', 'sample', 'template_metric', 'template_shift', 'phase_error',

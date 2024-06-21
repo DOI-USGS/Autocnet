@@ -2,7 +2,7 @@ from contextlib import nullcontext
 import logging
 
 from sqlalchemy.sql.expression import bindparam
-
+from sqlalchemy.orm import joinedload
 from autocnet.io.db.connection import retry
 from autocnet.io.db.model import Images, Overlay, Points, Measures
 from autocnet.graph.node import NetworkNode
@@ -11,7 +11,7 @@ from autocnet.graph.node import NetworkNode
 log = logging.getLogger(__name__)
 
 
-@retry()
+#@retry()
 def update_measures(ncg, session, measures_iterable_to_update):
     if not measures_iterable_to_update:
         return
@@ -28,7 +28,7 @@ def update_measures(ncg, session, measures_iterable_to_update):
         session.execute(stmt, measures_iterable_to_update)
     return
 
-@retry()
+#@retry()
 def ignore_measures(ncg, session, measures_iterable_to_ignore, chooser):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
         measures_to_set_false = [{'_id':i} for i in measures_iterable_to_ignore]
@@ -83,9 +83,10 @@ def get_overlap(ncg, session, overlapid):
 @retry(wait_time=30)
 def get_point(ncg, session, pointid):
     with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-        point = session.query(Points).filter(Points.id == pointid).one()
-        # Get the measures as well.
-        _ = point.measures
+        point = session.query(Points). \
+                filter(Points.id == pointid). \
+                options(joinedload('*')). \
+                one()
         session.expunge_all()
     return point
 

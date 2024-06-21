@@ -1,5 +1,10 @@
 import json
+import logging
 import sys
+
+# Set the logging level
+logging.basicConfig(level='INFO')
+logger = logging.getLogger()
 
 from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
@@ -7,6 +12,8 @@ from autocnet.utils.utils import import_func
 from autocnet.utils.serializers import object_hook
 from autocnet.io.db.model import Measures, Points, Overlay, Images
 from autocnet.io.db.connection import retry, new_connection
+
+from sqlalchemy.orm import joinedload
 
 apply_iterable_options = {
                 'measures' : Measures,
@@ -62,11 +69,13 @@ def _instantiate_row(msg, session):
     """
     # Get the dict mapping iterable keyword types to the objects
     obj = apply_iterable_options[msg['along']]
-    res = session.query(obj).filter(getattr(obj, 'id')==msg['id']).one()
-    session.expunge_all() # Disconnect the object from the session
+    res = session.query(obj). \
+            filter(getattr(obj, 'id')==msg['id']). \
+            options(joinedload('*')). \
+            one()
+    session.expunge_all()
     return res
 
-@retry()
 def execute_func(func, *args, **kwargs):
     return func(*args, **kwargs)
 
@@ -133,7 +142,7 @@ def process(msg):
 def main():
     msg = ''.join(sys.argv[1:])
     result = process(msg)
-    print(result)
+    logging.info('Result: ', result)
     
 if __name__ == '__main__':
     main()
