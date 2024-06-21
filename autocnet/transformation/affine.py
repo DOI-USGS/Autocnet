@@ -111,6 +111,7 @@ def estimate_affine_from_sensors(reference_image,
     residuals = affine.residuals(np.array(base_gcps), np.array(dst_gcps))
     mask = residuals <= 1
     if len(np.array(base_gcps)[mask]) < 3:
+        logging.info(f'Affine residuals: {residuals}.')
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(np.array(dst_gcps)[mask])} points, but need at least 3.')
 
     affine.estimate(np.array(base_gcps)[mask], np.array(dst_gcps)[mask])
