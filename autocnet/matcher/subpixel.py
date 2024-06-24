@@ -805,6 +805,7 @@ def subpixel_register_point_smart(point,
                                   chooser='subpixel_register_point_smart',
                                   verbose=False,
                                   func=pattern_match,
+                                  maximum_affine_reprojective_error=1.0,
                                   ncg=None):
 
     """
@@ -882,7 +883,8 @@ def subpixel_register_point_smart(point,
                              size_y=match_kwargs['image_size'][1])
         try:
             baseline_affine = estimate_local_affine(moving_roi,
-                                                    reference_roi)
+                                                    reference_roi,
+                                                    maximum_affine_reprojective_error)
         except Exception as e:
             log.exception(e)
             m = {'id': measure.id,
@@ -1121,6 +1123,7 @@ def validate_candidate_measure(point,
                                node_cache,
                                parameters=[],
                                func=pattern_match,
+                               maximum_affine_reprojective_error=1.0,
                                **kwargs):
     """
     Compute the matching distances, matching the reference measure to the measure
@@ -1183,7 +1186,9 @@ def validate_candidate_measure(point,
                             buffer=20)
     
     try:
-        baseline_affine = estimate_local_affine(moving_roi, reference_roi)
+        baseline_affine = estimate_local_affine(moving_roi, 
+                                                reference_roi,
+                                                maximum_affine_reprojective_error)
     except:
        log.error('Unable to transform image to reference space. Likely too close to the edge of the non-reference image. Setting ignore=True')
        return [np.inf] * len(parameters)
@@ -1220,6 +1225,7 @@ def smart_register_point(point,
                          parameters=[], 
                          shared_kwargs={}, 
                          valid_reprojection_distance=1.5, 
+                         maximum_affine_reprojective_error=1.0,
                          ncg=None):
     """
     The entry func for the smart subpixel registration code. This is the user
@@ -1256,6 +1262,12 @@ def smart_register_point(point,
                                   measures matched from the moving image to the reference image with a 
                                   distance less than this value in pixels are considered valid. Default: 1.1 
 
+    maximum_affine_reprojective_error: float
+                                       reprojective errors less than or equal to this value (default 1.0) are
+                                       masked and removed from affine transform estimations. If less than 3 points
+                                       are found, affine estimation will fail. This value can be used to loosen
+                                       the reprojective constraint estimating the affine transform between 
+                                       images.
     Returns
     -------
     measures_to_update : list
@@ -1269,12 +1281,22 @@ def smart_register_point(point,
     if not isinstance(point, Points):
         point = get_point(ncg, session, point)
         
-    measure_results, node_cache = subpixel_register_point_smart(point, session, ncg=ncg, parameters=parameters, **shared_kwargs)
+    measure_results, node_cache = subpixel_register_point_smart(point, 
+                                                                session, 
+                                                                ncg=ncg, 
+                                                                parameters=parameters, 
+                                                                maximum_affine_reprojective_error=maximum_affine_reprojective_error
+                                                                **shared_kwargs)
     measures_to_update, measures_to_set_false = decider(measure_results)
     log.info(f'Found {len(measures_to_update)} measures that found subpixel registration consensus.')
     # Validate that the new position has consensus
     for measure in measures_to_update:
-        reprojection_distances = validate_candidate_measure(point, measure, node_cache, parameters=parameters, **shared_kwargs)
+        reprojection_distances = validate_candidate_measure(point, 
+                                                            measure, 
+                                                            node_cache, 
+                                                            parameters=parameters, 
+                                                            maximum_affine_reprojective_error=maximum_affine_reprojective_error,
+                                                            **shared_kwargs)
         log.info(f'Validation Distance Boolean: {np.array(reprojection_distances) < valid_reprojection_distance}')
         if np.sum(np.array(reprojection_distances) < valid_reprojection_distance) < 2:
             log.info(f"Measure {measure['id']} failed validation. Setting ignore=True for this measure.")

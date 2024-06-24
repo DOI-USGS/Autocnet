@@ -35,7 +35,8 @@ def estimate_affine_from_sensors(reference_image,
                                  bcenter_x,
                                  bcenter_y,
                                  size_x=40,
-                                 size_y=40):
+                                 size_y=40,
+                                 maximum_affine_reprojective_error=1.0):
     """
     Using the a priori sensor model, project corner and center points from the reference_image into
     the moving_image and use these points to estimate an affine transformation.
@@ -54,7 +55,13 @@ def estimate_affine_from_sensors(reference_image,
                 half-height of the subimage used in the affine transformation
     size_y:     int
                 half-width of the subimage used in affine transformation
-
+    maximum_affine_reprojective_error: float
+                reprojective errors less than or equal to this value (default 1.0) are
+                masked and removed from affine transform estimations. If less than 3 points
+                are found, affine estimation will fail. This value can be used to loosen
+                the reprojective constraint estimating the affine transform between 
+                images.
+                
     Returns
     -------
     affine : object
@@ -71,21 +78,10 @@ def estimate_affine_from_sensors(reference_image,
     base_starty = int(bcenter_y - size_y)
     base_stopx = int(bcenter_x + size_x)
     base_stopy = int(bcenter_y + size_y)
-
-    match_size = reference_image.raster_size
-
-    # for now, require the entire window resides inside both cubes.
-    # if base_stopx > match_size[0]:
-    #     raise Exception(f"Window: {base_stopx} > {match_size[0]}, center: {bcenter_x},{bcenter_y}")
-    # if base_startx < 0:
-    #     raise Exception(f"Window: {base_startx} < 0, center: {bcenter_x},{bcenter_y}")
-    # if base_stopy > match_size[1]:
-    #     raise Exception(f"Window: {base_stopy} > {match_size[1]}, center: {bcenter_x},{bcenter_y} ")
-    # if base_starty < 0:
-    #     raise Exception(f"Window: {base_starty} < 0, center: {bcenter_x},{bcenter_y}")
     
     x_coords = [base_startx, base_startx, base_stopx, base_stopx, bcenter_x]
     y_coords = [base_starty, base_stopy, base_stopy, base_starty, bcenter_y]
+    
     # Dispatch to the sensor to get the a priori pixel location in the input image
     lons, lats = reference_image.sensormodel.sampline2lonlat(x_coords, y_coords, allowoutside=True)
     xs, ys = moving_image.sensormodel.lonlat2sampline(lons, lats, allowoutside=True)
@@ -103,13 +99,14 @@ def estimate_affine_from_sensors(reference_image,
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(dst_gcps)} points, but need at least 3.')
 
     log.debug(f'Number of GCPs for affine estimation: {len(dst_gcps)}')
+    
     affine = tf.AffineTransform()
     # Estimate the affine twice. The first time to get an initial estimate
     # and the second time to drop points with an estimated reprojection 
-    # error greater than or equal to 0.1px.
+    # error greater than the passed maximum_affine_reprojective_error.
     affine.estimate(np.array(base_gcps), np.array(dst_gcps))
     residuals = affine.residuals(np.array(base_gcps), np.array(dst_gcps))
-    mask = residuals <= 1
+    mask = residuals <= maximum_affine_reprojective_error
     if len(np.array(base_gcps)[mask]) < 3:
         logging.info(f'Affine residuals: {residuals}.')
         raise ValueError(f'Unable to find enough points to compute an affine transformation. Found {len(np.array(dst_gcps)[mask])} points, but need at least 3.')
@@ -122,7 +119,7 @@ def estimate_affine_from_sensors(reference_image,
     return affine
 
 
-def estimate_local_affine(reference_roi, moving_roi, size_x=60, size_y=60):
+def estimate_local_affine(reference_roi, moving_roi, size_x=60, size_y=60, maximum_affine_reprojective_error=1.0):
     """
     Applies the affine transfromation calculated in estimate_affine_from_sensors to the moving region of interest (ROI).
     
@@ -135,7 +132,16 @@ def estimate_local_affine(reference_roi, moving_roi, size_x=60, size_y=60):
     moving_image : autocnet.io.geodataset.AGeoDataset
                    Image that is expected to move around during the matching process, 
                    points are projected onto this image to compute an affine  
-
+    size_x:     int
+                half-height of the subimage used in the affine transformation
+    size_y:     int
+                half-width of the subimage used in affine transformation
+    maximum_affine_reprojective_error: float
+                reprojective errors less than or equal to this value (default 1.0) are
+                masked and removed from affine transform estimations. If less than 3 points
+                are found, affine estimation will fail. This value can be used to loosen
+                the reprojective constraint estimating the affine transform between 
+                images.
     Returns
     -------
     affine
@@ -146,7 +152,8 @@ def estimate_local_affine(reference_roi, moving_roi, size_x=60, size_y=60):
                                                     reference_roi.x, 
                                                     reference_roi.y, 
                                                     size_x=size_x, 
-                                                    size_y=size_y)
+                                                    size_y=size_y,
+                                                    maximum_affine_reprojective_error=1.0)
 
 
     # Remove the translation from the transformation. Users of this function should add
