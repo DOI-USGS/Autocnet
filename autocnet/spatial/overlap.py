@@ -1,7 +1,6 @@
 from contextlib import nullcontext
 import time
 import logging
-import warnings
 
 import shapely
 import json
@@ -10,9 +9,12 @@ from subprocess import CalledProcessError
 from autocnet.cg import cg as compgeom
 from autocnet.graph.node import NetworkNode
 from autocnet.io.db.model import Images, Measures, Overlay, Points, JsonEncoder
+from autocnet.io.db.utils import get_nodes_for_overlap, get_overlap, bulk_commit
 from autocnet.transformation import roi
 from autocnet.matcher.cpu_extractor import extract_most_interesting
 from autocnet.matcher.validation import is_valid_lroc_image
+
+
 
 # set up the logger file
 log = logging.getLogger(__name__)
@@ -118,8 +120,12 @@ def find_interesting_point(nodes, lon, lat, size=71, **kwargs):
 
         # Extract ORB features in a sub-image around the desired point
         image_roi = roi.Roi(node.geodata, sample, line)
-        roi_array = image_roi.clip(size_x=size, size_y=size) # Units are pixels for the array
-
+        try:
+            roi_array = image_roi.clip(size_x=size, size_y=size) # Units are pixels for the array
+        except Exception as e:
+            logging.debug(f'Failed to clip ROI with exception: {e}.')
+            log.warn(f'Unable to clip ROI for {node}.')
+            continue
         # Check if the image is valid and could be used as the reference
         if not is_valid_lroc_image(roi_array):
             log.info('Failed to find interesting features in image due to poor quality image.')
@@ -213,34 +219,19 @@ def place_points_in_overlap(overlap,
     """
     t1 = time.time()
     if not isinstance(overlap, Overlay):
-        with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-            overlap = session.query(Overlay).filter(Overlay.id == overlap).one()
-            session.expunge_all()
-    
+        overlap = get_overlap(ncg, session, overlap)
+
     # Determine the point distribution in the overlap geom
     geom = overlap.geom
     candidate_points = compgeom.distribute_points_in_geom(geom, ratio_size=ratio_size, **distribute_points_kwargs, **kwargs)
     logging.debug(f'Found {len(candidate_points)} in overlap {overlap.id}.')
     if not candidate_points.any():
-        warnings.warn(f'Failed to distribute points in overlap {overlap.id}')
+        log.warn(f'Failed to distribute points in overlap {overlap.id}')
         return []
     log.info(f'Have {len(candidate_points)} potential points to place in overlap {overlap.id}.')
     
-    # If an NCG is passed, instantiate a session off the NCG, else just pass the session through
-    nodes = []
-    with ncg.session_scope() if ncg is not None else nullcontext(session) as session:
-        for id in overlap.intersections:
-            try:
-                res = session.query(Images).filter(Images.id == id).one()
-            except:
-                warnings.warn(f'Unable to instantiate image with id: {id}')
-                continue
-            nn = NetworkNode(node_id=id, 
-                             image_path=res.path, 
-                             cam_type=res.cam_type,
-                             dem=res.dem,
-                             dem_type=res.dem_type)
-            nodes.append(nn)
+    nodes = get_nodes_for_overlap(ncg, session, overlap)
+    logging.debug(f'Nodes: {nodes}')
     points_to_commit = []
     for valid in candidate_points:
         log.debug(f'Valid point: {valid}')
@@ -279,11 +270,10 @@ def place_points_in_overlap(overlap,
         else:
             if len(point.measures) >= 2:
                 points_to_commit.append(point)
+    
     log.debug(f'Committing: {points_to_commit}')
     if points_to_commit:
-        with ncg.session_scope() if ncg else nullcontext(session) as session:
-            session.add_all(points_to_commit)
-            session.commit()
+        bulk_commit(ncg, session, points_to_commit)
     t2 = time.time()
     log.info(f'Placed {len(candidate_points)} in {t2-t1} seconds.')
 
@@ -357,8 +347,13 @@ def place_points_in_image(image,
             continue
 
         # Extract ORB features in a sub-image around the desired point
-        image_roi = roi.Roi(node.geodata, sample, line)
-        roi_array = image_roi.clip(size_x=size, size_y=size)
+        try:
+            image_roi = roi.Roi(node.geodata, sample, line)
+            roi_array = image_roi.clip(size_x=size, size_y=size)
+        except Exception as e:
+            log.debug(f'Failed to clip ROI with exception: {e}.')
+            log.warn(f'Unable to clip ROI for {node}.')
+            continue
         interesting = extract_most_interesting(roi_array)
 
         # kps are in the image space with upper left origin and the roi

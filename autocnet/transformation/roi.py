@@ -1,11 +1,13 @@
+import logging
 from math import floor
-import numpy as np
-import scipy.ndimage as ndimage
 
+import numpy as np
 from skimage import transform as tf
-from skimage.util import img_as_float32
 
 from autocnet.io.geodataset import AGeoDataset
+
+log = logging.getLogger(__name__)
+
 
 class Roi():
     """
@@ -212,7 +214,7 @@ class Roi():
         min_y = self._whole_y - self.size_y - buffer
         x_read_length = (self.size_x * 2) + (buffer * 2)
         y_read_length = (self.size_y * 2) + (buffer * 2)
-
+        log.debug('XY ROI read start and read length: ', min_x, min_y, x_read_length, y_read_length)
         # series of checks to make sure all pixels inside image limits
         raster_xsize, raster_ysize = self.data.raster_size
         if min_x < 0 or min_y < 0 or min_x+x_read_length > raster_xsize or min_y+y_read_length > raster_ysize:

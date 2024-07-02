@@ -213,9 +213,11 @@ def main():  # pragma: no cover
     args = vars(parse_args())
     # set up the logger
     logging.basicConfig(level=os.environ.get("AUTOCNET_LOGLEVEL", "INFO"))
-    # Get the message
+    # Get the message; 30s timeout should be long enough to handle minor
+    # network issues or congestion without holding onto cluster resources
+    # for an undue amount of time.
     queue = StrictRedis(host=args['host'], port=args['port'], db=0,
-                        socket_timeout=30, socket_connect_timeout=300)
+                        socket_timeout=30, socket_connect_timeout=30)
     manage_messages(args, queue)
 
 if __name__ == '__main__':

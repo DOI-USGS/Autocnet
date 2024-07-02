@@ -38,6 +38,10 @@ release.
 ### Added
 - Debug logging to `place_points_in_overlap` and `distribute_points_in_geom` to make debugging issues easier.
 
+### Changed
+- cluster submission object loading to use [`joinedload('*')`](https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html#wildcard-loading-strategies) in order to properly load and expunge measures on point objects. This change is at the query level (and not the mapper level).
+- Acceptable affine residual bumped to 1px, better support for KaguyaTC data.
+
 ### Fixed
 - Error in `find_interesting_feature` that was mis-using the ROI API. This bug was introduced in 1.2.0 when the ROI API updated.
 

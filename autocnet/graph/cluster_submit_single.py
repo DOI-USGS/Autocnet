@@ -1,16 +1,19 @@
 import json
-import socket
+import logging
 import sys
-from time import sleep
 
-from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
+# Set the logging level
+logging.basicConfig(level='INFO')
+logger = logging.getLogger()
 
 from autocnet.graph.node import NetworkNode
 from autocnet.graph.edge import NetworkEdge
 from autocnet.utils.utils import import_func
 from autocnet.utils.serializers import object_hook
 from autocnet.io.db.model import Measures, Points, Overlay, Images
+from autocnet.io.db.connection import retry, new_connection
+
+from sqlalchemy.orm import joinedload
 
 apply_iterable_options = {
                 'measures' : Measures,
@@ -31,21 +34,14 @@ apply_iterable_options = {
                 5: Images
             }
 
-def retry(max_retries=3, wait_time=300):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            retries = 0
-            if retries < max_retries:
-                try:
-                    result = func(*args, **kwargs)
-                    return result
-                except:
-                    retries += 1
-                    sleep(wait_time)
-            else:
-                raise Exception(f"Maximum retires of {func} exceeded")
-        return wrapper
-    return decorator
+def set_srids(spatial):
+    latitudinal_srid = spatial['latitudinal_srid']
+    rectangular_srid = spatial['rectangular_srid']
+    for cls in [Points, Overlay, Images]:
+        setattr(cls, 'latitudinal_srid', latitudinal_srid)
+        setattr(cls, 'rectangular_srid', rectangular_srid)
+    Points.semimajor_rad = spatial['semimajor_rad']
+    Points.semiminor_rad = spatial['semiminor_rad']
 
 @retry(max_retries=5)
 def _instantiate_obj(msg):
@@ -73,27 +69,13 @@ def _instantiate_row(msg, session):
     """
     # Get the dict mapping iterable keyword types to the objects
     obj = apply_iterable_options[msg['along']]
-    res = session.query(obj).filter(getattr(obj, 'id')==msg['id']).one()
-    session.expunge_all() # Disconnect the object from the session
+    res = session.query(obj). \
+            filter(getattr(obj, 'id')==msg['id']). \
+            options(joinedload('*')). \
+            one()
+    session.expunge_all()
     return res
 
-@retry()
-def get_db_connection(dbconfig):
-    db_uri = 'postgresql://{}:{}@{}:{}/{}'.format(dbconfig['username'],
-                                                  dbconfig['password'],
-                                                  dbconfig['host'],
-                                                  dbconfig['pgbouncer_port'],
-                                                  dbconfig['name'])
-    hostname = socket.gethostname()
-
-    engine = create_engine(db_uri,
-        poolclass=NullPool,
-        connect_args={"application_name":f"AutoCNet_{hostname}"},
-        isolation_level="AUTOCOMMIT",
-        pool_pre_ping=True)
-    return engine
-
-@retry()
 def execute_func(func, *args, **kwargs):
     return func(*args, **kwargs)
 
@@ -112,8 +94,13 @@ def process(msg):
     # Deserialize the message
     msg = json.loads(msg, object_hook=object_hook)
 
-    engine = get_db_connection(msg['config']['database'])
+    # Get the database connection
+    engine = new_connection(msg['config']['database'])
     
+    # Set the SRIDs on the table objects based on the passed config
+    set_srids(msg['config']['spatial'])
+
+    # Instantiate the objects to be used
     if msg['along'] in ['node', 'edge']:
         obj = _instantiate_obj(msg)
     elif msg['along'] in ['points', 'measures', 'overlaps', 'images']:
@@ -145,19 +132,17 @@ def process(msg):
     # Now run the function.
     res = execute_func(func,*msg['args'], **msg['kwargs'])
 
-    del Session
-    del engine
-
     # Update the message with the True/False
     msg['results'] = res
-    # Update the message with the correct callback function
-
+    
+    engine.dispose()
+    del engine
     return msg
 
 def main():
     msg = ''.join(sys.argv[1:])
     result = process(msg)
-    print(result)
+    logging.info('Result: ', result)
     
 if __name__ == '__main__':
     main()

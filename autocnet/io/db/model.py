@@ -23,6 +23,7 @@ from shapely.geometry import Point
 
 from autocnet.transformation.spatial import reproject, og2oc
 from autocnet.utils.serializers import JsonEncoder
+from autocnet.io.db.connection import retry
 
 log = logging.getLogger(__name__)
 
@@ -370,13 +371,6 @@ class Overlay(BaseMixin, Base):
     intersections = Column(ARRAY(Integer))
     #geom = Column(Geometry(geometry_type='POLYGON', management=True))  # sqlite
     _geom = Column("geom", Geometry('POLYGON', srid=latitudinal_srid, dimension=2, spatial_index=True))  # postgresql
-    points = relationship('Points',
-                          primaryjoin='func.ST_Contains(foreign(Overlay.geom), Points.geom).as_comparison(1,2)',
-                          backref=backref('overlay', uselist=False),
-                          sync_backref=False,
-                          viewonly=True,
-                          uselist=True)
-
 
     @hybrid_property
     def geom(self):
@@ -388,6 +382,7 @@ class Overlay(BaseMixin, Base):
     def geom(self, geom):
         self._geom = from_shape(geom, srid=self.latitudinal_srid)
 
+    @retry(max_retries=5)
     @classmethod
     def overlapping_larger_than(cls, size_threshold, session):
         """
@@ -434,7 +429,7 @@ class Points(Base, BaseMixin):
                                 spatial_index=False))
     measures = relationship('Measures', 
                             order_by="asc(Measures.id)", 
-                            backref=backref('point', lazy='joined'),
+                            back_populates="point",
                             passive_deletes=True)
     reference_index = Column("referenceIndex", Integer, default=0)
     _residuals = Column("residuals", ARRAY(Float))
@@ -688,7 +683,7 @@ class Measures(BaseMixin, Base):
     linesigma = Column(Float)
     weight = Column(Float, default=None)
     rms = Column(Float)
-
+    point = relationship("Points", back_populates="measures")
     
     _default_fields = ['id', 'pointid', 'imageid', 'serial', 'measuretype', 'ignore',
                        'line', 'sample', 'template_metric', 'template_shift', 'phase_error',

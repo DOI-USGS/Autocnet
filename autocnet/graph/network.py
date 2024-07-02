@@ -1620,23 +1620,8 @@ class NetworkCandidateGraph(CandidateGraph):
         self._Session = Session
 
     def _setup_database(self):
-        # A non-linear timeout if the DB is spinning up or loaded with many connections.
-        sleeptime = 2
-        retries = 0
-        self.Session, self.engine = new_connection(self.config['database'])
+        self.Session, self.engine = new_connection(self.config['database'], with_session=True)
         try_db_creation(self.engine, self.config)
-        return
-        while retries < 5:
-            log.debug(f'Database connection attempt {retries}')
-            try:
-                self.Session, self.engine = new_connection(self.config['database'])
-
-                # Attempt to create the database (if it does not exist)
-                try_db_creation(self.engine, self.config)
-                break
-            except:
-                retries += 1
-                sleep(retries ** sleeptime)
 
     # def _setup_nodes(self):
     #     with self.session_scope() as session:
@@ -2433,7 +2418,7 @@ class NetworkCandidateGraph(CandidateGraph):
         >>> ncg.add_from_remote_database(source_db_config, outpath, query_string=query)
         """
 
-        sourceSession, _ = new_connection(source_db_config)
+        sourceSession, _ = new_connection(source_db_config, with_session=True)
         sourcesession = sourceSession()
 
         sourceimages = sourcesession.execute(query_string).fetchall()
