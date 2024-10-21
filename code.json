@@ -2,7 +2,7 @@
     {
       "name": "autocnet",
       "organization": "U.S. Geological Survey",
-      "description": "REPOSITORY_DESCRIPTION",
+      "description": "Automatic control network generation",
       "version": "main",
       "status": "Development",
   
@@ -34,18 +34,55 @@
         "Python"
       ],
   
-      "contact": [
-        {
+      "contact": {
             "name": "Kelvin Rodriguez",
             "email": "krodriguez@usgs.gov"
-        },
-        {
-            "name": "Dr. Jason Laura",
-            "email": "jlaura@usgs.gov"
-        }
-      ],
+      },
       "date": {
         "metadataLastUpdated": "2024-10-21"
       }
-    }
+    },
+    {
+        "name": "autocnet",
+        "organization": "U.S. Geological Survey",
+        "description": "Automatic control network generation",
+        "version": "1.2.1",
+        "status": "Production",
+    
+        "permissions": {
+          "usageType": "openSource",
+          "licenses": [
+            {
+              "name": "Public Domain, CC0-1.0",
+              "URL": "https://code.usgs.gov/astrogeology/autocnet/-/raw/1.2.1/LICENSE.md"
+            }
+          ]
+        },
+    
+        "homepageURL": "https://code.usgs.gov/astrogeology/autocnet",
+        "downloadURL": "https://code.usgs.gov/astrogeology/autocnet/-/archive/1.2.1/autocnet-1.2.1.zip",
+        "disclaimerURL": "https://code.usgs.gov/astrogeology/autocnet/-/raw/1.2.1/DISCLAIMER.md",
+        "repositoryURL": "https://code.usgs.gov/astrogeology/autocnet.git",
+        "vcs": "git",
+    
+        "laborHours": 0,
+    
+        "tags": [
+          "Planetary",
+          "Remote Sensing",
+          "Data Processing"
+        ],
+    
+        "languages": [
+          "Python"
+        ],
+    
+        "contact": {
+              "name": "Kelvin Rodriguez",
+              "email": "krodriguez@usgs.gov"
+        },
+        "date": {
+          "metadataLastUpdated": "2024-10-21"
+        }
+      }
   ]
