@@ -34,6 +34,10 @@ release.
 -->
 ## [Unreleased]
 
+## [1.2.2]
+### [Changed]
+- Made image_registration dependency optional for conda-forge package which cannot use pip installs.
+
 ## [1.2.1]
 ### Added
 - Debug logging to `place_points_in_overlap` and `distribute_points_in_geom` to make debugging issues easier.
