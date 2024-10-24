@@ -7,7 +7,11 @@ import numpy as np
 from scipy.ndimage import center_of_mass
 from skimage.transform import rescale
 from skimage.util import img_as_float32
-from image_registration import chi2_shift
+try:
+    from image_registration import chi2_shift
+except:
+    chi2_shift = None
+
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +42,9 @@ def pattern_match_chi2(image, template, usfac=16):
 
     # Swapped so that we get the adjustment to the image to match the template
     # like the other matchers.
+    if chi2_shift is None:
+        raise ValueError("chi2_shift function is not defined. You need to install the 'image_registration' package with 'pip install image_registration'.")
+
     dx, dy, err_x, err_y = chi2_shift(image, template, return_error=True, upsample_factor=usfac, boundary='constant')
     shape_y, shape_x = np.array(template.shape)//2
     err =  (err_x + err_y) / 2.
