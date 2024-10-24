@@ -54,14 +54,14 @@
         "licenses": [
           {
             "name": "Public Domain, CC0-1.0",
-            "URL": "https://code.usgs.gov/astrogeology/autocnet/-/raw/v1.2.2/LICENSE.md"
+            "URL": "https://code.usgs.gov/astrogeology/autocnet/-/raw/1.2.2/LICENSE.md"
           }
         ]
       },
   
       "homepageURL": "https://code.usgs.gov/astrogeology/autocnet",
-      "downloadURL": "https://code.usgs.gov/astrogeology/autocnet/-/archive/v1.2.2/autocnet-v1.2.2.zip",
-      "disclaimerURL": "https://code.usgs.gov/astrogeology/autocnet/-/raw/v1.2.2/DISCLAIMER.md",
+      "downloadURL": "https://code.usgs.gov/astrogeology/autocnet/-/archive/1.2.2/autocnet-1.2.2.zip",
+      "disclaimerURL": "https://code.usgs.gov/astrogeology/autocnet/-/raw/1.2.2/DISCLAIMER.md",
       "repositoryURL": "https://code.usgs.gov/astrogeology/autocnet.git",
       "vcs": "git",
   

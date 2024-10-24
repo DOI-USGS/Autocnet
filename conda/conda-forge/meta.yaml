@@ -6,7 +6,7 @@ package:
   version: {{ version }}
 
 source:
-  url: https://code.usgs.gov/astrogeology/autocnet/-/archive/v1.2.2/autocnet-v1.2.2.tar.gz
+  url: https://code.usgs.gov/astrogeology/autocnet/-/archive/1.2.2/autocnet-1.2.2.tar.gz
   sha256: 29f30e980aae216225d8ef181b2d228c2325ca0afb6ba60f2dfe0384759e828d
 
 build:
@@ -38,13 +38,12 @@ requirements:
       - setuptools
       - libgl  # [linux]
     run:
-      - python
       - csmapi
       - cython
       - cyvlfeat
       - matplotlib-base
       - dill
-      - conda-forge::gdal
+      - conda-forge::gdal >=3.5,<4.0
       - geoalchemy2
       - geopandas
       - hoggorm
@@ -52,8 +51,9 @@ requirements:
       - ipykernel
       - kalasiris
       - conda-forge::knoten
+      - libgl  # [linux]
       - networkx >=2,<3
-      - numpy
+      - numpy >=1.21,<2.0
       - opencv
       - conda-forge::plio >=1.3
       - pandas
@@ -63,9 +63,10 @@ requirements:
       - psycopg2
       - pvl >=1.0,<2
       - proj
-      - conda-forge::pyproj 
+      - conda-forge::pyproj
+      - python
       - richdem
-      - scikit-image >=0.17
+      - scikit-image >=0.17,<0.25
       - scikit-learn
       - scipy
       - shapely
@@ -74,7 +75,7 @@ requirements:
       - redis-py <5
       - conda-forge::usgscsm >=2.0.0
       - vlfeat
-      - protobuf =3.20
+      - protobuf <=3.20
 
 test:
   imports:
